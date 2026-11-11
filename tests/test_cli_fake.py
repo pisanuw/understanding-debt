@@ -28,7 +28,7 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
     assert rc == 0
     m = Store(root).load_map()
     ids = [u["id"] for u in m["units"]]
-    assert ids == ["storage", "scoring"]
+    assert ids == ["scoring", "storage"]  # most central first
     storage = next(u for u in m["units"] if u["id"] == "storage")
     assert storage["churn"] == 4 and storage["importance"] == 0.88  # 0.6*0.8 + 0.4*1.0
 
