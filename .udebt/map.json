@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "generated_at": "2026-11-11T20:49:34+00:00",
+  "head": "5fafc04741592cf9d66bf8a72aeb718d963f9d4e",
+  "units": [
+    {
+      "id": "scoring-model",
+      "name": "Debt scoring model",
+      "kind": "module",
+      "summary": "Pure, I/O-free functions turn quiz evidence, centrality, churn and commit decay into per-unit understanding, debt and a 0-100 debt index, plus team bus-factor view.",
+      "decision": "Importance = 0.6*centrality/5 + 0.4*churn; evidence is 1/0.5/0/-0.5 (confident wrong); verified = clamped mean of last K records; understanding decays 0.9 per later commit touching the unit; debt = importance*(1-understanding); team understanding = max over developers.",
+      "alternatives": "Provenance-based scoring; time-based decay; static-analysis importance; team understanding as mean rather than max; ML-calibrated scores.",
+      "why": "BRIEFING: provenance misstates architectural understanding; confident misconceptions should cost more than gaps; commit decay makes debt grow while AI builds. Pure functions keep it testable.",
+      "paths": [
+        "udebt/scoring.py",
+        "tests/test_scoring.py",
+        "README.md"
+      ],
+      "centrality": 5,
+      "churn": 2,
+      "scope": "architectural",
+      "importance": 1.0
+    },
+    {
+      "id": "llm-backend",
+      "name": "LLM backend via claude CLI",
+      "kind": "boundary",
+      "summary": "An LLM protocol (structured/text) implemented by ClaudeCLI, which shells out to `claude -p` with read-only tools and JSON schema, and by a deterministic FakeLLM selected with UDEBT_LLM=fake.",
+      "decision": "Call the local `claude` CLI as a subprocess (subscription-billed, tools limited to Read/Glob/Grep, structured output via --json-schema), with a prompt-marker-keyed FakeLLM for offline tests.",
+      "alternatives": "Anthropic API SDK with an API key; other providers; local models; mocking per-test with unittest.mock.",
+      "why": "No API key or runtime dependency needed (stdlib only), the model can explore the repo itself with read tools, and fake mode enables end-to-end CLI tests.",
+      "paths": [
+        "udebt/llm.py",
+        "udebt/prompts.py",
+        "tests/conftest.py",
+        "tests/test_cli_fake.py"
+      ],
+      "centrality": 5,
+      "churn": 1,
+      "scope": "architectural",
+      "importance": 0.8
+    },
+    {
+      "id": "prompts-and-schemas",
+      "name": "Prompts and JSON schemas with TASK markers",
+      "kind": "boundary",
+      "summary": "Prompt builders and JSON schemas for map, questions, grade and dig; each prompt begins with a TASK: marker that FakeLLM dispatches on.",
+      "decision": "Contract with the LLM is a JSON schema plus a prompt starting with a `TASK:` marker; FakeLLM parses the prompt text (e.g. '- unit_id:' lines, 'ANSWER:' lines) to produce canned answers.",
+      "alternatives": "Separate method per task on the LLM interface; templating files; free-form text parsing.",
+      "why": "Keeps one generic structured() entry point while letting the fake emulate each task; unclear beyond testing convenience.",
+      "paths": [
+        "udebt/prompts.py",
+        "udebt/llm.py"
+      ],
+      "centrality": 4,
+      "churn": 1,
+      "scope": "architectural",
+      "importance": 0.68
+    },
+    {
+      "id": "json-storage",
+      "name": "JSON files under .udebt/, committed",
+      "kind": "decision",
+      "summary": "All state lives in .udebt/: shared map.json, per-developer append-only records/<email-slug>.jsonl, and optional config.json.",
+      "decision": "Plain JSON/JSONL files in the repo, one record file per developer (keyed by git email slug), append-only; config loaded fresh with defaults.",
+      "alternatives": "SQLite; a hosted service; storing in git notes; an untracked local cache.",
+      "why": "Zero dependencies, diff-friendly, and per-developer files avoid merge conflicts while enabling team view via git.",
+      "paths": [
+        "udebt/store.py"
+      ],
+      "centrality": 4,
+      "churn": 1,
+      "scope": "architectural",
+      "importance": 0.68
+    },
+    {
+      "id": "git-integration",
+      "name": "Git helpers and developer identity",
+      "kind": "module",
+      "summary": "Thin subprocess wrappers around git for repo root, HEAD, user identity, tracked files and commit counts touching paths since a given commit.",
+      "decision": "Shell out to git; identify developers by git config user.email slug; commit churn per unit's paths drives both importance and decay; if the recorded head is gone (rebase) fall back to counting all commits.",
+      "alternatives": "GitPython/libgit2; explicit user accounts; file-content hashing for change detection.",
+      "why": "Stdlib-only constraint and commit-count is a cheap proxy for change; identity from git needs no auth.",
+      "paths": [
+        "udebt/repo.py",
+        "tests/test_repo.py"
+      ],
+      "centrality": 4,
+      "churn": 1,
+      "scope": "architectural",
+      "importance": 0.68
+    },
+    {
+      "id": "architecture-map",
+      "name": "Architectural map generation",
+      "kind": "flow",
+      "summary": "`udebt map` sends tracked files to the LLM, receives units, then attaches unique ids, churn, importance and preserved scope before saving map.json.",
+      "decision": "The LLM proposes architectural units (decisions/modules/boundaries/flows), the code adds churn and importance, and previously set blackbox scopes survive regeneration by id.",
+      "alternatives": "File- or directory-level units; static analysis/import graph; hand-authored maps.",
+      "why": "BRIEFING: measure understanding of architecture, not files; package internals are out of scope; blackbox is a deliberate-ignorance declaration.",
+      "paths": [
+        "udebt/mapping.py",
+        "udebt/cli.py"
+      ],
+      "centrality": 4,
+      "churn": 1,
+      "scope": "architectural",
+      "importance": 0.68
+    },
+    {
+      "id": "quiz-flow",
+      "name": "Prediction quiz and grading flow",
+      "kind": "flow",
+      "summary": "Pick highest-debt units, LLM generates questions, developer answers with confidence, LLM grades against code, results are appended as records and status is shown.",
+      "decision": "Measure understanding by prediction questions graded by an LLM against the code; blank answers are 'unknown' with no penalty; confidence >=3 with wrong answer is a misconception.",
+      "alternatives": "Multiple-choice quizzes; provenance tracking; self-reported understanding; deterministic grading.",
+      "why": "BRIEFING: prediction tests the real mental model; known unknowns should not be penalized.",
+      "paths": [
+        "udebt/quiz.py",
+        "udebt/cli.py",
+        "tests/test_cli_fake.py"
+      ],
+      "centrality": 4,
+      "churn": 1,
+      "scope": "architectural",
+      "importance": 0.68
+    },
+    {
+      "id": "cli-contract",
+      "name": "udebt CLI surface",
+      "kind": "boundary",
+      "summary": "argparse commands (init, map, units, scope, quiz, status [--team], dig) with global --repo/--model/--as-user, orchestrating the other modules and formatting the debt tables.",
+      "decision": "Single stdlib argparse entry point where cmd_* functions wire store, git, LLM and scoring; errors become SystemExit messages; --as-user overrides identity.",
+      "alternatives": "Click/Typer; a library API or web UI; editor/hook integration (deferred).",
+      "why": "Stdlib-only runtime and a team-oriented CLI product per BRIEFING.",
+      "paths": [
+        "udebt/cli.py",
+        "README.md"
+      ],
+      "centrality": 3,
+      "churn": 2,
+      "scope": "architectural",
+      "importance": 0.76
+    },
+    {
+      "id": "dig-walkthrough",
+      "name": "Guided dig walkthrough",
+      "kind": "flow",
+      "summary": "`udebt dig` asks the LLM for a markdown walkthrough ending in 'CHECK QUESTION:', then optionally quizzes and records the answer.",
+      "decision": "Free-text LLM output parsed with a regex for a trailing CHECK QUESTION line, reusing the grade/record path.",
+      "alternatives": "Structured walkthrough output via schema; separate learning-record type.",
+      "why": "Teaching text is easier as free-form markdown; reuses the quiz evidence pipeline so learning counts toward scores.",
+      "paths": [
+        "udebt/dig.py",
+        "udebt/cli.py"
+      ],
+      "centrality": 2,
+      "churn": 1,
+      "scope": "architectural",
+      "importance": 0.44
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "model": null,
+  "decay_per_commit": 0.9,
+  "evidence_window": 5,
+  "known_threshold": 0.6
+}

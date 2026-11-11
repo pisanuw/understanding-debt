@@ -211,7 +211,13 @@ def cmd_dig(args) -> int:
     except LLMError as e:
         raise SystemExit(str(e)) from e
     print(body)
-    if not question or args.no_check:
+    if args.no_check:
+        return 0
+    if not question:
+        print(
+            "\n(No check question came back, so nothing was recorded. "
+            "Run `udebt quiz --unit " + unit["id"] + "` to verify your understanding.)"
+        )
         return 0
     print("\n--- Check yourself ---")
     answered = ask_interactively(

@@ -25,6 +25,8 @@ def build_map(root: Path, store: Store, llm: LLM, *, max_units: int = 12) -> dic
     units = result.get("units", [])
     if not units:
         raise SystemExit("The mapper returned no units.")
+    # The model treats max_units as advice; enforce it, keeping the most central units.
+    units = sorted(units, key=lambda u: -int(u.get("centrality", 3)))[:max_units]
 
     previous = {u["id"]: u for u in (store.load_map() or {}).get("units", [])}
     seen: set[str] = set()

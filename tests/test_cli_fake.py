@@ -87,3 +87,26 @@ def test_unknown_unit_errors(fixture_repo, capsys):
     run(fixture_repo, "map", capsys=capsys)
     with pytest.raises(SystemExit, match="Unknown unit"):
         run(fixture_repo, "scope", "nope", "blackbox", capsys=capsys)
+
+
+def test_map_enforces_max_units(fixture_repo, capsys):
+    run(fixture_repo, "init", capsys=capsys)
+    rc, out = run(fixture_repo, "map", "--max-units", "1", capsys=capsys)
+    assert rc == 0
+    units = Store(fixture_repo).load_map()["units"]
+    assert [u["id"] for u in units] == ["scoring"]  # centrality 5 beats 4
+
+
+def test_dig_without_check_line_warns(fixture_repo, monkeypatch, capsys):
+    from udebt import llm as llm_mod
+
+    class NoCheck(llm_mod.FakeLLM):
+        def text(self, prompt, **kw):
+            return "# Walkthrough only\n"
+
+    monkeypatch.setattr(llm_mod, "FakeLLM", NoCheck)
+    run(fixture_repo, "init", capsys=capsys)
+    run(fixture_repo, "map", capsys=capsys)
+    rc, out = run(fixture_repo, "dig", "scoring", capsys=capsys)
+    assert rc == 0 and "nothing was recorded" in out
+    assert Store(fixture_repo).load_records("dev1@example.com") == []
