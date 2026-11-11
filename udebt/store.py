@@ -1,0 +1,126 @@
+"""On-disk layout under <repo>/.udebt/.
+
+map.json             shared architectural map (commit this)
+records/<slug>.jsonl one developer's evidence, append-only (commit this for team view)
+config.json          optional settings (model, decay)
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from . import repo
+
+DIR = ".udebt"
+
+
+def now_iso() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
+
+
+@dataclass
+class Config:
+    model: str | None = None
+    decay_per_commit: float = 0.9
+    evidence_window: int = 5
+    known_threshold: float = 0.6
+    extra: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def load(cls, path: Path) -> Config:
+        if not path.exists():
+            return cls()
+        data = json.loads(path.read_text(encoding="utf-8"))
+        known = {k: data.pop(k) for k in list(data) if k in cls.__dataclass_fields__}
+        return cls(**known, extra=data)
+
+    def dump(self) -> dict[str, Any]:
+        d = {
+            "model": self.model,
+            "decay_per_commit": self.decay_per_commit,
+            "evidence_window": self.evidence_window,
+            "known_threshold": self.known_threshold,
+        }
+        d.update(self.extra)
+        return d
+
+
+class Store:
+    def __init__(self, root: Path):
+        self.root = root
+        self.dir = root / DIR
+        self.map_path = self.dir / "map.json"
+        self.records_dir = self.dir / "records"
+        self.config_path = self.dir / "config.json"
+
+    # -- lifecycle -----------------------------------------------------------
+    def exists(self) -> bool:
+        return self.dir.is_dir()
+
+    def init(self) -> None:
+        self.records_dir.mkdir(parents=True, exist_ok=True)
+        if not self.config_path.exists():
+            self.config_path.write_text(
+                json.dumps(Config().dump(), indent=2) + "\n", encoding="utf-8"
+            )
+
+    def require(self) -> None:
+        if not self.exists():
+            raise SystemExit("No .udebt/ here. Run `udebt init` first.")
+
+    @property
+    def config(self) -> Config:
+        return Config.load(self.config_path)
+
+    # -- map -----------------------------------------------------------------
+    def load_map(self) -> dict[str, Any] | None:
+        if not self.map_path.exists():
+            return None
+        return json.loads(self.map_path.read_text(encoding="utf-8"))
+
+    def save_map(self, data: dict[str, Any]) -> None:
+        self.map_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    def require_map(self) -> dict[str, Any]:
+        m = self.load_map()
+        if m is None:
+            raise SystemExit("No architectural map yet. Run `udebt map` first.")
+        return m
+
+    # -- records -------------------------------------------------------------
+    def record_path(self, email: str) -> Path:
+        return self.records_dir / f"{repo.slug(email)}.jsonl"
+
+    def append_record(self, email: str, rec: dict[str, Any]) -> None:
+        self.records_dir.mkdir(parents=True, exist_ok=True)
+        rec = {"ts": now_iso(), **rec}
+        with self.record_path(email).open("a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    def load_records(self, email: str) -> list[dict[str, Any]]:
+        p = self.record_path(email)
+        if not p.exists():
+            return []
+        out = []
+        for line in p.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                out.append(json.loads(line))
+        return out
+
+    def all_records(self) -> dict[str, list[dict[str, Any]]]:
+        """slug -> records, for every developer with a record file."""
+        if not self.records_dir.is_dir():
+            return {}
+        out = {}
+        for p in sorted(self.records_dir.glob("*.jsonl")):
+            recs = []
+            for line in p.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    recs.append(json.loads(line))
+            out[p.stem] = recs
+        return out

@@ -1,0 +1,132 @@
+"""Prediction quiz: pick units, generate questions, ask, grade, record."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from . import repo, scoring
+from .llm import LLM
+from .prompts import GRADE_SCHEMA, QUESTIONS_SCHEMA, grade_prompt, questions_prompt
+from .store import Store
+
+
+def compute_scores(
+    root: Path,
+    store: Store,
+    units: list[dict[str, Any]],
+    email: str,
+    records: list[dict[str, Any]] | None = None,
+) -> list[scoring.UnitScore]:
+    cfg = store.config
+    recs = store.load_records(email) if records is None else records
+    out = []
+    for u in units:
+        unit_recs = [r for r in recs if r.get("unit") == u["id"]]
+        since = scoring.last_record_head(unit_recs)
+        commits = repo.commit_count(root, u.get("paths", []), since) if since else 0
+        out.append(
+            scoring.score_unit(
+                u, unit_recs, commits, window=cfg.evidence_window, decay=cfg.decay_per_commit
+            )
+        )
+    return out
+
+
+def pick_units(
+    units: list[dict[str, Any]],
+    scores: list[scoring.UnitScore],
+    n: int,
+    only: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    by_id = {u["id"]: u for u in units}
+    if only:
+        missing = [o for o in only if o not in by_id]
+        if missing:
+            raise SystemExit(f"Unknown unit id(s): {', '.join(missing)}")
+        return [by_id[o] for o in only]
+    ranked = scoring.quiz_priority(scores)
+    return [by_id[s.unit_id] for s in ranked[:n]]
+
+
+def generate_questions(
+    root: Path, llm: LLM, units: list[dict[str, Any]], per_unit: int = 1
+) -> list[dict[str, Any]]:
+    res = llm.structured(
+        questions_prompt(units, per_unit), QUESTIONS_SCHEMA, cwd=root, read_tools=True
+    )
+    valid = {u["id"] for u in units}
+    qs = [q for q in res.get("questions", []) if q.get("unit_id") in valid]
+    if not qs:
+        raise SystemExit("No questions were generated.")
+    return qs
+
+
+def ask_interactively(questions: list[dict[str, Any]], inp=None, out=print) -> list[dict[str, Any]]:
+    """Collect answers and confidence. Empty answer means 'I don't know' (a known unknown)."""
+    inp = inp or input  # resolved at call time so tests can patch builtins.input
+    answered = []
+    for i, q in enumerate(questions, 1):
+        out(f"\n[{i}/{len(questions)}] unit: {q['unit_id']}")
+        out(q["question"])
+        out("(Enter on an empty line to finish. Leave blank if you don't know.)")
+        lines = []
+        while True:
+            line = inp("> " if not lines else "  ")
+            if line.strip() == "" and (lines or not line):
+                break
+            lines.append(line)
+        answer = "\n".join(lines).strip()
+        confidence = 1
+        if answer:
+            while True:
+                c = inp("Confidence 1 (guess) / 2 (fairly sure) / 3 (certain): ").strip() or "2"
+                if c in ("1", "2", "3"):
+                    confidence = int(c)
+                    break
+        answered.append({**q, "answer": answer, "confidence": confidence})
+    return answered
+
+
+def grade(root: Path, llm: LLM, answered: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    to_grade = [a for a in answered if a["answer"]]
+    grades: dict[int, dict[str, Any]] = {}
+    if to_grade:
+        res = llm.structured(grade_prompt(to_grade), GRADE_SCHEMA, cwd=root, read_tools=True)
+        for g in res.get("grades", []):
+            grades[int(g["index"])] = g
+    results, gi = [], 0
+    for a in answered:
+        if not a["answer"]:
+            results.append(
+                {
+                    **a,
+                    "verdict": "unknown",
+                    "feedback": "Marked as a known unknown. No misconception recorded.",
+                }
+            )
+            continue
+        g = grades.get(gi, {"verdict": "wrong", "feedback": "Grader returned nothing for this."})
+        gi += 1
+        results.append({**a, "verdict": g["verdict"], "feedback": g["feedback"]})
+    return results
+
+
+def record(store: Store, root: Path, email: str, results: list[dict[str, Any]]) -> None:
+    h = repo.head(root)
+    for r in results:
+        store.append_record(
+            email,
+            {
+                "type": "quiz",
+                "unit": r["unit_id"],
+                "head": h,
+                "question": r["question"],
+                "reference": r["reference_answer"],
+                "evidence": r.get("evidence", []),
+                "answer": r["answer"],
+                "confidence": r["confidence"],
+                "verdict": r["verdict"],
+                "feedback": r["feedback"],
+            },
+        )
