@@ -7,10 +7,13 @@ as a flat list, so older maps keep working.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 
+from .provenance import _under
+
 Unit = dict[str, Any]
+Split = Callable[[str], float]  # path -> the part of its lines a unit gets
 
 
 def walk(units: list[Unit]) -> Iterator[tuple[Unit, Unit | None]]:
@@ -109,3 +112,38 @@ def rows(units: list[Unit], deep: bool, also: set[str] | None = None) -> list[tu
             if deep or c["id"] in also:
                 out.append((c, 1))
     return out
+
+
+class Membership:
+    """How the lines of a file that several units list are split among them: evenly among
+    the top-level units that list it, then a parent's part evenly among those of its
+    sub-units that list it. A file in four top-level units gives each a quarter of its lines,
+    so a hub file (a `main.py` every flow passes through) is not counted four times over.
+    Build one per map and pass `split(unit_id)` to every attribution, so churn, provenance,
+    decay, risk and footprint all split the same way."""
+
+    def __init__(self, units: list[Unit]):
+        self._top = [u.get("paths", []) for u in units]
+        self._kids = {u["id"]: [c.get("paths", []) for c in children_of(u)] for u in units}
+        self._parent = parent_of(units)
+        self._n: dict[tuple[str | None, str], int] = {}
+
+    def listing(self, path: str, parent: str | None = None) -> int:
+        """How many top-level units (or sub-units of `parent`) list `path`."""
+        key = (parent, path)
+        n = self._n.get(key)
+        if n is None:
+            groups = self._top if parent is None else self._kids.get(parent, [])
+            n = self._n[key] = sum(1 for ps in groups if _under(path, ps))
+        return n
+
+    def split(self, unit_id: str) -> Split:
+        parent = self._parent.get(unit_id)
+
+        def part(path: str) -> float:
+            x = 1.0 / max(1, self.listing(path))
+            if parent is not None:
+                x /= max(1, self.listing(path, parent))
+            return x
+
+        return part

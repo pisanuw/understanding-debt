@@ -30,7 +30,7 @@ from .filekinds import kind as _kind
 from .filekinds import mechanical
 from .graph import Graph, communities, louvain
 from .imports import PARSERS, Imports, scan
-from .provenance import Commit
+from .provenance import Commit, landed
 from .weights import CommitWeight
 
 COCHANGE_MAX_FILES = 30
@@ -178,7 +178,7 @@ def cochange_graph(
     for c in commits:
         if not c.files or len(c.files) > max_files:
             continue
-        w = weights[c.sha].weight if c.sha in weights else 0.0
+        w = landed(c, weights, 0.0)  # bots move files together mechanically
         fs = sorted({f for f in c.files if f in nodes})
         if len(fs) < 2 or w <= 0:
             continue
@@ -206,7 +206,7 @@ def file_mass(commits: list[Commit], weights: dict[str, CommitWeight]) -> dict[s
     """Commit weight landed on each file, split by line share (square root, as for units)."""
     out: dict[str, float] = {}
     for c in commits:
-        w = weights[c.sha].weight if c.sha in weights else 0.0
+        w = landed(c, weights, 0.0)
         if w <= 0 or not c.files:
             continue
         lines = c.counted_lines

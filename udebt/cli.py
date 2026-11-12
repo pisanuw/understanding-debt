@@ -10,6 +10,7 @@ udebt quiz [-n N] [--deep]      answer prediction questions, get graded, record 
 udebt status [unit] [--deep]    debt per unit and a 0-100 debt index (--team: bus target)
 udebt risk [range]              a change's weight per unit against your understanding
 udebt dig [<id>]                guided walkthrough of the worst unit (or a chosen one)
+udebt directed add <session>    count agent commits you directed as your assisted work
 """
 
 from __future__ import annotations
@@ -36,7 +37,13 @@ from .mapping import (
     weights_for,
 )
 from .prompts import WEIGH_SCHEMA, weigh_prompt
-from .provenance import summarize, unit_provenance
+from .provenance import (
+    BUILTIN_SIGNATURES,
+    session_id,
+    sessions_of,
+    summarize,
+    unit_provenance,
+)
 from .quiz import ask_interactively, compute_scores, generate_questions, grade, pick_units
 from .quiz import record as record_results
 from .store import Store
@@ -260,12 +267,18 @@ def cmd_quiz(args) -> int:
 
 def _prov_line(commits, mine: set[str] | None = None) -> str:
     sm = summarize(commits, mine)
-    agents = ", ".join(f"{k} {v}" for k, v in sm["agents"].items()) or "none detected"
-    mine_ = f"; yours: {sm['dev']}" if mine else ""
+    agents = ", ".join(f"{k} {v}" for k, v in _top(sm["agents"])) or "none detected"
+    bots = f"; bots: {', '.join(f'{k} {v}' for k, v in _top(sm['bots']))}" if sm["bots"] else ""
+    directed = f" (+{sm['directed']} directed)" if sm["directed"] else ""
+    mine_ = f"; yours: {sm['dev']}{directed}" if mine else ""
     return (
         f"{sm['total']} commits: {sm['ai']} ai, {sm['assisted']} assisted, "
-        f"{sm['human']} human (agents: {agents}){mine_}"
+        f"{sm['human']} human, {sm['bot']} bot (agents: {agents}{bots}){mine_}"
     )
+
+
+def _top(counts: dict[str, int], n: int = 6) -> list[tuple[str, int]]:
+    return sorted(counts.items(), key=lambda kv: -kv[1])[:n]
 
 
 def _note(s_, u, prov, by_score) -> str:
@@ -330,6 +343,7 @@ def cmd_status(args) -> int:
     my_set = _my_set(resp, key, units)
     touching = risk_mod.touched_units(hier.level(units, deep), risk_mod.working_files(root))
     parents = hier.parent_of(units)
+    members = hier.Membership(units)
     shown = hier.rows(units, deep, also=my_set)
     if focus is not None:
         fid = focus["id"]
@@ -357,7 +371,7 @@ def cmd_status(args) -> int:
         ordered = shown
     for u, depth in ordered:
         s_ = by_score[u["id"]]
-        prov = unit_provenance(commits, u.get("paths", []), mine, weights)
+        prov = unit_provenance(commits, u.get("paths", []), mine, weights, members.split(u["id"]))
         mark = ""
         if my_set:
             if hier.covers(my_set, u["id"], units):
@@ -398,8 +412,8 @@ def cmd_status(args) -> int:
             "`udebt responsibility seed` proposes one."
         )
     print(
-        "ai% = share of the unit's commits by or with an AI agent. "
-        "you% = share you authored (AI-assisted ones count half)."
+        "ai% = weighted share of the unit's mass by an AI agent (assisted counts half). "
+        "you% = share you authored (assisted counts half). Bot commits are left out of both."
     )
     if hier.has_children(units) and not deep:
         print("Sub-units: `udebt status --deep`, or `udebt status <unit>` for one unit.")
@@ -451,12 +465,20 @@ def _team_status(root, store, units, commits, weights, resp, deep) -> int:
     shown = hier.rows(units, deep)
     w = _width(shown)
     target = cfg.bus_target
+    quizzed = any(recs for recs in members.values())
     print(f"\n{_prov_line(commits)}")
     print(
         f"Team view ({len(per_dev)} developer(s)); known threshold {cfg.known_threshold}, "
         f"bus target {target}"
     )
-    print(f"{'unit':<{w}} {'imp':>5} {'ai%':>4} {'team und':>9} {'bus':>5}  holders; responsible")
+    if not quizzed:
+        print(
+            f"No quiz evidence yet; holders need a quiz score >= {cfg.known_threshold} "
+            f"(the own-commit prior stops at {scoring.PRIOR_CAP}), so every count below is "
+            "0 until someone takes `udebt quiz`."
+        )
+    bus = "bus" if quizzed else "quizzed"
+    print(f"{'unit':<{w}} {'imp':>5} {'ai%':>4} {'team und':>9} {bus:>7}  holders; responsible")
     for u, depth in shown:
         t = team[u["id"]]
         flag = "" if t["scope"] == "architectural" else "  (blackbox)"
@@ -465,7 +487,7 @@ def _team_status(root, store, units, commits, weights, resp, deep) -> int:
         label = ("  " * depth) + u["id"]
         print(
             f"{label:<{w}} {t['importance']:>5.2f} {ai:>4} {t['understanding']:>9.2f} "
-            f"{t['bus_factor']:>2}/{target:<2}  {', '.join(t['holders']) or '-'}; "
+            f"{t['bus_factor']:>4}/{target:<2}  {', '.join(t['holders']) or '-'}; "
             f"{', '.join(assigned) or '-'}{flag}"
         )
     level_ids = [u["id"] for u in hier.level(units, deep)]
@@ -488,10 +510,16 @@ def _team_status(root, store, units, commits, weights, resp, deep) -> int:
         print(f"  {dev:<34} {scoring.debt_index(sc, only=only):>5}   ({what})")
     below = scoring.below_target(team, level_ids, target)
     arch = [uid for uid in level_ids if team[uid]["scope"] == "architectural"]
-    print(
-        f"\nBus target: {len(arch) - len(below)} of {len(arch)} architectural units have at "
-        f"least {target} holders (understanding >= {cfg.known_threshold})."
-    )
+    if quizzed:
+        print(
+            f"\nBus target: {len(arch) - len(below)} of {len(arch)} architectural units have "
+            f"at least {target} holders (understanding >= {cfg.known_threshold})."
+        )
+    else:
+        print(
+            f"\nBus target: not measured yet: no quiz evidence yet; holders need a quiz score "
+            f">= {cfg.known_threshold}. {len(arch)} architectural units, each needing {target}."
+        )
     if below:
         print("Below target:")
         for uid in below:
@@ -632,7 +660,8 @@ def cmd_contributors(args) -> int:
             you = "  <- you" if c.is_you else ""
             print(
                 f"  {c.name:<28} {c.commits:>5} commits  (ai {c.ai}, assisted {c.assisted}, "
-                f"human {c.human})  {c.first}..{c.last}  conf {c.confidence:.2f}{you}"
+                f"human {c.human}, bot {c.bot})  {c.first}..{c.last}  "
+                f"conf {c.confidence:.2f}{you}"
             )
             print(f"  {'':<28} {', '.join(c.emails)}")
             print(f"  {'':<28} {'; '.join(c.reasons)}")
@@ -915,6 +944,49 @@ def _responsibility_detail(root, store, units, commits, weights, resp, key) -> i
     return 0
 
 
+def cmd_directed(args) -> int:
+    """Agent commits a developer directed count as their assisted work (half weight) in their
+    share, prior and footprint; the commits stay `ai` for display and AI share."""
+    root, store = _ctx(args)
+    store.require()
+    cfg = store.config
+    if args.action in ("add", "remove"):
+        if not args.refs:
+            raise SystemExit(f"usage: udebt directed {args.action} <session-or-agent>...")
+        key = _dev_key(args, root, store, args.for_dev)
+        entry = cfg.directed.setdefault(key, {"sessions": [], "agents": []})
+        known = {s["name"] for s in [*BUILTIN_SIGNATURES, *cfg.extra.get("ai_signatures", [])]}
+        for ref in args.refs:
+            is_session = "session_" in ref or "/" in ref
+            kind, value = ("sessions", session_id(ref)) if is_session else ("agents", ref.lower())
+            if not is_session and value not in known:
+                print(f"Note: {ref} is not a known agent name ({', '.join(sorted(known))}).")
+            items = entry.setdefault(kind, [])
+            if args.action == "add" and value not in items:
+                items.append(value)
+            elif args.action == "remove" and value in items:
+                items.remove(value)
+        if not entry.get("sessions") and not entry.get("agents"):
+            cfg.directed.pop(key)
+        store.save_config(cfg)
+    commits = commits_for(root, store)
+    if not cfg.directed:
+        print("No directed agent work configured. `udebt directed add <session-or-agent>`.")
+        return 0
+    print("\nAgent commits counted as a developer's assisted work (half weight):")
+    for dev, d in sorted(cfg.directed.items()):
+        n = sum(1 for c in commits if c.directed_by == cfg.primary(dev))
+        print(f"  {dev}: {n} commits")
+        for s in d.get("sessions") or []:
+            k = sum(1 for c in commits if c.klass == "ai" and s in sessions_of(c))
+            print(f"    session {s}  ({k} agent commits)")
+        for a in d.get("agents") or []:
+            print(f"    agent {a}  (every {a} commit no session claims)")
+    unclaimed = sum(1 for c in commits if c.klass == "ai" and not c.directed_by)
+    print(f"Agent commits nobody directed: {unclaimed} (they count for nobody's footprint).")
+    return 0
+
+
 def cmd_hook(args) -> int:
     root, store = _ctx(args)
     store.require()
@@ -1006,6 +1078,22 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("alias", help="record other emails you have committed under")
     s.add_argument("emails", nargs="+")
     s.set_defaults(fn=cmd_alias)
+
+    s = sub.add_parser(
+        "directed",
+        help="agent sessions or agents whose commits you directed",
+        description="udebt directed                              list what is configured\n"
+        "udebt directed add <session-or-agent>...   e.g. session_01Ab... or claude-code\n"
+        "udebt directed remove <session-or-agent>...\n"
+        "A session is matched against Claude-Session: trailers; an agent name claims every\n"
+        "commit by that agent that no session claims. Matched commits stay `ai`, and count\n"
+        "as your assisted work (half weight) in your share, prior and footprint.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    s.add_argument("action", nargs="?", choices=["list", "add", "remove"], default="list")
+    s.add_argument("refs", nargs="*", metavar="SESSION_OR_AGENT")
+    s.add_argument("--for", dest="for_dev", metavar="DEV", help="for this developer")
+    s.set_defaults(fn=cmd_directed)
 
     s = sub.add_parser("contributors", help="who contributed, sorted by kind")
     s.add_argument("--json", action="store_true")

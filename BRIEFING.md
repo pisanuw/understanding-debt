@@ -25,12 +25,15 @@ acceptable.
   decision-bearing commits (founding, dependencies, infra, new dirs, renames, big
   restructurings); the LLM reads code plus that list and links each unit to the commits that
   shaped it (`history` on each unit).
-- **Three commit classes**: `ai` (agent-authored), `assisted` (human author, AI co-author
-  trailer), `human`. Signatures are data in config. **Every agent counts** (owner,
-  2026-11-12): Claude was the starting point, but Copilot's coding agent, Cursor, Codex,
-  Devin, OpenCode and `Assisted-by:` trailers carry large shares in real repos (TESTBEDS.md).
-- **Weak prior from own commits**, capped at 0.5, AI-assisted commits at half weight,
-  decayed by every commit someone else landed since. Replaced by any quiz evidence.
+- **Four commit classes**: `ai` (agent-authored), `assisted` (human author, AI co-author
+  or attribution trailer), `human`, and `bot` (CI, release, dependency and pipeline
+  automation). Signatures are data in config (`ai_signatures`, `bot_signatures`) and match
+  case-insensitively. **Every agent counts** (owner, 2026-11-12): Claude was the starting
+  point, but Copilot's coding agent, Cursor, Codex, Devin, OpenCode and `Assisted-by:`
+  trailers carry large shares in real repos (TESTBEDS.md).
+- **Weak prior from own commits**, capped at 0.5 (owner, second round: keep the cap), AI-
+  assisted commits at half weight, decayed by every commit someone else landed since.
+  Replaced by any quiz evidence.
 - **Identity aliases** in config (`identities`) so a developer's several emails count as one.
 - **Testbeds**: `pisanuw/digitalme` (190 commits, 126 human / 62 assisted / 2 ai) is the
   primary; `pisanuw/dsa-instructor` (2510 commits, mostly ai) is the stress test; the small
@@ -98,6 +101,36 @@ acceptable.
   synthetic developers (the `claude` CLI quizzed from an older snapshot) and reverts on the
   large-team testbeds, first experiment right after 1.1. Times are reported in Lisbon time.
 
+- **Phase 1.1 classifier (2026-11-12)**: attribution trailers (`Assisted-by:`,
+  `Generated-by:`, `Made-with:`) count when the value names an AI, positively: a known agent
+  name, a vendor or model family, or the agentic-commits `(provider/model)` form. The agent
+  named first wins; an AI no signature knows maps to the generic trailer key
+  (`assisted-by`). A value naming a person does not count, so `Assisted-by: pi` (an obscure
+  agent) is missed on purpose rather than risk counting human helpers.
+- **Bots land no mass** (owner): a `bot` commit weighs 0 wherever mass is summed (one helper,
+  `provenance.landed`), so it is out of churn, decay, the prior, risk, co-change, footprint
+  and every share's denominator; its commits are still counted for display. Bot identities
+  are one source of truth: `contributors` labels Bot exactly the identities whose commits are
+  classed `bot`. A bot-authored commit carrying an agent trailer is `ai`. The name heuristics
+  are the old contributor ones (`bot`, `pipeline`, `automation`, `actions` as whole words),
+  so digitalme's `YPai pipeline <bot@...>` commit is now `bot` (see open questions); an
+  `ai_signatures` entry claims such an identity back because agent signatures win.
+- **Directed agent work** (owner): config `directed` maps a developer to `Claude-Session:`
+  session ids and, wholesale, agent names (`udebt directed add`). A matched `ai` commit stays
+  `ai` for display and AI share; in `unit_provenance` and footprint seeding it is that
+  developer's assisted work at half weight, and it resets their prior's decay like an own
+  commit. Session claims win over agent claims; among agent claims the first wins. A
+  developer who only directed agents is a human for seeding. This repo claims its two
+  sessions, so its dogfood set is no longer empty.
+- **Shared files are split** (owner): a file k top-level units list gives each 1/k of its
+  lines, and a parent's part is split again among its sub-units that list it, so a sub-unit
+  never gets more of a file than its parent. One `units.Membership` per map feeds share,
+  attribution, churn, provenance, decay, risk and footprint. Blackbox units still count as
+  listing a file.
+- **Team view without quizzes** (owner): when no developer has a quiz record, it says
+  "no quiz evidence yet; holders need a quiz score >= threshold" and labels the holder
+  column `quizzed`.
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.
@@ -109,11 +142,11 @@ acceptable.
 
 - Threshold for "architectural decision worth an acknowledgement" when we add
   capture-at-generation-time.
-- Agent commits a human directed (cloud sessions authored as the agent) count for nobody's
-  footprint, so on dsa-instructor two units built only by agent sessions are in nobody's set
-  and this repo seeds no set at all. Should config map an agent identity, or a
-  `Claude-Session` trailer, to the human who directed it?
-- The own-commit prior is capped at 0.5, below the 0.6 known threshold, so no unit has a
-  holder until someone takes a quiz and the bus target reads 0 everywhere at first. Intended?
-- A file listed under several units (digitalme's `backend/main.py` is in four) lands its full
-  line share in each, which inflates the mass of hub files.
+- (Answered 2026-11-12, second round: directed agent work, keep the prior cap, split shared
+  files. See Decisions.)
+- digitalme's one `YPai pipeline <bot@ypai.pisan.me>` commit (18aa4c2, the content pipeline
+  itself, merged as PR #1) is now `bot` and lands no mass. If an agent session wrote it under
+  that identity, claim it with an `ai_signatures` entry or `udebt directed`; should the
+  `pipeline` name heuristic stay?
+- vscode's `on behalf of @user` footer names the directing developer; it could fill
+  `directed` automatically from `handles`.

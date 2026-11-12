@@ -33,7 +33,7 @@ from typing import Any
 
 from . import units as hier
 from .contributors import contributors
-from .provenance import Commit, _under
+from .provenance import Commit, _under, landed
 from .store import Config, Store, now_iso
 from .weights import CommitWeight
 
@@ -160,19 +160,24 @@ def footprint(
     weights: dict[str, CommitWeight],
     unit: dict[str, Any],
     cfg: Config,
+    split: hier.Split | None = None,
 ) -> tuple[dict[str, float], dict[str, float]]:
     """(developer -> share, developer -> mass) of the human-led work on a unit. AI-authored
-    commits are left out of both sides: responsibility is a human matter, and a unit only an
-    agent touched has no footprint at all. Assisted commits count in full, since the human
-    who committed them directed the work."""
+    and bot commits are left out of both sides: responsibility is a human matter, and a unit
+    only an agent or automation touched has no footprint at all. Assisted commits count in
+    full, since the human who committed them directed the work. An agent commit a developer
+    directed (config `directed`) counts for them at half weight, like the prior."""
     paths = unit.get("paths", [])
     mass: dict[str, float] = {}
     total = 0.0
     for c in commits:
-        if c.klass == "ai" or not c.touches(paths):
+        if c.klass == "bot" or (c.klass == "ai" and not c.directed_by) or not c.touches(paths):
             continue
-        w = (weights[c.sha].weight if c.sha in weights else 1.0) * c.attribution(paths)
-        key = cfg.primary(c.author_email)
+        w = landed(c, weights) * c.attribution(paths, split=split)
+        if c.klass == "ai":
+            key, w = cfg.primary(c.directed_by or ""), 0.5 * w
+        else:
+            key = cfg.primary(c.author_email)
         mass[key] = mass.get(key, 0.0) + w
         total += w
     if total <= 0:
@@ -350,6 +355,7 @@ def seed(
         known |= {p.lower(), *(a.lower() for a in aliases)}
     cons = contributors(commits, cfg.identities, set())
     humans = {cfg.primary(e) for c in cons if c.label not in NOT_DEVELOPERS for e in c.emails}
+    humans |= {cfg.primary(d) for d in cfg.directed}  # they directed agent work here
 
     seeded: dict[str, dict[str, str]] = {}
     pending: dict[str, list[str]] = {}
@@ -373,10 +379,11 @@ def seed(
         named = set(seeded)
 
     shares: dict[str, tuple[dict[str, float], dict[str, float]]] = {}
+    members = hier.Membership(units)
 
     def by_footprint(u: dict[str, Any]) -> set[str]:
         if u["id"] not in shares:
-            shares[u["id"]] = footprint(commits, weights, u, cfg)
+            shares[u["id"]] = footprint(commits, weights, u, cfg, members.split(u["id"]))
         share, mass = shares[u["id"]]
         return {
             d

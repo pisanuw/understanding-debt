@@ -22,3 +22,8 @@
 2026-11-12 [decision] Testbeds: count every agent, not only Claude. Starter set huggingface_hub, sentry-javascript, mlflow + servo control; no team contacts, so validate via reverts; Py/TS first.
 2026-11-12 [doc] TESTBEDS.md + testbeds.json: 34 public repos screened from metadata, pinned shas; built-in signatures miss Assisted-by, Devin, claude[bot], OpenCode, Generated-by.
 2026-11-12 [decision] Owner: merge testbeds branch; Phase 1.1 (missing agent signatures, case-insensitive emails, bot class out of human share/decay, PR grouping for squash bias); synthetic developers + reverts as validation, first experiment after 1.1.
+2026-11-12 [code] Phase 1.1 classifier: Assisted-by/Generated-by/Made-with naming an AI, Devin, claude[bot], OpenCode, Jules, Codex connector, Amazon Q, vscode Copilot footer; case-insensitive.
+2026-11-12 [decision] Fourth class `bot` (bot signatures + config bot_signatures) lands no mass: out of churn, decay, prior, risk, co-change and share denominators. Bot + agent trailer = ai.
+2026-11-12 [decision] Directed agent work (config `directed`, `udebt directed add`): a matched ai commit stays ai but counts as the developer's assisted work (half) in share, prior, footprint.
+2026-11-12 [decision] A file listed by k units gives each 1/k of its lines (top level, then among the parent's sub-units); one Membership index per map feeds every attribution.
+2026-11-12 [decision] Prior cap stays 0.5. Team view without any quiz says 'no quiz evidence yet; holders need a quiz score >= threshold' and labels the holder column `quizzed`.

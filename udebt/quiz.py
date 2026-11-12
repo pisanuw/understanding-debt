@@ -11,23 +11,28 @@ from . import units as hier
 from .llm import LLM
 from .mapping import commits_for, weights_for
 from .prompts import GRADE_SCHEMA, QUESTIONS_SCHEMA, grade_prompt, questions_prompt
-from .provenance import Commit, unit_provenance
+from .provenance import Commit, landed, unit_provenance
 from .responsibility import Responsibility, effective_scope
 from .responsibility import load as load_responsibility
 from .store import Store
 
 
 def mass_since(
-    commits: list[Commit], weights: dict[str, Any], paths: list[str], since_sha: str | None
+    commits: list[Commit],
+    weights: dict[str, Any],
+    paths: list[str],
+    since_sha: str | None,
+    split: hier.Split | None = None,
 ) -> float:
-    """Weighted mass landed on `paths` after commit `since_sha` (all of it if unknown)."""
+    """Weighted mass landed on `paths` after commit `since_sha` (all of it if unknown). Bot
+    commits land nothing: automation does not erode anyone's understanding."""
     if since_sha is None:
         return 0.0
     idx = next((i for i, c in enumerate(commits) if c.sha == since_sha), -1)
     later = commits[idx + 1 :] if idx >= 0 else commits
     return round(
         sum(
-            (weights[c.sha].weight if c.sha in weights else 1.0) * c.attribution(paths)
+            landed(c, weights) * c.attribution(paths, split=split)
             for c in later
             if c.touches(paths)
         ),
@@ -59,13 +64,15 @@ def compute_scores(
     dev_scope = resp.scope(cfg.primary(email))
     team_scope = {u["id"]: u.get("scope", "architectural") for u in hier.flat(units)}
     mine = cfg.emails_for(email)
+    members = hier.Membership(units)
     own: dict[str, scoring.UnitScore] = {}
     for u, parent in hier.walk(units):
         paths = u.get("paths", [])
+        split = members.split(u["id"])
         unit_recs = [r for r in recs if r.get("unit") == u["id"]]
         since = scoring.last_record_head(unit_recs)
-        m_since = mass_since(commits, weights, paths, since)
-        prov = unit_provenance(commits, paths, mine, weights)
+        m_since = mass_since(commits, weights, paths, since, split)
+        prov = unit_provenance(commits, paths, mine, weights, split)
         prior = scoring.prior_understanding(
             prov.dev_share, prov.others_since_dev_w, cfg.decay_per_commit
         )

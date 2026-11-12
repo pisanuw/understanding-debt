@@ -4,7 +4,7 @@ map.json             shared architectural map, two levels of units (commit this)
 records/<slug>.jsonl one developer's evidence, append-only (commit this for team view)
 commits.json         per-commit weights (heuristic, LLM-refined for the heaviest); commit this
 responsibility.json  each developer's responsibility set and per-developer scope (commit this)
-config.json          settings (model, decay, identities, handles, bus target)
+config.json          settings (model, decay, identities, handles, directed agents, bus target)
 """
 
 from __future__ import annotations
@@ -37,6 +37,8 @@ class Config:
     identities: dict[str, list[str]] = field(default_factory=dict)  # primary email -> aliases
     # CODEOWNERS handle -> email (or list of emails); null marks a handle still to be mapped
     handles: dict[str, Any] = field(default_factory=dict)
+    # developer email -> {"sessions": [...], "agents": [...]}: agent commits they directed
+    directed: dict[str, dict[str, list[str]]] = field(default_factory=dict)
     extra: dict[str, Any] = field(default_factory=dict)
 
     def primary(self, email: str) -> str:
@@ -76,6 +78,7 @@ class Config:
             "cochange_max_files": self.cochange_max_files,
             "identities": self.identities,
             "handles": self.handles,
+            "directed": self.directed,
         }
         d.update(self.extra)
         return d

@@ -12,7 +12,17 @@ from . import units as hier
 from .history import decision_candidates, rename_shas, tree_summary
 from .llm import LLM
 from .prompts import MAP_SCHEMA, map_prompt
-from .provenance import Commit, _under, load_commits, load_signatures, summarize, unit_provenance
+from .provenance import (
+    Commit,
+    _under,
+    assign_directed,
+    landed,
+    load_bots,
+    load_commits,
+    load_signatures,
+    summarize,
+    unit_provenance,
+)
 from .store import Store, now_iso
 from .weights import CommitWeight, ensure_weights
 
@@ -31,20 +41,29 @@ def mappable_files(root: Path) -> list[str]:
 
 
 def commits_for(root: Path, store: Store) -> list[Commit]:
-    sigs = load_signatures(store.config.extra.get("ai_signatures"))
-    return load_commits(root, sigs)
+    cfg = store.config
+    sigs = load_signatures(cfg.extra.get("ai_signatures"))
+    commits = load_commits(root, sigs, bots=load_bots(cfg.extra.get("bot_signatures")))
+    assign_directed(commits, cfg.directed, cfg.primary)
+    return commits
 
 
 def weights_for(root: Path, store: Store, commits: list[Commit]) -> dict[str, CommitWeight]:
     return ensure_weights(root, store.weights_path, commits, rename_shas(root))
 
 
-def unit_mass(commits: list[Commit], paths: list[str], weights: dict[str, CommitWeight]) -> float:
+def unit_mass(
+    commits: list[Commit],
+    paths: list[str],
+    weights: dict[str, CommitWeight],
+    split: hier.Split | None = None,
+) -> float:
     """Weighted mass landed on `paths`: each commit's weight times its attribution to the
-    paths (square root of the line share)."""
+    paths (square root of the line share, shared files split by `split`). Bot commits land
+    nothing."""
     return round(
         sum(
-            weights[c.sha].weight * c.attribution(paths)
+            landed(c, weights) * c.attribution(paths, split=split)
             for c in commits
             if c.sha in weights and c.touches(paths)
         ),
@@ -52,14 +71,21 @@ def unit_mass(commits: list[Commit], paths: list[str], weights: dict[str, Commit
     )
 
 
-def _attach_one(u: dict[str, Any], commits: list[Commit], weights: dict[str, CommitWeight]):
-    u["churn"] = unit_mass(commits, u["paths"], weights)
-    prov = unit_provenance(commits, u["paths"], None, weights)
+def _attach_one(
+    u: dict[str, Any],
+    commits: list[Commit],
+    weights: dict[str, CommitWeight],
+    members: hier.Membership,
+):
+    split = members.split(u["id"])
+    u["churn"] = unit_mass(commits, u["paths"], weights, split)
+    prov = unit_provenance(commits, u["paths"], None, weights, split)
     u["provenance"] = {
         "total": prov.total,
         "ai": prov.ai,
         "assisted": prov.assisted,
         "human": prov.human,
+        "bot": prov.bot,
         "ai_share": round(prov.ai_share, 2),
         "mass": prov.total_w,
         "first": (prov.first_date or "")[:10],
@@ -72,9 +98,11 @@ def attach_scores(
 ) -> None:
     """Churn, provenance and importance for every unit. Top-level importance blends
     centrality with churn relative to the busiest top-level unit; a parent's importance is
-    then split among its sub-units by the same blend among siblings."""
+    then split among its sub-units by the same blend among siblings. A file several units list
+    counts a part in each (units.Membership)."""
+    members = hier.Membership(units)
     for u in units:
-        _attach_one(u, commits, weights)
+        _attach_one(u, commits, weights, members)
     max_churn = max((u["churn"] for u in units), default=0)
     for u in units:
         u["importance"] = scoring.importance(u.get("centrality", 3), u["churn"], max_churn)
@@ -82,7 +110,7 @@ def attach_scores(
         if not kids:
             continue
         for c in kids:
-            _attach_one(c, commits, weights)
+            _attach_one(c, commits, weights, members)
         sib_max = max(c["churn"] for c in kids)
         raw = [scoring.importance(c.get("centrality", 3), c["churn"], sib_max) for c in kids]
         for c, imp in zip(kids, scoring.split_importance(u["importance"], raw), strict=True):

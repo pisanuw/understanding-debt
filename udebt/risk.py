@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from . import units as hier
-from .provenance import Commit, _under
+from .provenance import Commit, _under, landed
 from .scoring import UnitScore
 from .weights import CommitWeight, heuristic_weight
 
@@ -130,6 +130,7 @@ def assess(
     the whole map, needed to tell whether a unit is in the set through its parent or a
     touched sub-unit."""
     hierarchy = hierarchy if hierarchy is not None else units
+    members = hier.Membership(hierarchy)
     rows: list[tuple[dict[str, Any], list[str]]] = []  # (unit, paths to exclude)
     for u in units:
         kids = hier.children_of(u)
@@ -157,7 +158,7 @@ def assess(
         touched = [c for c in changes if any(f in files for f in c.files)]
         mass = round(
             sum(
-                weights[c.sha].weight * c.attribution(paths, exclude or None)
+                landed(c, weights) * c.attribution(paths, exclude or None, members.split(u["id"]))
                 for c in touched
                 if c.sha in weights
             ),

@@ -242,6 +242,8 @@ def test_hierarchy_responsibility_and_risk(layered_repo, monkeypatch, capsys):
 
     rc, out = run(root, "status", "--team", capsys=capsys)
     assert "bus target 2" in out and "Below target:" in out and "needs 2 more" in out
+    assert "No quiz evidence yet; holders need a quiz score >= 0.6" in out
+    assert "quizzed" in out and "Bus target: not measured yet" in out
 
     # quiz on sub-units, inside alice's set
     answers = iter(["returns a default", "", "2"] * 4)
@@ -272,3 +274,44 @@ def test_hierarchy_responsibility_and_risk(layered_repo, monkeypatch, capsys):
 
 def hier_children(m, uid):
     return next(u for u in m["units"] if u["id"] == uid).get("children", [])
+
+
+def test_directed_sessions_seed_a_set(mixed_repo, capsys):
+    """A developer who only directed agent sessions gets a footprint once the sessions are
+    claimed with `udebt directed add`."""
+    from conftest import AI_ENV, git
+
+    root = mixed_repo
+    (root / "udebt" / "scoring.py").write_text("\n".join(f"x{i} = {i}" for i in range(60)) + "\n")
+    git(
+        root,
+        "commit",
+        "-q",
+        "-am",
+        "rewrite scoring\n\nClaude-Session: https://claude.ai/code/session_01Xyz",
+        env=AI_ENV,
+    )
+    run(root, "init", capsys=capsys)
+    run(root, "map", capsys=capsys)
+    lead = "lead@example.com"
+    rc, out = run(root, "--as-user", lead, "status", capsys=capsys)
+    assert "yours: 0" in out and "directed" not in out.split("\n")[2]
+    rc, out = run(
+        root,
+        "--as-user",
+        lead,
+        "directed",
+        "add",
+        "https://claude.ai/code/session_01Xyz",
+        capsys=capsys,
+    )
+    assert rc == 0 and "lead@example.com: 1 commits" in out and "session_01Xyz" in out
+    cfg = json.loads((root / ".udebt" / "config.json").read_text())
+    assert cfg["directed"] == {lead: {"sessions": ["session_01Xyz"], "agents": []}}
+    rc, out = run(root, "--as-user", lead, "status", capsys=capsys)
+    assert "yours: 0 (+1 directed)" in out and "prior from your commits" in out
+    rc, out = run(root, "responsibility", "seed", capsys=capsys)
+    resp = json.loads((root / ".udebt" / "responsibility.json").read_text())
+    assert "scoring" in resp["developers"][lead]["units"]
+    rc, out = run(root, "--as-user", lead, "directed", "remove", "session_01Xyz", capsys=capsys)
+    assert "No directed agent work" in out

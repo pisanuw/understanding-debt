@@ -4,12 +4,14 @@ Labels:
   AI                 an agent authored effectively every commit under this identity
   Joint human-AI     a human whose commits carry agent trailers at a material rate
   Human              no agent signal and no AI-looking metadata
-  Bot                CI and pipeline identities
+  Bot                CI, release, dependency and pipeline automation (bot signatures)
   Most likely AI     no explicit signature, but cadence and message shape look generated
   Most likely human  weak or mixed signals
 
-"Most likely" labels come from metadata only (commit cadence, message shape, when trailers
-start) and are advisory: scoring never uses them unless a person confirms the label.
+AI, Bot and Joint come from the commit classes (provenance.py), so a contributor labelled
+Bot is exactly one whose commits are classed `bot` and left out of every mass. "Most likely"
+labels come from metadata only (commit cadence, message shape, when trailers start) and are
+advisory: scoring never uses them unless a person confirms the label.
 """
 
 from __future__ import annotations
@@ -22,11 +24,6 @@ from typing import Any
 
 from .provenance import Commit
 
-BOT = re.compile(
-    r"(\[bot\]|(^|[^a-z])bot([^a-z]|$)|pipeline|automation|actions|dependabot|renovate|"
-    r"semantic-release|github-actions)",
-    re.I,
-)
 CONVENTIONAL = re.compile(
     r"^(feat|fix|chore|docs|refactor|test|perf|ci|style|revert|build)(\(|:|!)"
 )
@@ -41,6 +38,7 @@ class Contributor:
     ai: int = 0
     assisted: int = 0
     human: int = 0
+    bot: int = 0
     first: str = ""
     last: str = ""
     label: str = "Human"
@@ -127,9 +125,10 @@ def _label(con: Contributor) -> None:
         con.label, con.confidence = "AI", con.ai / n
         con.reasons = ["agent signature on the author identity"]
         return
-    if BOT.search(con.name) or any(BOT.search(e.split("@")[0]) for e in con.emails):
-        con.label, con.confidence = "Bot", 0.9
-        con.reasons = ["bot-like name or address"]
+    if con.bot / n >= 0.5:
+        bots = sorted({c.agent or "bot" for c in con._commits if c.klass == "bot"})
+        con.label, con.confidence = "Bot", con.bot / n
+        con.reasons = [f"bot signature on the author identity ({', '.join(bots)})"]
         return
     if con.assisted_share >= 0.2:
         con.label, con.confidence = "Joint human-AI", con.assisted_share
@@ -163,6 +162,7 @@ def as_dict(c: Contributor) -> dict[str, Any]:
         "ai": c.ai,
         "assisted": c.assisted,
         "human": c.human,
+        "bot": c.bot,
         "first": c.first,
         "last": c.last,
         "label": c.label,

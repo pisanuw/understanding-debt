@@ -8,6 +8,8 @@ Cheap heuristics only; the LLM decides what the decision actually was. Scores:
   +2 contains renames or moves
   +1 per decision keyword in the subject (max 2)
   +1 unusually many files changed (top decile)
+
+Bot commits (dependabot, release automation) are never candidates.
 """
 
 from __future__ import annotations
@@ -77,6 +79,8 @@ def decision_candidates(
             reasons.append("dependencies")
         new_dirs = {d for d in (_toplevel(f) for f in c.files) if d and d not in seen_dirs}
         seen_dirs |= new_dirs
+        if c.klass == "bot":  # a dependency bump by automation is nobody's decision
+            continue
         if new_dirs and i >= 3:
             score += 3
             reasons.append("new dir " + ",".join(sorted(new_dirs))[:40])

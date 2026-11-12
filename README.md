@@ -9,8 +9,9 @@ continuing to build on top.
 human commits, AI-assisted commits and AI-authored commits, and uses the `claude` CLI
 (subscription-billed, no API key) to:
 
-1. **classify** every commit as `human`, `assisted` (a human committed with an AI co-author)
-   or `ai` (an agent authored it), from signatures in commit trailers and author identities;
+1. **classify** every commit as `human`, `assisted` (a human committed with an AI co-author),
+   `ai` (an agent authored it) or `bot` (CI, release, dependency or pipeline automation),
+   from signatures in commit trailers and author identities;
 2. **mine** the history for decision-bearing commits: founding commits, dependency and
    infrastructure changes, new top-level directories, renames, big restructurings;
 3. **map** the architectural units of the codebase in two levels, starting from clusters it
@@ -43,6 +44,7 @@ on your PATH and logged in.
 cd your-repo
 udebt init                    # creates .udebt/
 udebt alias other@me.org       # other addresses you have committed under (optional)
+udebt directed add <session>   # agent sessions (or a whole agent) whose commits you directed
 udebt contributors             # everyone who committed: AI, joint human-AI, human, bot, "most likely"
 udebt weigh [--refine]         # how much debt each commit can create; --refine asks claude about the heaviest
 udebt clusters                 # candidate units from imports and co-change, no LLM
@@ -83,9 +85,16 @@ square root is deliberate: a unit that got a tenth of a large architectural comm
 about a third of its debt, because a new dependency or a changed model spills past the lines
 it touched there. A commit confined to one unit lands its full weight. Lockfile and generated
 lines do not count towards the share: a 2000-line `package-lock.json` in a backend refactor
-says nothing about where the thinking went.
+says nothing about where the thinking went. A file that several units list (a `main.py`
+every flow passes through) is split evenly among them: in four units, it gives each a
+quarter of its lines. The split is first among the top-level units that list the file, then
+a parent's part among those of its sub-units that list it, and every mass below uses it.
 
-Everything below that used to be a commit count is now a sum of weights ("mass").
+Everything below that used to be a commit count is now a sum of weights ("mass"). **Bot
+commits land no mass at all**: automation neither erodes anyone's understanding nor builds
+anyone's footprint, so it is left out of churn, decay, the prior, risk, the co-change graph
+and the denominator of every share (`ai%` and `you%` in `status` are shares of the non-bot
+mass).
 
 For each architectural unit `u` and developer `d`:
 
@@ -94,6 +103,8 @@ For each architectural unit `u` and developer `d`:
 | evidence of one answer | correct 1.0, partial 0.5, wrong 0.0, unknown 0.0, **confidently wrong -0.5** |
 | verified understanding | mean evidence over the last 5 answers on `u`, clamped to [0, 1] |
 | understanding | verified x 0.9^(mass landed on `u` since the last answer) |
+| line share of a commit in `u` | changed lines under `u` / all changed lines, lockfile and generated lines left out; a file listed by k top-level units counts 1/k of its lines in each, and a parent's part is split again among the sub-units listing it |
+| attribution of a commit to `u` | weight x sqrt(line share); 0 for a bot commit |
 | prior (no quiz yet) | 0.5 x your weighted share of `u` x 0.9^(mass others landed since your last commit) |
 | importance | 0.6 x centrality/5 + 0.4 x mass/max mass, centrality rated 1-5 by the mapper |
 | co-change edge (a, b) | sum over commits touching both, with at most 30 files, of weight / (files - 1) |
@@ -109,8 +120,10 @@ For each architectural unit `u` and developer `d`:
 | bus target | every architectural unit should have >= `bus_target` (default 2) developers at understanding >= 0.6; the team view lists those below |
 | risk of a change | per unit touched: mass landed vs your understanding; **OUTSIDE** if the unit is outside your set, mass >= 0.1 and understanding < 0.6; HIGH if mass >= 0.3 and understanding < 0.3; CAUTION if mass >= 0.1 and understanding < 0.6; the change's verdict is its worst unit |
 
-Your share of a unit's commits counts AI-assisted commits at half weight. Four deliberate
-choices:
+Your share of a unit's commits counts AI-assisted commits at half weight, and so do agent
+commits you directed (config `directed`, see Contributors): such a commit stays `ai` for
+display and AI share, but it is your work for your share, your prior and your footprint, and
+it does not erode your prior. Four deliberate choices:
 
 - **Your own commits give you a weak prior, never more than 0.5.** Having typed the code is
   evidence of understanding, but half-credit at best, and it erodes as others (human or AI)
@@ -125,7 +138,9 @@ choices:
 Team view takes the maximum understanding across developers per unit and counts how many
 developers clear the known threshold (default 0.6). That count is the unit's bus factor, and
 the team view lists every architectural unit whose bus factor is below `bus_target` along
-with who is responsible for it.
+with who is responsible for it. Holders need a quiz score: the own-commit prior stops at 0.5,
+below the threshold, so until someone takes a quiz the team view says "no quiz evidence yet"
+and labels the holder column `quizzed` rather than reading as "nobody knows anything".
 
 ## Units and sub-units
 
@@ -196,29 +211,82 @@ decisions no cluster captures (auth model, persistence, error policy). On a 1900
 ## Contributors
 
 `udebt contributors` merges identities (through `.mailmap` and `udebt alias`) and labels
-each one. **AI**, **Bot** and **Joint human-AI** come from explicit signals (agent author
-identities, bot-like names, agent trailers on a material share of commits). **Most likely
-AI** and **Most likely human** come from commit metadata only: burst cadence, long
-bullet-list bodies, uniformly conventional subjects. Those two are advisory and never
-feed the scores.
+each one. **AI**, **Bot** and **Joint human-AI** come from the commit classes: an identity
+whose commits are `ai` (agent author identities), `bot` (bot signatures, below) or carry
+agent trailers on a material share of commits. A contributor labelled Bot is exactly one
+whose commits are left out of every mass. **Most likely AI** and **Most likely human** come
+from commit metadata only: burst cadence, long bullet-list bodies, uniformly conventional
+subjects. Those two are advisory and never feed the scores.
+
+**Directed agent work.** Cloud sessions often commit as the agent itself, so a developer who
+directed every line has no footprint and no prior. `udebt directed add <session>` (a
+`session_...` id or a `https://claude.ai/code/session_...` link, matched against
+`Claude-Session:` trailers) or `udebt directed add <agent>` (every commit by that agent that
+no session claims; `--for <dev>` for someone else) records it in `.udebt/config.json`:
+
+```json
+{"directed": {"dev@example.com": {"sessions": ["session_01Ab..."], "agents": ["claude-code"]}}}
+```
+
+A matched commit stays `ai` in every count and AI share, and counts as that developer's
+assisted work, at half weight, in their share, prior and responsibility footprint.
 
 ## Recognised AI agents
 
-Built in: Claude Code (author `noreply@anthropic.com`, `Co-Authored-By: Claude ...`,
-`Claude-Session:` trailers), GitHub Copilot, Cursor, aider, OpenAI Codex and Gemini by their
-usual author identities and co-author trailers. Add your own in `.udebt/config.json`:
+Every pattern matches case-insensitively. Built in (`udebt/provenance.py`,
+`BUILTIN_SIGNATURES`):
+
+| agent | authored by (class `ai`) | trailers and footers (class `assisted`) |
+|---|---|---|
+| `claude-code` | `noreply@anthropic.com`, `Claude`, `Claude Code`, the `claude[bot]` GitHub app | `Co-Authored-By: Claude ...`, `Claude-Session:`, `Generated with Claude Code` |
+| `github-copilot` | `Copilot`, `copilot-swe-agent[bot]`, `*copilot*@users.noreply.github.com`; a body saying `🤖 Authored with GitHub Copilot on behalf of @user` | `Co-Authored-By: ... Copilot` |
+| `cursor` | `@cursor.sh`, `@cursor.com`, `Cursor Agent`, `cursor[bot]` | `Co-Authored-By: ... Cursor` |
+| `aider` | `... (aider)` | `Co-Authored-By: ... aider`, `aider:` |
+| `openai-codex` | `codex*@openai.com`, `Codex`, `OpenAI Codex`, `chatgpt-codex-connector[bot]` | `Co-Authored-By: ... Codex` |
+| `gemini` | `Gemini`, `Gemini CLI`, `Gemini Code Assist` | `Co-Authored-By: ... Gemini` |
+| `devin` | `devin-ai-integration[bot]`, `Devin`, `Devin AI` | `Co-Authored-By: Devin ...` |
+| `opencode` | `noreply@opencode.ai`, `opencode`, `opencode-agent[bot]` | `Co-Authored-By: ... opencode` |
+| `jules` | `google-labs-jules[bot]` | `Co-Authored-By: ... google-labs-jules` |
+| `amazon-q` | `amazon-q-developer[bot]` | `Co-Authored-By: ... Amazon Q` |
+
+**Attribution trailers.** `Assisted-by:` (the Linux kernel, Fedora and LLVM convention),
+`Generated-by:` and `Made-with:` count when their value names an AI: `Assisted-by: Claude
+Code`, `Assisted-by: Claude:claude-opus-4` (kernel), `Assisted-by: Copilot`,
+`Generated-by: Claude Opus ...`, `Made-with: Cursor`, and the
+[agentic-commits](https://github.com/grushetsky/agentic-commits) form
+`Assisted-by: <agent> <version> (<provider>/<model>)`. Each signature's `names` recognise
+its agent; the agent named first wins (`Assisted-by: OpenCode with Claude Opus` is OpenCode),
+and the `(provider/model)` part is the model, not the agent. A value that names no known
+agent but does name an AI (a model family, a vendor, "LLM") maps to a generic agent named
+after the trailer (`assisted-by`); a value naming a person (`Assisted-by: Jane Doe
+<jane@example.org>`) or a script does not count.
+
+**Bots** (`BUILTIN_BOTS`): dependabot, renovate, github-actions, semantic-release, any other
+`*[bot]` GitHub app that no agent signature claims, and identities named like automation
+(`bot`, `pipeline`, `automation`, `actions` as a whole word in the name or address). A bot
+commit that carries an agent trailer is `ai`: automation committed an agent's work and no
+human was in the loop.
+
+Order: an agent author identity, then an "authored by an agent" body, then a bot identity,
+then agent trailers, else `human`. Add your own in `.udebt/config.json`:
 
 ```json
 {
   "ai_signatures": [
     {"name": "mybot", "author_emails": ["^bot@corp\\.com$"],
-     "trailer_patterns": ["(?im)^Co-Authored-By: MyBot"]}
+     "trailer_patterns": ["(?m)^Co-Authored-By: MyBot"], "names": ["\\bmybot\\b"]}
+  ],
+  "bot_signatures": [
+    {"name": "deploy", "author_emails": ["^deploy@corp\\.com$"]}
   ]
 }
 ```
 
-A commit matching `author_emails` or `author_names` is `ai`; a human-authored commit matching
-`trailer_patterns` is `assisted`.
+A commit matching `author_emails` or `author_names` (or `authored_patterns` in the body) is
+`ai`; a human-authored commit matching `trailer_patterns`, or with an attribution trailer
+one of the `names` recognises, is `assisted`. An identity that a broad bot rule catches but
+that an agent really drives can be claimed back with an `ai_signatures` entry, since agent
+signatures are checked first.
 
 ## Development
 
