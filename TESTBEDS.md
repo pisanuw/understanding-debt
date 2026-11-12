@@ -173,6 +173,44 @@ Possible fixes: weight candidates by the share of their files that survive at HE
 toward recent commits or give each period a quota, and score with the commit weights that
 now exist instead of a separate count.
 
+### Phase 1.3 re-check (2026-11-12)
+
+A fresh clone (`git clone --depth 3000`, which holds the whole history: 2,920 commits, one
+root, not shallow) came out at `2c61ae8`, the sha `testbeds.json` pins, so the numbers
+compare directly. Candidates from the old miner (d682805) and the Phase 1.3 one, no LLM
+(`udebt history --candidates`); survival is measured the same way for both, renames followed.
+
+| | before | after |
+|---|--:|--:|
+| candidates by year (2020 / 21 / 22 / 23 / 24 / 25 / 26) | 1 / 23 / 11 / 3 / 0 / 1 / 1 | 2 / 0 / 6 / 3 / 3 / 1 / 25 |
+| touching `api-inference-community/` (deleted April 2022) | 25 | 0 |
+| no file alive at HEAD | 22 | 0 |
+| mean survival | 0.25 | 0.98 |
+| AI-involved (`ai` or `assisted`) | 2 (5%) | 18 (45%) |
+| from the last 12 months (since 2025-11-11) | 1 | 25 (18 AI-involved) |
+| eligible in the last 12 months | 153 (score >= 2) | 448 (weight + bonuses >= 0.5; 214 AI-involved, survival 0.97) |
+
+By period (four of equal mass: 2020-12 to 2022-11, to 2024-08, to 2026-03, to 2026-11) the
+40 slots fall 8 / 5 / 5 / 22. The swing to the recent era comes from the scores, not the
+quota: the last quarter of the mass holds 27 of the 59 commits scoring 1.0 or more (AI-era
+commits are larger and their files all survive), and without the quota it would get 26 of
+the last 12 months' slots, against 25 with it; the quota is what keeps the two middle
+periods at 5 each. The founding commits stay (`Initial commit`, `Initial import (#1)`, 74%
+alive), as do the 2022 cache-layout and commit-API decisions.
+
+**`udebt map` on the new candidates** (one `claude` CLI call, 39 s; 12 units, 7 sub-units,
+84% coverage): **31 history links to 30 distinct commits**, on 9 of the 12 units, against 9
+links (7 to "V1.0 release (#3464)") before. **22 links (21 commits) point at the last 12
+months**, 18 at AI-involved commits; no commit has more than two links. Examples: the CLI's
+move to an `out` output singleton (six 2026 commits), the cross-repo shared blob store, the
+Xet-streamed multi-commit upload, browser-based OAuth login, the Endpoints catalog's new
+API; and from the older era the 2022 git-aware cache layout and the streamed ndjson commit
+payload. `udebt history` now lists 30 decisions instead of 2.
+
+The major-version rule (Phase 1.3, ROADMAP) changes 4 of huggingface_hub's 2,849 non-bot
+commits (ruff and mypy upgrades within 0.x, each now +0.3; mass 1314.1 to 1315.2) and no
+candidate.
+
 ## Caveats
 
 - **Disclosure-only.** Every AI share is a lower bound. Zed (2%), Ruff (2%) and openai/codex

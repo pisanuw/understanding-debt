@@ -185,6 +185,28 @@ acceptable.
 - **Team view without quizzes** (owner): when no developer has a quiz record, it says
   "no quiz evidence yet; holders need a quiz score >= threshold" and labels the holder
   column `quizzed`.
+- **History mining from weights, survival and periods** (Phase 1.3): a decision
+  candidate's score is its commit weight (a branch commit's standalone weight, LLM class
+  blended in) plus +0.3 new top-level dir, +0.2 renames, +0.1 per keyword (max 2), times
+  the share of its files alive at HEAD (renamed successors followed; rename pairs cached as
+  `mv`), +0.5 for a founding commit after the multiplication. No surviving file drops a
+  commit unless it is founding; weight plus bonuses under 0.5 is not a candidate.
+  Dependencies and infrastructure count only through the weight, not as a parallel count.
+  Four periods of equal weighted mass (`history_periods`) each get 5 of the 40 slots
+  (`history_quota`), the rest go to the best scores, ties to the more recent commit. Equal
+  mass rather than calendar years, so busy eras get more periods; half the slots spread,
+  half competed for. The output keeps its fields and adds `survival`, `weight`, `period`;
+  `udebt history --candidates` prints it without a map or a model call. On
+  huggingface_hub the last 12 months go from 1 slot to 25 and the map's history links from
+  9 (7 to one release) to 31 on 30 commits, 22 of them recent (TESTBEDS.md).
+- **Major upgrades are dependency changes** (owner, Phase 1.3): a pin whose version moves
+  to a new major (first number; first two below 1.0; an upper bound that admits a new
+  major) weighs +0.3 and stays in line share. Patch and minor upgrades, the project's own
+  version lines and pins moved to the version the same diff gives the project stay version
+  bumps; calendar versions (first number >= 1000) and non-numeric versions keep the Phase
+  1.2 behaviour. `commits.json` v4; the parsed cache versions its `ver` input, so only
+  that input is recomputed. Changes 0 commits on digitalme and dsa-instructor, 4 on
+  huggingface_hub (ruff and mypy 0.x upgrades).
 
 ## Non-goals (for now)
 
@@ -208,6 +230,13 @@ acceptable.
 - The synthetic rerun suggests decay faster than 0.9 per unit of mass and mass reaching
   small units from outside their paths (contacts-db wrong at 0.12). Change the model now,
   or wait for human quizzes on digitalme? Run the same design on dsa-instructor next?
-- Dependency upgrades (same package, new version) now weigh like version bumps. Should a
-  major-version upgrade (`pydantic>=1` to `>=2`) with no code change keep some weight? On
-  prefect most such commits are dependabot's (already bots); on go-git several are human.
+- (Answered 2026-11-12, Phase 1.3: a major-version upgrade keeps the dependency weight;
+  patch and minor upgrades stay version bumps. See Decisions.)
+- History mining now leans to the recent era: on huggingface_hub 22 of 40 candidates come
+  from the last quarter of the mass, 25 from the last 12 months, because AI-era commits are
+  larger and all their files survive. The quota (5 per period) protects the middle periods,
+  not the recent one. Should the floor be larger (10 per period would make slots
+  proportional to mass), or is the recent lean right for a tool about AI-built code?
+- The dogfood `.udebt/map.json` here was mapped from the old miner, which found 3
+  candidates in this repository; the new one finds 18, those 3 among them, so a
+  re-map would link more history. Not re-run, to save the call.

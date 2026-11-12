@@ -179,6 +179,45 @@ with a cache of roughly 85 MB plain, 20-25 MB gzipped (extrapolated). Cached and
 results are identical on digitalme, dsa-instructor, prefect, go-git and this repository:
 every commit field, the four weighing inputs and every weight.
 
+### Phase 1.3: history mining for the AI era, major upgrades
+
+**Status 2026-11-12: done.** From the first `udebt map` on huggingface_hub (TESTBEDS.md),
+where 34 of 40 decision candidates came from 2021-2022 and 22 touched no file alive at
+HEAD, and one owner addition.
+
+| item | status |
+|---|---|
+| survival weighting | done: score x share of the commit's files alive at HEAD, renamed successors followed (rename pairs cached as `mv`); no surviving file drops a commit unless founding |
+| score from the commit weights | done: commit weight (a branch commit's standalone weight) + new dir 0.3, renames 0.2, keywords 0.1 each (max 2); founding +0.5 after survival; no parallel dependency or infra count |
+| recency | done: ties go to the more recent commit; `history_periods` (4) equal-mass periods each get `history_quota` (5) of the 40 slots |
+| output | same fields plus `survival`, `weight`, `period`; `udebt history --candidates [--json]`, no map, no LLM |
+| major upgrades (owner addition) | done: a pin moved to a new major is "dependencies changed" (+0.3); patch, minor, own version, calendar and non-numeric versions as before; `commits.json` v4, parsed cache `ver` input v2 |
+
+huggingface_hub at `2c61ae8`, old miner against new (TESTBEDS.md has the rest):
+
+| | before | after |
+|---|--:|--:|
+| candidates from 2021-2022 | 34 | 6 |
+| candidates from the last 12 months | 1 | 25 |
+| with no file alive at HEAD | 22 | 0 |
+| mean survival | 0.25 | 0.98 |
+| AI-involved | 2 | 18 |
+| map: history links (distinct commits) | 9 (2; 7 links to the V1.0 release) | 31 (30) |
+| map: links to the last 12 months | at most 2 (one candidate was that recent) | 22 |
+
+The list now leans to the recent era (22 of 40 from the last quarter of the mass): AI-era
+commits are larger and all their files survive, so they win the open slots; the quota keeps
+the two middle periods at 5 each (BRIEFING open questions). On this repository the old
+miner found 3 candidates and the new one 18, so the dogfood map, made from the old list,
+would link more history if re-run; it was not re-run. On digitalme 17 of the old 29
+candidates stay among the new 40; on dsa-instructor 9 of 40.
+
+Major upgrades, heuristic weights before and after on non-bot commits: digitalme 0 of 189
+changed, dsa-instructor 0 of 2,510 (its one version-only edit is a minor Playwright bump),
+huggingface_hub 4 of 2,849 (ruff and mypy 0.x upgrades, +0.3 each; mass 1314.1 to 1315.2,
+no candidate changed). No other testbed is cloned here; prefect and go-git, where Phase 1.2
+saw most version-only pins, would move most.
+
 ## Phase 2: conceptual units and responsibility
 
 **Adds**

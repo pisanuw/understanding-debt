@@ -41,3 +41,8 @@
 2026-11-12 [note] Synthetic rerun, digitalme, snapshots at mass 2.3/25.7/50.4: score 1.00/0.46/0.21, 30 of 31 pairs worse; within-snapshot rho 0.39, 0.00. Decay over time, not units.
 2026-11-12 [decision] No model change from one synthetic run: decay looks faster than 0.9/mass and spills past unit paths; wait for human quizzes (BRIEFING open questions).
 2026-11-12 [note] First map on huggingface_hub (12 units, 45 s): decision_candidates misses the AI era; 22 of 40 touch no file alive at HEAD; ties go to oldest.
+2026-11-12 [code] Phase 1.3 history mining: score = commit weight + new dir/renames/keyword bonuses, x share of files alive at HEAD (renames followed); none alive drops it unless founding.
+2026-11-12 [decision] Candidates: 4 equal-mass periods get 5 of 40 slots each (config history_periods, history_quota); ties go to the newer commit. `udebt history --candidates` lists them, no LLM.
+2026-11-12 [note] huggingface_hub 2c61ae8: last-12-month candidates 1 -> 25, none alive 22 -> 0, AI-involved 2 -> 18; map history links 9 (7 to one release) -> 31 on 30 commits, 22 recent.
+2026-11-12 [decision] Owner: a pin moved to a new major (0.x: the minor) is a dependency change (+0.3), not a version bump; own version, patch, minor, calver stay bumps. commits.json v4.
+2026-11-12 [note] Major-upgrade rule changes 0 commits on digitalme and dsa-instructor, 4 on huggingface_hub. Dogfood map not re-run: the old miner saw 3 candidates here, the new one 18.

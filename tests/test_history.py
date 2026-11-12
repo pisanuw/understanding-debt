@@ -7,7 +7,7 @@ import pytest
 from conftest import _write, git
 
 from udebt import cli
-from udebt.cache import open_cache
+from udebt.cache import ParsedCache, open_cache
 from udebt.history import decision_candidates, periods, survival
 from udebt.mapping import commits_for, history_candidates, weights_for
 from udebt.provenance import Commit
@@ -125,9 +125,9 @@ def test_rename_pairs_are_cached(aging_repo):
     pc = open_cache(aging_repo, store.dir)
     moves = pc.moves(commits)
     assert list(moves.values()) == [[("core/util.py", "core/helpers.py")]]
-    again = open_cache(aging_repo, store.dir)
-    again.stats.inputs.clear()
-    assert again.moves(commits) == moves and "mv" not in again.stats.inputs
+    again = ParsedCache(aging_repo, store.dir)  # a fresh process reads them from the file
+    commits = again.commits()
+    assert again.moves(commits) == moves and again.stats.inputs == {}
 
 
 def _commit(i: int, date: str, files: list[str] | None = None, subject: str = "change") -> Commit:

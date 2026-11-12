@@ -20,6 +20,16 @@
    "sha": "2394341bbda5e124694cebc4bb9b2d5c67577a6d",
    "weight": 0.9
   },
+  "250a41e2ef84a4e6d9e1e9b41464a09fffcc827c": {
+   "effective_lines": 574,
+   "reasons": [
+    "574 effective lines",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "250a41e2ef84a4e6d9e1e9b41464a09fffcc827c",
+   "weight": 0.8
+  },
   "286cdd4198854ff93349d053904f556b1ac9c285": {
    "effective_lines": 1346,
    "reasons": [
@@ -65,6 +75,15 @@
    "sha": "3b3f9a13ba989ab9a1be130bb374d3f39ae61182",
    "weight": 0.813
   },
+  "3db93761dc47137e10b34aede74e62399af97673": {
+   "effective_lines": 37,
+   "reasons": [
+    "documentation only"
+   ],
+   "refined": null,
+   "sha": "3db93761dc47137e10b34aede74e62399af97673",
+   "weight": 0.05
+  },
   "3fa8fda8e888383f6adbdf5f37582cf694b1b0e6": {
    "effective_lines": 1,
    "reasons": [
@@ -92,6 +111,16 @@
    "refined": null,
    "sha": "4ff6ad09e4bd95b167760ba738aa3dd3a2e50494",
    "weight": 0.8
+  },
+  "5351e7e9911960232e72a8ecc6dc3c7ff8d121ce": {
+   "effective_lines": 200,
+   "reasons": [
+    "200 effective lines",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "5351e7e9911960232e72a8ecc6dc3c7ff8d121ce",
+   "weight": 0.712
   },
   "5bdff31dfdc502d2684dc39f7730d813a40161fc": {
    "effective_lines": 0,
@@ -156,6 +185,17 @@
    "sha": "a6a02e2a205d3caf1547dc49c2670b2dd97c33bd",
    "weight": 0.778
   },
+  "b6919dd2609b672fc3c00302ead0ff8a4e2c3814": {
+   "effective_lines": 171,
+   "reasons": [
+    "171 effective lines",
+    "spans 2 top-level dirs",
+    "decision keyword in subject"
+   ],
+   "refined": null,
+   "sha": "b6919dd2609b672fc3c00302ead0ff8a4e2c3814",
+   "weight": 0.797
+  },
   "ba564e24af5cf56b7283ad5abc61c36357fac843": {
    "effective_lines": 15,
    "reasons": [
@@ -174,6 +214,15 @@
    "refined": null,
    "sha": "cf5ce6d80c776c114577bbaacc6ad91fed0831a3",
    "weight": 0.05
+  },
+  "d682805f48eb5edb8ba249e7fada3b9e28442618": {
+   "effective_lines": 0,
+   "reasons": [
+    "no diff (merge or empty)"
+   ],
+   "refined": null,
+   "sha": "d682805f48eb5edb8ba249e7fada3b9e28442618",
+   "weight": 0.0
   },
   "e2a508610931e946f1d1e6950cd3dbdd222659ba": {
    "effective_lines": 2,
@@ -236,5 +285,5 @@
    "weight": 0.9
   }
  },
- "version": 3
+ "version": 4
 }

@@ -13,7 +13,9 @@ human commits, AI-assisted commits and AI-authored commits, and uses the `claude
    `ai` (an agent authored it) or `bot` (CI, release, dependency or pipeline automation),
    from signatures in commit trailers and author identities;
 2. **mine** the history for decision-bearing commits: founding commits, dependency and
-   infrastructure changes, new top-level directories, renames, big restructurings;
+   infrastructure changes, new top-level directories, renames, big restructurings, scored
+   from the commit weights, discounted by how much of each still exists at HEAD and spread
+   over the history's periods so the AI-built era is not crowded out;
 3. **map** the architectural units of the codebase in two levels, starting from clusters it
    finds in the import and co-change graphs: the decisions, boundaries and flows a developer
    must understand, each linked to the commits that shaped it and who made them;
@@ -58,6 +60,7 @@ udebt status                   # your debt per top-level unit, index over your s
 udebt status --deep            # the same with sub-units; `udebt status <unit>` for one unit
 udebt status --team            # holders per unit against the bus target; units below it
 udebt history                  # the decisions that shaped the repo, oldest first, with who made them
+udebt history --candidates     # the commits `map` would show the model as decision candidates (no LLM)
 udebt quiz -n 5 [--deep]       # five decision questions from your set (sub-units with --deep)
 udebt dig [unit]               # walkthrough of the highest-debt unit, then a check question
 udebt risk [range|--staged]    # weight a change lands in each unit vs your understanding; --deep per sub-unit
@@ -115,6 +118,22 @@ apart from docs (a changelog), lockfiles and generated files, weighs 0.03, like 
 bump, so a monorepo release no longer decays every unit. Adding, removing or swapping a
 dependency is still a dependency change (+0.3). One `git log -p -U0` pass, restricted to
 manifest and version files, reads the diffs; the parsed-commit cache keeps the result.
+
+**A major upgrade is a dependency change.** A pin whose version moves to a new major
+version is not a version bump: `"left-pad": "1.5.0"` to `"2.0.0"`, `"^17.0.2"` to
+`"^18.2.0"`, `pydantic>=1.10` to `>=2.0`, `gem "rails", "~> 6.1"` to `"~> 7.0"`, or an upper
+bound that lets one in (`<2.0.0` to `<3.0.0`) counts as "dependencies changed" (+0.3) and
+stays in line share, because an upgrade that breaks things is a decision someone must
+understand even when no code changed with it. The major is the first number, or the first
+two below 1.0 (`0.23` to `0.30` is major, since 0.x minors break). A go.mod module path that
+moves from `/v2` to `/v3` was already a different line and still counts. Patch and minor
+upgrades (`1.4.2` to `1.5.0`) stay version bumps, and so do the project's own version lines
+and pins moved to the version the same diff gives the project (a monorepo's major release
+pinning its own packages). Calendar versions (a year first, `certifi==2023.7.22` to
+`2024.2.2`) and versions that are not numbers (`latest`, a git sha, `1.x`) keep the
+behaviour above. In a Cargo dependency table (`[dependencies.serde]` then `version =
+"1.0"`) the version line reads as a version line, so a major upgrade written that way is
+missed.
 
 **A merged branch is weighed as one commit.** A repository that squashes every pull request
 lands it as one commit; one that merges keeps the branch's commits, and weighed one by one
@@ -255,6 +274,40 @@ file-name words), its heaviest files, the packages it imports and the clusters i
 from. The model names the clusters, merges and splits them, and adds the cross-cutting
 decisions no cluster captures (auth model, persistence, error policy). On a 1900-file,
 2500-commit repository the graph work takes about four seconds, most of it parsing Python.
+
+## History mining
+
+The mapper links each unit to the commits that shaped it, choosing from at most 40 decision
+candidates that `udebt` picks from history without the model (`udebt history --candidates`
+lists them, `--json` for the full records):
+
+1. **Score.** A commit's score starts from its commit weight (above: size, dependency and
+   infrastructure changes, new code files, spread; the LLM class where `weigh --refine`
+   set one). A commit a merged branch brought in is ranked by its weight on its own, before
+   the branch's weight is shared out, since a decision is ranked by what the commit did.
+   Then the bonuses that make a commit a decision rather than just a big change: +0.3 for a
+   new top-level directory, +0.2 for renames or moves, +0.1 per decision keyword in the
+   subject (`migrate`, `replace`, `split`, `async`, `schema`, ... at most two). A commit
+   whose weight plus bonuses is under 0.5 is not a candidate; bots and merges never are.
+2. **Survival.** That sum is multiplied by the share of the commit's files that still
+   exist at HEAD, directly or under the name a later rename gave them (rename pairs are
+   kept in the parsed-commit cache). The mapper can only link a commit to code that is
+   still there: a subproject deleted years ago, however busy it was, says nothing about the
+   units of today. A commit none of whose files survive is dropped, except a founding
+   commit (the first three), which adds +0.5 after the multiplication.
+3. **Spread.** History is cut into `history_periods` (default 4) periods of equal weighted
+   mass, oldest first, and each is guaranteed `history_quota` (default 5) of the slots,
+   filled by its best scores. The other slots go to the best scores anywhere. Equal mass
+   rather than equal time: a busy recent year gets more periods than a quiet early one, and
+   a long pre-AI past cannot crowd out the era the agents built. With 4 x 5 of 40 slots,
+   half the list is spread evenly and half goes to the strongest commits.
+4. **Ties** go to the more recent commit.
+
+Each candidate carries its sha, date, class, agent, author, subject, file count, score,
+reasons, up to eight sample files (those still alive first), its `survival`, its `weight`
+and its `period`. On huggingface_hub, where the old count-based miner gave 34 of 40 slots
+to 2021-2022 and 22 to commits with no surviving file, the last 12 months now get 25 slots
+and no candidate is gone from HEAD (TESTBEDS.md).
 
 ## Contributors
 
