@@ -301,19 +301,23 @@ def _note(s_, u, prov, by_score) -> str:
         p = by_score.get(s_.parent)
         pv = f" ({p.verified:.2f})" if p and p.verified is not None else ""
         return pre + f"half of the parent's quiz{pv}"
+    by = f"mass {prov.others_since_dev_w}"
+    if s_.prior_share is not None:
+        by = f"share {s_.prior_share:.2f}, mass {prov.others_since_dev_w}"
     if s_.source == "prior" and s_.understanding < 0.005:
         return pre + (
-            f"prior from your commits eroded by {prov.others_since_dev} commits "
-            f"(mass {prov.others_since_dev_w}) by others"
+            f"prior from your commits eroded by {prov.others_since_dev} commits ({by}) by others"
         )
     if s_.source == "prior":
         note = "prior from your commits"
         if prov.others_since_dev:
-            note += (
-                f", {prov.others_since_dev} commits (mass {prov.others_since_dev_w}) "
-                "by others since"
-            )
+            note += f", {prov.others_since_dev} commits ({by}) by others since"
         return pre + note
+    if s_.share_since is not None and (s_.share_since or s_.commits_since):
+        return pre + (
+            f"quiz, decayed from {s_.verified:.2f} by share {s_.share_since:.2f} "
+            f"(mass {s_.commits_since})"
+        )
     if s_.commits_since:
         return pre + f"quiz, decayed from {s_.verified:.2f} by mass {s_.commits_since}"
     return pre + "quiz"
@@ -1039,18 +1043,32 @@ def cmd_experiment(args) -> int:
     store.require()
     email = _email(args, root)
     if args.suggest:
-        targets = [float(x) for x in args.suggest.split(",") if x.strip()]
-        rows = synthetic.suggest(root, store, targets, args.units)
+        spec = args.suggest.strip()
+        by, _, rest = spec.partition(":")
+        if by not in ("share", "mshare") or not rest:
+            by, rest = "mass", spec
+        spec = rest
+        targets = [float(x) for x in spec.split(",") if x.strip()]
+        rows = synthetic.suggest(root, store, targets, args.units, by)
         print(
-            f"\n{'target':>6} {'sha':<9} {'date':<10} {'commits':>7} {'mass':>6}  units unchanged"
+            f"\n{'target':>6} {'sha':<9} {'date':<10} {'commits':>7} {'mass':>6} {'share':>5} "
+            f"{'median':>6} {'mshare':>6} {'pred':>5}  units unchanged"
         )
         for r in rows:
             print(
-                f"{r['target']:>6.1f} {r['at_sha'][:8]:<9} {r['at_date'][:10]:<10} "
-                f"{r['commits_since']:>7} {r['mass_since']:>6.1f}  {r['unchanged']}/{r['units']}"
-                f"  {r['changes']}"
+                f"{r['target']:>6.2f} {r['at_sha'][:8]:<9} {r['at_date'][:10]:<10} "
+                f"{r['commits_since']:>7} {r['mass_since']:>6.1f} "
+                f"{r.get('mean_share_changed', 0):>5.2f} {r.get('median_share_changed', 0):>6.2f} "
+                f"{r.get('mean_share_since', 0):>6.3f} {r.get('mean_predicted', 0):>5.2f}  "
+                f"{r['unchanged']}/{r['units']}  {r['changes']}"
             )
-        print("\nmass = landed weight of <sha>..HEAD (first-parent commits from HEAD). No LLM.")
+        print(
+            "\nmass = landed weight of <sha>..HEAD (first-parent commits from HEAD); share, "
+            "median = the units' mean and median share changed since (weighted changed lines / "
+            "size at HEAD); mshare = mean mass since / unit mass; pred = the decay model's mean "
+            "predicted score for a developer frozen there. Targets are mass, or share:S,... or "
+            "mshare:S,... No LLM."
+        )
         return 0
     revs = [args.at] if args.at else [r.strip() for r in (args.snapshots or "").split(",")]
     revs = [r for r in revs if r]
@@ -1083,7 +1101,9 @@ def cmd_experiment(args) -> int:
             f"{pair['discordant']}, same {pair['tied']} (tau {pair['tau']})"
         )
     print(
-        "\nsince = weighted mass landed on the unit after the snapshot; score = mean of correct 1,"
+        "\nsince = weighted mass landed on the unit after the snapshot; share = share of the "
+        "unit changed since (weighted changed lines / size at HEAD); pred = the decay model's "
+        "score for a developer who knew the unit at the snapshot; score = mean of correct 1,"
         " partial 0.5, wrong and unknown 0; cw = confidently wrong (confidence 3); change = "
         "where the lines since went (files the snapshot had: edited; files it lacked: new)."
     )
@@ -1102,15 +1122,18 @@ def _print_snapshot(snap: dict[str, Any]) -> None:
         f"{snap['commits_since']} commits, mass {snap['mass_since']} since"
     )
     print(
-        f"{'unit':<{w}} {'since':>6} {'edited':>6} {'change':<13} {'score':>5} {'cw':>2}  verdicts"
+        f"{'unit':<{w}} {'since':>6} {'share':>5} {'edited':>6} {'change':<13} {'pred':>5} "
+        f"{'score':>5} {'cw':>2}  verdicts"
     )
     for r in sorted(rows, key=lambda r: -r["mass_since"]):
         edited = "-" if r["edited_share"] is None else f"{r['edited_share']:.2f}"
         score = "-" if r["score"] is None else f"{r['score']:.2f}"
+        shr = f"{r['share_changed']:.2f}" if "share_changed" in r else "-"
+        pred = f"{r['predicted']:.2f}" if "predicted" in r else "-"
         conf = ",".join(str(q["confidence"]) for q in r["questions"] if q["answer"])
         print(
-            f"{r['unit']:<{w}} {r['mass_since']:>6.2f} {edited:>6} {r['change']:<13} {score:>5} "
-            f"{r['confident_wrong']:>2}  {r['verdict'] or '(no question)'}"
+            f"{r['unit']:<{w}} {r['mass_since']:>6.2f} {shr:>5} {edited:>6} {r['change']:<13} "
+            f"{pred:>5} {score:>5} {r['confident_wrong']:>2}  {r['verdict'] or '(no question)'}"
             f"{f' (conf {conf})' if conf else ''}"
         )
     sm = snap.get("summary")
@@ -1121,6 +1144,13 @@ def _print_snapshot(snap: dict[str, Any]) -> None:
         f"unknown {sm['unknown_share']} of answers; verdicts {sm['verdicts']}"
     )
     print(f"mass since vs 1 - score: {sm['mass_since_vs_wrongness']['reading']}")
+    if "mean_predicted" in sm:
+        print(
+            f"share changed vs 1 - score: {sm['share_changed_vs_wrongness']['reading']}; mean "
+            f"predicted {sm['mean_predicted']} (rmse {sm['rmse_predicted']}), 0.9^mass "
+            f"{sm['mean_predicted_mass']} (rmse {sm['rmse_predicted_mass']}), observed "
+            f"{sm['mean_observed']}"
+        )
     groups = ", ".join(
         f"{k} {g['units']} (wrongness {g['mean_wrongness']}, cw {g['confident_wrong']}, "
         f"unknown {g['unknown']})"
@@ -1335,7 +1365,8 @@ def build_parser() -> argparse.ArgumentParser:
     which.add_argument(
         "--suggest",
         metavar="MASS,...",
-        help="list the first-parent commits that many weighted mass units before HEAD (no LLM)",
+        help="list the first-parent commits that many weighted mass units before HEAD, or "
+        "with share:S,... (mshare:S,...) that mean share of the units changed (no LLM)",
     )
     x.add_argument("--units", type=int, help="the N most important units (default all)")
     x.add_argument("--per-unit", type=int, default=2, help="questions per unit (default 2)")

@@ -620,6 +620,22 @@ def decision_weight(w: CommitWeight) -> float:
     return w.standalone
 
 
+def line_weights(weights: dict[str, CommitWeight]) -> dict[str, float]:
+    """sha -> the weight each of the commit's changed lines carries in the share-changed
+    decay. A commit on its own: its weight. A commit a merged branch brought in: the weight
+    of the whole branch (the sum of its commits' parts, at most 1), because the branch was
+    weighed as one change; with each commit's own small part, a ten-commit branch would count
+    a tenth of the lines the same work squashed counts."""
+    groups: dict[str, float] = {}
+    for w in weights.values():
+        if w.group is not None:
+            groups[w.group] = groups.get(w.group, 0.0) + w.weight
+    return {
+        sha: (min(1.0, groups[w.group]) if w.group is not None else w.weight)
+        for sha, w in weights.items()
+    }
+
+
 def mass(commits: list[Commit], weights: dict[str, CommitWeight]) -> float:
     return round(sum(weights[c.sha].weight for c in commits if c.sha in weights), 3)
 

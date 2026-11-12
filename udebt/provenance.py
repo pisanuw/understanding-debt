@@ -275,9 +275,27 @@ class Commit:
         confined to one unit lands its full weight."""
         return math.sqrt(self.share(paths, exclude, split))
 
+    def lines_in(self, paths: list[str], split: Callable[[str], float] | None = None) -> float:
+        """Changed lines under `paths`, counted as line share counts them (no lockfiles,
+        generated files or version bumps; a shared file split by `split`). The numerator of
+        the share-changed decay, before weighting."""
+        part = split or _whole
+        return sum(n * part(f) for f, n in self.counted_lines.items() if _under(f, paths))
+
 
 def _whole(_path: str) -> float:
     return 1.0
+
+
+def line_weight(c: Commit, line_weights: dict[str, float] | None, weights: Any) -> float:
+    """The weight each changed line of `c` carries in the share-changed decay: its commit's
+    weight, or for a commit a merged branch brought in, the weight of the whole branch
+    (weights.line_weights), since the branch was weighed as one change. Zero for a bot."""
+    if c.klass == "bot":
+        return 0.0
+    if line_weights is not None and c.sha in line_weights:
+        return line_weights[c.sha]
+    return landed(c, weights)
 
 
 def landed(c: Commit, weights: dict[str, Any] | None, default: float = 1.0) -> float:
@@ -552,6 +570,10 @@ class UnitProvenance:
     bot_w: float = 0.0
     dev_w: float = 0.0  # own human commits at full weight, own assisted and directed at half
     others_since_dev_w: float = 0.0
+    # weighted changed lines (line_weight x lines under the unit) by others since then, and in
+    # all: the numerator of the share-changed erosion of the prior
+    others_since_dev_lines: float = 0.0
+    lines_w: float = 0.0
     first_date: str | None = None
     last_date: str | None = None
 
@@ -572,16 +594,18 @@ def unit_provenance(
     dev: str | set[str] | None,
     weights: dict[str, Any] | None = None,
     split: Callable[[str], float] | None = None,
+    line_weights: dict[str, float] | None = None,
 ) -> UnitProvenance:
     """Provenance of the commits touching `paths`. `dev` is the developer's email, or the set
     of all addresses they have committed under. `weights` maps sha -> CommitWeight; without
     it every commit weighs 1. `split` shares a file several units list (units.Membership).
     Bot commits are tallied apart and decay nobody's prior. An agent commit the developer
     directed (`Commit.directed_by`) counts as their assisted work: half weight towards their
-    share, and it does not erode their prior."""
+    share, and it does not erode their prior. `line_weights` (weights.line_weights) weigh the
+    changed lines counted for the share-changed erosion; without them, each commit's own."""
     p = UnitProvenance()
     mine = _emails(dev)
-    since, since_w = 0, 0.0
+    since, since_w, since_l = 0, 0.0, 0.0
     for c in commits:  # oldest first
         if not c.touches(paths):
             continue
@@ -592,8 +616,10 @@ def unit_provenance(
             )
             continue
         w = landed(c, weights) * c.attribution(paths, split=split)  # the part landing here
+        lines = line_weight(c, line_weights, weights) * c.lines_in(paths, split)
         p.total += 1
         p.total_w += w
+        p.lines_w += lines
         setattr(p, c.klass, getattr(p, c.klass) + 1)
         if c.klass == "ai":
             p.ai_w += w
@@ -604,7 +630,7 @@ def unit_provenance(
         if c.klass == "ai" and c.directed_by is not None and c.directed_by in mine:
             p.dev_directed += 1
             p.dev_w += 0.5 * w
-            since, since_w = 0, 0.0
+            since, since_w, since_l = 0, 0.0, 0.0
         elif c.author_email.lower() in mine and c.klass != "ai":
             if c.klass == "human":
                 p.dev_human += 1
@@ -612,13 +638,16 @@ def unit_provenance(
             else:
                 p.dev_assisted += 1
                 p.dev_w += 0.5 * w
-            since, since_w = 0, 0.0
+            since, since_w, since_l = 0, 0.0, 0.0
         else:
             since += 1
             since_w += w
+            since_l += lines
     has_own = bool(p.dev_human or p.dev_assisted or p.dev_directed)
     p.others_since_dev = since if has_own else p.total
     p.others_since_dev_w = round(since_w if has_own else p.total_w, 3)
+    p.others_since_dev_lines = round(since_l if has_own else p.lines_w, 1)
+    p.lines_w = round(p.lines_w, 1)
     p.total_w, p.ai_w, p.assisted_w, p.dev_w, p.bot_w = (
         round(p.total_w, 3),
         round(p.ai_w, 3),

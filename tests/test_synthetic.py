@@ -125,6 +125,12 @@ def test_experiment_one_snapshot(fixture_repo, spy, capsys):
     assert storage["mass_since"] > 0 and storage["change"] == "mostly-edited"
     assert storage["edited_share"] == 1.0 and storage["lines_since_new"] == 0
     assert scoring_["mass_since"] == 0 and scoring_["change"] == "unchanged"
+    # the share model's input and prediction, next to the mass model's
+    assert rep["decay"]["model"] == "share"
+    assert storage["share_changed"] > 0 and storage["size_lines"] >= 1
+    assert storage["predicted"] < 1 and storage["predicted_mass"] < 1
+    assert scoring_["share_changed"] == 0 and scoring_["predicted"] == 1.0
+    assert snap["mean_share_changed"] == round(storage["share_changed"] / 2, 3)
     # the fake answers every other question: one correct, one unknown per unit
     assert storage["verdict"] == "correct/unknown" and storage["score"] == 0.5
     assert storage["unknown"] == 1 and storage["confident_wrong"] == 0
@@ -133,6 +139,8 @@ def test_experiment_one_snapshot(fixture_repo, spy, capsys):
     assert sm["by_change"]["unchanged"]["units"] == 1
     assert sm["by_change"]["mostly-edited"]["units"] == 1
     assert "reading" in sm["mass_since_vs_wrongness"]
+    assert sm["mean_observed"] == 0.5 and 0.5 < sm["mean_predicted"] < 1
+    assert "share changed vs 1 - score" in out and "pred" in out
 
 
 def test_experiment_several_snapshots_share_one_question_set(fixture_repo, spy, capsys):
@@ -198,6 +206,11 @@ def test_experiment_suggest_needs_no_model(fixture_repo, spy, capsys):
     assert rc == 0 and spy.log == []
     lines = [ln for ln in out.splitlines() if ln.strip().startswith(("0.1", "100.0"))]
     assert len(lines) == 2 and "1/2" in lines[0]  # scoring has not moved since HEAD~1
+    # by share: the first commit whose units' mean share changed since reaches the target
+    rc, out = _run(root, capsys, "experiment", "synthetic", "--suggest", "share:0.01")
+    assert rc == 0 and spy.log == []
+    (row,) = [ln for ln in out.splitlines() if ln.strip().startswith("0.01")]
+    assert row.split()[1] == _sha(root, "HEAD~1")[:8] and "1/2" in row
 
 
 def test_experiment_rejects_head(fixture_repo, monkeypatch, capsys):

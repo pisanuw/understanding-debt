@@ -29,7 +29,9 @@ def now_iso() -> str:
 @dataclass
 class Config:
     model: str | None = None
-    decay_per_commit: float = 0.9
+    decay_model: str = "share"  # share: by the share of a unit changed; mass: per unit of mass
+    share_decay_rate: float = 1.386  # share model: exp(-rate x share changed); ln 4
+    decay_per_commit: float = 0.9  # mass model: the factor per unit of weighted mass
     evidence_window: int = 5
     known_threshold: float = 0.6
     refine_top: int = 40  # how many of the heaviest commits `udebt weigh --refine` classifies
@@ -45,6 +47,13 @@ class Config:
     # developer email -> {"sessions": [...], "agents": [...]}: agent commits they directed
     directed: dict[str, dict[str, list[str]]] = field(default_factory=dict)
     extra: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def decay(self):
+        """The decay rule these settings describe (scoring.Decay)."""
+        from .scoring import Decay
+
+        return Decay(self.decay_model, self.share_decay_rate, self.decay_per_commit)
 
     def primary(self, email: str) -> str:
         """The developer key for `email`: the identity group's primary address, else itself."""
@@ -74,6 +83,8 @@ class Config:
     def dump(self) -> dict[str, Any]:
         d = {
             "model": self.model,
+            "decay_model": self.decay_model,
+            "share_decay_rate": self.share_decay_rate,
             "decay_per_commit": self.decay_per_commit,
             "evidence_window": self.evidence_window,
             "known_threshold": self.known_threshold,

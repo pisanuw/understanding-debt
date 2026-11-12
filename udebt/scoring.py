@@ -6,10 +6,16 @@ For each architectural unit u and developer d:
 
     evidence(record)   = 1.0 correct | 0.5 partial | 0.0 wrong | -0.5 confidently wrong
     verified(u, d)     = clamp(mean(evidence of last K records), 0, 1)
-    understanding(u,d) = verified * decay ** mass_landed_on_u_since_last_record
-    prior(u, d)        = 0.5 * dev_share * decay ** others_mass_since_dev  [no quiz records]
+    understanding(u,d) = verified * fade(since the last record)
+    prior(u, d)        = 0.5 * dev_share * fade(others' changes since dev's last commit)
+                         [no quiz records]
     debt(u, d)         = importance(u) * (1 - understanding(u, d))   [architectural units only]
     debt_index(d)      = 100 * sum(debt) / sum(importance)            [0 = none, 100 = total]
+
+    fade, decay model "share" (default) = exp(-rate * share changed), rate = ln 4, where
+        share changed = weighted changed lines landed on u since / u's size in lines
+        (understanding halves for every half of the unit that changes)
+    fade, decay model "mass"            = per_mass ** weighted mass landed on u since
 
 Hierarchy (map version 3): a unit may have sub-units.
 
@@ -26,6 +32,7 @@ above the known threshold; a unit is below target when bus_factor < bus_target.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -50,12 +57,57 @@ def verified_understanding(records: list[dict[str, Any]], window: int = 5) -> fl
     return max(0.0, min(1.0, mean))
 
 
-def decayed(verified: float | None, mass_since: float, decay: float = 0.9) -> float:
+SHARE_RATE = 1.386  # ln 4: fitted 1.37 on the two synthetic runs (ROADMAP Phase 5)
+PER_MASS = 0.9  # the mass model's factor per unit of weighted mass
+MODELS = ("share", "mass")
+
+
+@dataclass(frozen=True)
+class Decay:
+    """How understanding fades while a unit changes without you.
+
+    `share` (the default): by the share of the unit that changed, exp(-rate * share), where
+    the share is the weighted changed lines landed on the unit over its size in lines. A
+    fixed amount of change is a large part of a small unit and a small part of a large one,
+    so the rate means the same in every repository and for every unit. The exponential
+    composes: fading over two stretches of change is fading over their sum.
+
+    `mass`: the Phase 1 rule, per_mass ** weighted mass landed, kept to compare the two."""
+
+    model: str = "share"
+    rate: float = SHARE_RATE
+    per_mass: float = PER_MASS
+
+    def __post_init__(self) -> None:
+        if self.model not in MODELS:
+            raise ValueError(f"decay_model must be one of {', '.join(MODELS)}: {self.model}")
+
+    def factor(self, mass: float, share: float | None = None) -> float:
+        """What remains of an understanding after `mass` (weighted mass) or `share` (share
+        of the unit changed) has landed on its unit. The share model needs the share; with
+        none (no size known) it falls back to the mass rule."""
+        if self.model == "share" and share is not None:
+            return math.exp(-self.rate * max(0.0, share))
+        return self.per_mass ** max(0.0, mass)
+
+    @classmethod
+    def of(cls, decay: float | Decay) -> Decay:
+        """A Decay, or a plain per-mass factor (the mass model with that factor)."""
+        return decay if isinstance(decay, Decay) else cls("mass", per_mass=float(decay))
+
+
+def decayed(
+    verified: float | None,
+    mass_since: float,
+    decay: float | Decay = PER_MASS,
+    share_since: float | None = None,
+) -> float:
     """`mass_since` is the summed weight of commits that touched the unit after the evidence
-    was recorded (a plain count when weights are unavailable)."""
+    was recorded, `share_since` the share of the unit their changed lines make (the share
+    model's input). A plain number for `decay` is the mass model's factor."""
     if verified is None:
         return 0.0
-    return verified * (decay ** max(0.0, mass_since))
+    return verified * Decay.of(decay).factor(mass_since, share_since)
 
 
 def importance(centrality: int, churn: float, max_churn: float) -> float:
@@ -68,10 +120,17 @@ def importance(centrality: int, churn: float, max_churn: float) -> float:
 PRIOR_CAP = 0.5
 
 
-def prior_understanding(dev_share: float, others_mass_since: float, decay: float = 0.9) -> float:
-    """Weak prior from the developer's own commits to a unit, capped at PRIOR_CAP and
-    decayed by the weighted mass others (human or AI) landed on it since."""
-    return PRIOR_CAP * max(0.0, min(1.0, dev_share)) * (decay ** max(0.0, others_mass_since))
+def prior_understanding(
+    dev_share: float,
+    others_mass_since: float,
+    decay: float | Decay = PER_MASS,
+    others_share_since: float | None = None,
+) -> float:
+    """Weak prior from the developer's own commits to a unit, capped at PRIOR_CAP and eroded
+    by what others (human or AI) changed on it since: by the share of the unit their changed
+    lines make (share model) or by the weighted mass they landed (mass model)."""
+    fade = Decay.of(decay).factor(others_mass_since, others_share_since)
+    return PRIOR_CAP * max(0.0, min(1.0, dev_share)) * fade
 
 
 @dataclass
@@ -86,6 +145,8 @@ class UnitScore:
     prior: float = 0.0
     parent: str | None = None  # parent unit id for a sub-unit
     scope_origin: str = "team"  # team | you: where the effective scope comes from
+    share_since: float | None = None  # share of the unit changed since the last evidence
+    prior_share: float | None = None  # share others changed since the developer's last commit
 
     @property
     def measured(self) -> bool:
@@ -101,15 +162,16 @@ class UnitScore:
 def score_unit(
     unit: dict[str, Any],
     records: list[dict[str, Any]],
-    commits_since: int,
+    commits_since: float,
     *,
     window: int = 5,
-    decay: float = 0.9,
+    decay: float | Decay = PER_MASS,
     prior: float = 0.0,
+    share_since: float | None = None,
 ) -> UnitScore:
     v = verified_understanding(records, window)
     if v is not None:
-        understanding, source = decayed(v, commits_since, decay), "quiz"
+        understanding, source = decayed(v, commits_since, decay, share_since), "quiz"
     elif prior > 0:
         understanding, source = prior, "prior"
     else:
@@ -123,6 +185,7 @@ def score_unit(
         scope=unit.get("scope", "architectural"),
         source=source,
         prior=prior,
+        share_since=share_since if v is not None else None,
     )
 
 

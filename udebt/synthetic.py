@@ -46,10 +46,12 @@ from .filekinds import mechanical
 from .llm import LLM
 from .mapping import commits_for, unit_mass, weights_for
 from .prompts import ANSWER_SCHEMA, answer_prompt
-from .provenance import Commit, _under, landed
-from .quiz import generate_questions, grade
+from .provenance import Commit, _under, landed, line_weight
+from .quiz import generate_questions, grade, unit_sizes_at
+from .scoring import Decay
+from .sizes import share as share_of
 from .store import Store, now_iso
-from .weights import CommitWeight
+from .weights import CommitWeight, line_weights
 
 
 def _git(root: Path, *args: str) -> str:
@@ -250,13 +252,21 @@ def unit_rows(
     all_units: list[dict[str, Any]],
     commits: list[Commit],
     weights: dict[str, CommitWeight],
+    sizes: dict[str, float] | None = None,
+    decay: Decay | None = None,
 ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
-    """The snapshot's header and one row per unit, before any question is answered."""
+    """The snapshot's header and one row per unit, before any question is answered. With
+    `sizes` (unit id -> lines at HEAD) each row also carries the share of the unit changed
+    since the snapshot, as the share decay model counts it, and what `decay` predicts for a
+    developer who knew the unit fully at the snapshot (`predicted`, with the mass model's
+    0.9 per unit of mass beside it)."""
     since_shas = set(_git(root, "rev-list", f"{at}..{head}").split())
     since = [c for c in commits if c.sha in since_shas]
     members = hier.Membership(all_units)
     files_now = repo.tracked_files(root)
     files_then = {f for f in _git(root, "ls-tree", "-r", "--name-only", at).splitlines() if f}
+    lws = line_weights(weights)
+    decay = decay or Decay()
     rows: dict[str, dict[str, Any]] = {}
     for u in units:
         paths, split = u.get("paths", []), members.split(u["id"])
@@ -264,6 +274,21 @@ def unit_rows(
         m_total = unit_mass(commits, paths, weights, split)
         old, new = change_lines(since, paths, files_then, split)
         change, edited = classify_change(m_since, old, new)
+        extra: dict[str, Any] = {}
+        if sizes is not None:
+            lines = sum(
+                line_weight(c, lws, weights) * c.lines_in(paths, split)
+                for c in since
+                if c.touches(paths)
+            )
+            s = share_of(lines, sizes.get(u["id"], 0.0))
+            extra = {
+                "lines_changed": round(lines, 1),
+                "size_lines": sizes.get(u["id"], 0.0),
+                "share_changed": s,
+                "predicted": round(decay.factor(m_since, s), 3),
+                "predicted_mass": round(Decay("mass").factor(m_since), 3),
+            }
         rows[u["id"]] = {
             "unit": u["id"],
             "name": u.get("name", ""),
@@ -271,6 +296,7 @@ def unit_rows(
             "mass_since": m_since,
             "mass_total": m_total,
             "share_since": round(m_since / m_total, 3) if m_total else 0.0,
+            **extra,
             "files_now": sum(1 for f in files_now if _under(f, paths)),
             "files_at_rev": sum(1 for f in files_then if _under(f, paths)),
             "lines_since_existing": old,
@@ -285,6 +311,18 @@ def unit_rows(
         "commits_since": len(since),
         "mass_since": round(sum(landed(c, weights, 0.0) for c in since), 3),
     }
+    if rows:
+        header["mean_share_since"] = round(
+            sum(r["share_since"] for r in rows.values()) / len(rows), 3
+        )
+    if sizes is not None and rows:
+        shares = sorted(r["share_changed"] for r in rows.values())
+        header["mean_share_changed"] = round(sum(shares) / len(shares), 3)
+        mid = len(shares) // 2
+        header["median_share_changed"] = round(
+            shares[mid] if len(shares) % 2 else (shares[mid - 1] + shares[mid]) / 2, 3
+        )
+        header["mean_predicted"] = round(sum(r["predicted"] for r in rows.values()) / len(rows), 3)
     return header, rows
 
 
@@ -373,7 +411,30 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "share_since_vs_wrongness": correlation(
             [(r["share_since"], r["wrongness"]) for r in scored]
         ),
+        **_share_summary(scored),
         "by_change": by_change,
+    }
+
+
+def _share_summary(scored: list[dict[str, Any]]) -> dict[str, Any]:
+    """The share decay model against the observed scores, when the rows carry its share:
+    the correlation of share changed with wrongness, and the mean predicted score beside the
+    mean observed one (rows weigh alike), with the error of each unit's prediction."""
+    rows = [r for r in scored if "share_changed" in r]
+    if not rows:
+        return {}
+    n = len(rows)
+    err = [r["predicted"] - r["score"] for r in rows]
+    err_m = [r["predicted_mass"] - r["score"] for r in rows]
+    return {
+        "share_changed_vs_wrongness": correlation(
+            [(r["share_changed"], r["wrongness"]) for r in rows]
+        ),
+        "mean_observed": round(sum(r["score"] for r in rows) / n, 3),
+        "mean_predicted": round(sum(r["predicted"] for r in rows) / n, 3),
+        "mean_predicted_mass": round(sum(r["predicted_mass"] for r in rows) / n, 3),
+        "rmse_predicted": round((sum(e * e for e in err) / n) ** 0.5, 3),
+        "rmse_predicted_mass": round((sum(e * e for e in err_m) / n) ** 0.5, 3),
     }
 
 
@@ -424,6 +485,8 @@ def run(
     picked = pick_units(m["units"], n_units)
     commits = commits_for(root, store)
     weights = weights_for(root, store, commits)
+    sizes = unit_sizes_at(root, store, m["units"], head)
+    decay = store.config.decay
 
     prior: dict[str, Any] | None = None
     if resume is not None:
@@ -447,8 +510,9 @@ def run(
         "questions": None,
         "snapshots": [],
     }
+    report["decay"] = {"model": decay.model, "rate": decay.rate, "per_mass": decay.per_mass}
     for rev, at in snaps:
-        header, rows = unit_rows(root, at, head, picked, m["units"], commits, weights)
+        header, rows = unit_rows(root, at, head, picked, m["units"], commits, weights, sizes, decay)
         report["snapshots"].append({"at": rev, **header, "graded": False, "units": rows})
 
     def save() -> None:
@@ -522,36 +586,69 @@ def run(
 
 
 def suggest(
-    root: Path, store: Store, targets: list[float], n_units: int | None = None
+    root: Path,
+    store: Store,
+    targets: list[float],
+    n_units: int | None = None,
+    by: str = "mass",
 ) -> list[dict[str, Any]]:
-    """For each target mass, the first-parent commit from HEAD whose mass since (the landed
-    weight of `rev..HEAD`) first reaches it, with how many of the picked units have not
-    moved since. No model call."""
+    """For each target, the first-parent commit from HEAD at which it is first reached, with
+    how many of the picked units have not moved since. `by` "mass": the landed weight of
+    `rev..HEAD`; "share": the picked units' mean share changed since (the share decay
+    model's input, weighted changed lines over each unit's size at HEAD); "mshare": their
+    mean mass since over their mass in all (the measure the Phase 1.2 and 1.3 runs report).
+    Each grows along the first-parent line, so a binary search finds the commit. No model
+    call."""
     m = store.require_map()
     head = repo.head(root)
     picked = pick_units(m["units"], n_units)
     commits = commits_for(root, store)
     weights = weights_for(root, store, commits)
+    sizes = unit_sizes_at(root, store, m["units"], head)
+    lws = line_weights(weights)
+    members = hier.Membership(m["units"])
     by_sha = {c.sha: c for c in commits}
     line = _git(root, "rev-list", "--first-parent", head).split()
+    totals: dict[str, float] = {}
 
-    def mass_since(at: str) -> float:
-        shas = _git(root, "rev-list", f"{at}..{head}").split()
-        return sum(landed(by_sha[s], weights, 0.0) for s in shas if s in by_sha)
+    def measure(at: str) -> float:
+        shas = [s for s in _git(root, "rev-list", f"{at}..{head}").split() if s in by_sha]
+        if by == "mass":
+            return sum(landed(by_sha[s], weights, 0.0) for s in shas)
+        if by == "mshare":
+            since = [by_sha[s] for s in shas]
+            parts = []
+            for u in picked:
+                paths, split = u.get("paths", []), members.split(u["id"])
+                whole = totals.setdefault(u["id"], unit_mass(commits, paths, weights, split))
+                parts.append(unit_mass(since, paths, weights, split) / whole if whole else 0.0)
+            return sum(parts) / len(parts)
+        total = 0.0
+        for u in picked:
+            paths, split = u.get("paths", []), members.split(u["id"])
+            lines = sum(
+                line_weight(by_sha[s], lws, weights) * by_sha[s].lines_in(paths, split)
+                for s in shas
+                if by_sha[s].touches(paths)
+            )
+            total += share_of(lines, sizes.get(u["id"], 0.0))
+        return total / len(picked)
 
     out = []
     for target in targets:
-        lo, hi = 1, len(line) - 1  # mass since grows along the first-parent line
+        lo, hi = 1, len(line) - 1  # mass and share since grow along the first-parent line
         if hi < lo:
             break
         while lo < hi:
             mid = (lo + hi) // 2
-            if mass_since(line[mid]) >= target:
+            if measure(line[mid]) >= target:
                 hi = mid
             else:
                 lo = mid + 1
         at = line[lo]
-        header, rows = unit_rows(root, at, head, picked, m["units"], commits, weights)
+        header, rows = unit_rows(
+            root, at, head, picked, m["units"], commits, weights, sizes, store.config.decay
+        )
         out.append(
             {
                 "target": target,

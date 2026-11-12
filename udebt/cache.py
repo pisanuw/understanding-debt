@@ -52,7 +52,10 @@ INPUT_KINDS = ("eff", "add", "ren", "ver")
 # recomputed (one restricted pass) without re-parsing the history. `ver` 2: a dependency
 # moved to a new major version is no longer a version bump; 3: nor in a TOML dependency table.
 INPUT_VERSIONS = {"ver": 3}
-GITIGNORE = "# derived by udebt, rebuilt on demand (`udebt cache status`)\n{name}\n{name}.gz\n"
+GITIGNORE_HEADER = "# derived by udebt, rebuilt on demand (`udebt cache status`)\n"
+# every derived file udebt keeps under .udebt/: the parsed-commit cache and the per-blob line
+# counts (sizes.py)
+DERIVED = (NAME, NAME + ".gz", "sizes.json")
 
 
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess:
@@ -345,10 +348,14 @@ def open_cache(root: Path, udebt_dir: Path) -> ParsedCache:
 
 
 def ensure_gitignore(udebt_dir: Path) -> None:
-    """Keep the cache out of git: `.udebt/.gitignore` names it (created, or appended to)."""
+    """Keep the derived files out of git: `.udebt/.gitignore` names each of them (created,
+    or appended to)."""
     p = udebt_dir / ".gitignore"
     text = p.read_text(encoding="utf-8") if p.exists() else ""
-    if NAME in text.split():
+    have = set(text.split())
+    missing = [n for n in DERIVED if n not in have]
+    if not missing:
         return
     sep = "\n" if text and not text.endswith("\n") else ""
-    p.write_text(text + sep + GITIGNORE.format(name=NAME), encoding="utf-8")
+    head = "" if NAME in have else GITIGNORE_HEADER
+    p.write_text(text + sep + head + "".join(f"{n}\n" for n in missing), encoding="utf-8")

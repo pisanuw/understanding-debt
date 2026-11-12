@@ -66,7 +66,7 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
 
     subprocess.run(["git", "commit", "-q", "-am", "tweak"], cwd=root, check=True)
     rc, out = run(root, "status", capsys=capsys)
-    assert "decayed from 1.00 by mass" in out
+    assert "decayed from 1.00 by share" in out
 
     # blackbox scope removes a unit from the index; by default only for you
     rc, out = run(root, "scope", "scoring", "blackbox", capsys=capsys)
@@ -74,7 +74,15 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
     rc, out = run(root, "status", capsys=capsys)
     assert "blackbox for you (excluded)" in out
     idx = float(out.split("Debt index: ")[1].split(" ")[0])
-    assert 0 < idx < 10  # only storage left, decayed a little by one small commit
+    # only storage left: the tweak rewrote its one line of code, a large share of the unit
+    assert 20 < idx < 80
+    # the mass model decays it only a little: one small commit is little mass
+    cfg = json.loads((root / ".udebt" / "config.json").read_text())
+    (root / ".udebt" / "config.json").write_text(json.dumps({**cfg, "decay_model": "mass"}))
+    rc, out = run(root, "status", capsys=capsys)
+    assert "decayed from 1.00 by mass" in out and "by share" not in out
+    assert 0 < float(out.split("Debt index: ")[1].split(" ")[0]) < 10
+    (root / ".udebt" / "config.json").write_text(json.dumps(cfg))
     resp = json.loads((root / ".udebt" / "responsibility.json").read_text())
     assert resp["developers"]["dev1@example.com"]["scope"] == {"scoring": "blackbox"}
     rc, out = run(root, "--as-user", "dev2@example.com", "status", capsys=capsys)
