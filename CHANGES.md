@@ -46,3 +46,5 @@
 2026-11-12 [note] huggingface_hub 2c61ae8: last-12-month candidates 1 -> 25, none alive 22 -> 0, AI-involved 2 -> 18; map history links 9 (7 to one release) -> 31 on 30 commits, 22 recent.
 2026-11-12 [decision] Owner: a pin moved to a new major (0.x: the minor) is a dependency change (+0.3), not a version bump; own version, patch, minor, calver stay bumps. commits.json v4.
 2026-11-12 [note] Major-upgrade rule changes 0 commits on digitalme and dsa-instructor, 4 on huggingface_hub. Dogfood map not re-run: the old miner saw 3 candidates here, the new one 18.
+2026-11-12 [note] Synthetic rerun, dsa-instructor, snapshots at mass 4.5/25.2/50.6: score 0.98/0.94/0.96, paired 4 worse 4 better; ceiling. Mean share since 0.10 at mass 50 vs 0.70 on digitalme.
+2026-11-12 [decision] No model change from it; across both repos the score tracks a unit's share changed, not absolute mass. Decay by share is an open question (BRIEFING, ROADMAP Phase 5).

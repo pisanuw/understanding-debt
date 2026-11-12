@@ -192,6 +192,7 @@ HEAD, and one owner addition.
 | recency | done: ties go to the more recent commit; `history_periods` (4) equal-mass periods each get `history_quota` (5) of the 40 slots |
 | output | same fields plus `survival`, `weight`, `period`; `udebt history --candidates [--json]`, no map, no LLM |
 | major upgrades (owner addition) | done: a pin moved to a new major is "dependencies changed" (+0.3); patch, minor, own version, calendar and non-numeric versions as before; `commits.json` v4, parsed cache `ver` input v2 |
+| synthetic rerun on dsa-instructor | done: 7 calls; a ceiling (0.98, 0.94, 0.96), no decay with snapshot age; Phase 5 |
 
 huggingface_hub at `2c61ae8`, old miner against new (TESTBEDS.md has the rest):
 
@@ -450,6 +451,77 @@ repo-wide term), since small units decayed on little mass of their own. Do not d
 code: it was the worse case. Next: the same design on dsa-instructor (7 calls), a repeat on
 digitalme for variance, and a snapshot near mass 10 with a third of the units unchanged on
 a repository where one exists.
+
+**Third result, 2026-11-12** (the same design on dsa-instructor: HEAD `a005a03`
+(2026-11-11), map v3 of 12 top-level units at that HEAD, two questions per unit, developer
+`pisan@uw.edu`, 7 model calls, Phase 1.3 weights). Snapshots on the first-parent line,
+picked from `--suggest` before any answer was seen: `4f56755` at mass 4.5, the nearest in
+the 2-5 band with a third of the units unchanged (8 of 12), then 25.2 and 50.6. Report:
+`dsa-instructor/.udebt/experiments/synthetic-4f567559_a2245bd3_b5436cba-2026-11-12.json`
+(not committed there).
+
+| snapshot | commits since | mass since | mean share since | units unchanged | mean score | wrong / partial / correct / unknown | confidently wrong | Spearman(mass since, 1 - score) |
+|---|--:|--:|--:|--:|--:|---|--:|---|
+| `4f56755` (2026-11-07) | 33 | 4.5 | 0.003 | 8 of 12 | 0.98 | 0 / 1 / 23 / 0 | 0 | 0.26 (p = 0.33) |
+| `a2245bd` (2026-11-02) | 155 | 25.2 | 0.031 | 5 of 12 | 0.94 | 1 / 1 / 22 / 0 | 0 | 0.18 (p = 0.29) |
+| `b5436cb` (2026-10-31) | 320 | 50.6 | 0.097 | 0 of 12 | 0.96 | 0 / 2 / 22 / 0 | 0 | 0.58 (p = 0.03) |
+
+Per unit, mass since / mean score:
+
+| unit | `4f56755` | `a2245bd` | `b5436cb` |
+|---|--:|--:|--:|
+| web-layer | 0 / 1.00 | 2.14 / 1.00 | 4.43 / 1.00 |
+| agent-turn-pipeline | 0.90 / 1.00 | 1.30 / 1.00 | 2.35 / 1.00 |
+| persistence-migrations | 0 / 1.00 | 0 / 1.00 | 1.92 / 1.00 |
+| deploy-ops | 0.68 / 1.00 | 3.83 / 0.50 | 6.49 / 0.75 |
+| offline-pipeline | 0 / 1.00 | 2.62 / 1.00 | 3.42 / 1.00 |
+| config-env-manifest | 0.08 / 0.75 | 0.68 / 1.00 | 0.89 / 1.00 |
+| student-data-rights | 0 / 1.00 | 0 / 0.75 | 0.07 / 1.00 |
+| spend-and-keys | 0 / 1.00 | 0 / 1.00 | 0.72 / 1.00 |
+| chroma-integration | 0 / 1.00 | 0.20 / 1.00 | 0.20 / 1.00 |
+| reporting-admin | 0.24 / 1.00 | 2.63 / 1.00 | 3.89 / 0.75 |
+| classes-pairing | 0 / 1.00 | 0 / 1.00 | 1.02 / 1.00 |
+| teachback | 0 / 1.00 | 0 / 1.00 | 0.99 / 1.00 |
+
+New against edited code, units / mean mass / wrongness (no confidently wrong answers and
+no unknowns anywhere): `4f56755` unchanged 8 / 0 / 0.00, mostly-edited 4 / 0.47 / 0.06;
+`a2245bd` unchanged 5 / 0 / 0.05, mostly-edited 4 / 1.08 / 0.00, mostly-new 3 / 3.03 /
+0.17; `b5436cb` mostly-edited 4 / 0.88 / 0.00, mostly-new 8 / 2.86 / 0.06. Across
+snapshots the same unit with more mass since scored worse in 4 pairs, better in 4 and the
+same in 22 (tau 0.00); pooled over the 36 unit-snapshots rho = 0.27 (p = 0.06, not
+independent). Udebt's own evidence gives the same correlations (no confident wrong
+answers); share since gives 0.26, 0.11 and 0.39 (p = 0.14). Reading it honestly:
+
+- **It does not reproduce digitalme's decay with snapshot age.** Scores are flat (0.98,
+  0.94, 0.96) where digitalme fell 1.00, 0.46, 0.21, and the paired count is even. 67 of 72
+  answers are right: a ceiling, as digitalme had a floor in the first run.
+- **Within a snapshot the ranking is weak, as on digitalme.** 0.26 and 0.18, not
+  significant; 0.58 (p = 0.03) at the oldest rests on two partial answers out of 24, on
+  deploy-ops and reporting-admin, two of the three units with most mass since. The sign
+  agrees with decay; the evidence is two answers.
+- **Absolute mass does not transfer between repositories.** The same mass is a small part
+  of a big repository: at mass 50 a unit had on average 10% of its mass land since (at most
+  22%), against 70% on digitalme, and all three snapshots are 4 to 11 days old (dsa-
+  instructor lands about 30 commits a day). 0.9^mass predicts 0.81 at the oldest snapshot
+  and 0.96 was observed: slower than 0.9 per unit of mass here, faster on digitalme. Over
+  the six snapshots of the two repositories, the mean score falls with the mean share since
+  (0.003, 0.015, 0.031, 0.097: 0.98, 1.00, 0.94, 0.96; 0.30: 0.46; 0.70: 0.21), which one
+  per-mass rate cannot fit.
+- **Small things, as before.** The one wrong answer (deploy-ops at `a2245bd`, confidence 1)
+  is on the scheduled-workflow dedupe, whose code (`scripts/schedule_slots.py`) did not
+  exist at either older snapshot: a low-confidence guess, not a blank. New code was again
+  slightly worse than edited code (0.17 and 0.06 against 0.00), on 3 and 8 units. One
+  partial was on an unchanged unit (student-data-rights), the grader's noise floor.
+- Caveats as before (an LLM as the developer, graded by the same family, one run per
+  repository), plus the design's mass targets came from digitalme and were not rescaled.
+
+What it suggests for the model, untested: decay by how much of a unit changed (mass since
+over the unit's mass, or over its mass at the last verification) rather than by absolute
+mass, since a fixed rate per unit of mass decays a large unit far too fast and a small one
+too slowly; this would also make the decay rate comparable between repositories. Do not
+retune on two synthetic runs. Next: on dsa-instructor, snapshots chosen by share since
+(mean 0.3 and 0.7, roughly mass 150-400, weeks to months back) to meet digitalme's range;
+`--suggest` could take shares as well as masses.
 
 ## Decisions assumed in this roadmap
 

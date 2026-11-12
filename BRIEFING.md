@@ -172,6 +172,13 @@ acceptable.
   unit scored worse with more mass in 30 of 31 pairs; within a snapshot rho 0.39 (p 0.10)
   and 0.00. Decay across snapshots, unit attribution not shown; 2 of 72 unknown, 2 of 72
   confidently wrong. No model change made on it (ROADMAP Phase 5).
+- **Synthetic experiment, third result** (Phase 1.3, dsa-instructor, same design, 7
+  calls, snapshots picked from `--suggest` before any answer: mass 4.5 with 8 of 12 units
+  unchanged, 25.2, 50.6): mean score 0.98, 0.94, 0.96; 67 of 72 answers correct, none
+  unknown or confidently wrong; within a snapshot rho 0.26, 0.18, 0.58 (p 0.03, on two
+  partial answers); same unit with more mass since worse in 4 pairs, better in 4. It does
+  not reproduce digitalme's decay with snapshot age; the snapshots are 4 to 11 days old and
+  a unit's share since is 0.3%, 3% and 10%. Nothing tuned, no model change (ROADMAP Phase 5).
 - **Version bumps** (Phase 1.2): a manifest or version file whose diff changes only version
   strings is a `version` kind for that commit: no +0.3 for dependencies, no directory spread,
   out of line share; a commit of only version bumps (plus docs, lockfiles, generated files)
@@ -229,7 +236,15 @@ acceptable.
   `directed` automatically from `handles`.
 - The synthetic rerun suggests decay faster than 0.9 per unit of mass and mass reaching
   small units from outside their paths (contacts-db wrong at 0.12). Change the model now,
-  or wait for human quizzes on digitalme? Run the same design on dsa-instructor next?
+  or wait for human quizzes on digitalme? (The dsa-instructor run, below, points the other
+  way on the rate.)
+- The dsa-instructor synthetic run (Phase 1.3) hit a ceiling: 0.98, 0.94, 0.96 at mass
+  4.5, 25.2, 50.6, paired 4 worse / 4 better, because the same mass is a tenth as much of
+  a big repository's units (mean share since 0.10 at mass 50, against 0.70 on digitalme).
+  Across both repositories the score follows the share of a unit that changed, not the
+  absolute mass. Should decay be by share (mass since over the unit's mass) rather than
+  0.9 per unit of mass? And should the next dsa-instructor run pick snapshots by share
+  (0.3, 0.7: weeks to months back, about 8 more calls)?
 - (Answered 2026-11-12, Phase 1.3: a major-version upgrade keeps the dependency weight;
   patch and minor upgrades stay version bumps. See Decisions.)
 - History mining now leans to the recent era: on huggingface_hub 22 of 40 candidates come
