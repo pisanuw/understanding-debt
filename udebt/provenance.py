@@ -210,6 +210,9 @@ class Commit:
     klass: str = "human"  # ai | assisted | human | bot
     agent: str | None = None  # the AI agent (ai, assisted) or the bot (bot)
     file_lines: dict[str, int] = field(default_factory=dict)  # path -> insertions + deletions
+    # path -> deletions, where nonzero; with file_lines it gives a file's growth, which tracks
+    # a unit's size through history for the share decay's per-commit cap (touches_of)
+    file_dels: dict[str, int] = field(default_factory=dict)
     parents: list[str] = field(default_factory=list)
     directed_by: str | None = None  # developer who directed this agent commit (config)
     # files whose diff here changes only version strings (weights.version_bumps); set with
@@ -277,10 +280,23 @@ class Commit:
 
     def lines_in(self, paths: list[str], split: Callable[[str], float] | None = None) -> float:
         """Changed lines under `paths`, counted as line share counts them (no lockfiles,
-        generated files or version bumps; a shared file split by `split`). The numerator of
-        the share-changed decay, before weighting."""
+        generated files or version bumps; a shared file split by `split`). A deleted file
+        counts its deletions, which are its size, once. The numerator of the share-changed
+        decay, before weighting and before touches_of caps it at the unit's size."""
         part = split or _whole
         return sum(n * part(f) for f, n in self.counted_lines.items() if _under(f, paths))
+
+    def growth_in(self, paths: list[str], split: Callable[[str], float] | None = None) -> float:
+        """How many lines this commit adds to the files under `paths` (insertions minus
+        deletions; negative when it removes more), counted over the files a unit's size
+        counts (sizes.py: lockfiles, generated and media files left out; version files in),
+        a shared file split by `split`."""
+        part = split or _whole
+        return sum(
+            (n - 2 * self.file_dels.get(f, 0)) * part(f)
+            for f, n in self.file_lines.items()
+            if _under(f, paths) and not mechanical(f)
+        )
 
 
 def _whole(_path: str) -> float:
@@ -432,8 +448,8 @@ def parse_log(
 ) -> list[dict[str, Any]]:
     """What `git log --numstat` says about each commit, newest first (in log order when
     walking from HEAD; in no particular order for `shas`): sha, parents, author date, name and
-    email, subject, body, and per-file changed lines. Plain data, so the parsed-commit cache
-    (cache.py) can store it; `commit_from` turns one into a Commit."""
+    email, subject, body, and per file [path, changed lines, deleted lines]. Plain data, so
+    the parsed-commit cache (cache.py) can store it; `commit_from` turns one into a Commit."""
     if shas is not None and not shas:
         return []
     args = [f"--format={_LOG_FORMAT}", "--numstat", "--no-renames"]
@@ -458,7 +474,7 @@ def parse_log(
                 d = int(m.group(2)) if m.group(2).isdigit() else 0
                 ins += a
                 dels += d
-                files.append([m.group(3), a + d])
+                files.append([m.group(3), a + d, d])
         raws.append(
             {
                 "sha": sha.strip(),
@@ -485,10 +501,11 @@ def commit_from(raw: dict[str, Any]) -> Commit:
         author_email=raw["author_email"],
         subject=raw["subject"],
         body=raw["body"],
-        files=[f for f, _ in raw["files"]],
+        files=[e[0] for e in raw["files"]],
         insertions=raw["insertions"],
         deletions=raw["deletions"],
-        file_lines={f: n for f, n in raw["files"]},
+        file_lines={e[0]: e[1] for e in raw["files"]},
+        file_dels={e[0]: e[2] for e in raw["files"] if len(e) > 2 and e[2]},
         parents=list(raw["parents"]),
     )
 
@@ -596,18 +613,31 @@ class Touch:
     pos: int  # the commit's index in history, oldest first
     commit: Commit
     att: float  # attribution: the square root of its line share in the unit (shared files split)
-    lines: float  # its changed lines under the unit, counted as line share counts them
+    # its changed lines under the unit, counted as line share counts them, capped at the
+    # unit's size just after it: no commit changes more than all of a unit
+    lines: float
 
 
 def touches_of(
     commits: list[Commit], paths: list[str], split: Callable[[str], float] | None = None
 ) -> list[Touch]:
-    """The commits touching `paths`, oldest first, with their attribution and lines there."""
-    return [
-        Touch(i, c, c.attribution(paths, split=split), c.lines_in(paths, split))
-        for i, c in enumerate(commits)
-        if c.touches(paths)
-    ]
+    """The commits touching `paths`, oldest first, with their attribution and changed lines
+    there. The lines are capped at the unit's size just after the commit (at least one line),
+    so one commit changes at most 100% of a unit: a rewrite counts the unit once, not its old
+    plus its new lines, and deleting most of a unit (data files moved out of git) counts what
+    is left, not the deleted lines against a size that no longer holds them. The size is the
+    running sum of every earlier commit's growth there (Commit.growth_in), in history order,
+    so it needs no tree reads; on a branch it also counts what the main line added
+    meanwhile, an approximation the cap tolerates."""
+    out: list[Touch] = []
+    size = 0.0
+    for i, c in enumerate(commits):
+        if not c.touches(paths):
+            continue
+        size += c.growth_in(paths, split)
+        lines = min(c.lines_in(paths, split), max(1.0, size))
+        out.append(Touch(i, c, c.attribution(paths, split=split), lines))
+    return out
 
 
 def unit_provenance(

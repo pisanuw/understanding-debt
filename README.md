@@ -183,14 +183,15 @@ For each architectural unit `u` and developer `d`:
 |---|---|
 | evidence of one answer | correct 1.0, partial 0.5, wrong 0.0, unknown 0.0, **confidently wrong -0.5** |
 | verified understanding | mean evidence over the last 5 answers on `u`, clamped to [0, 1] |
-| understanding | verified x exp(-1.386 x share of `u` changed since the last answer): it halves for every half of the unit that changes (config `share_decay_rate`, ln 4) |
-| share of `u` changed since t | weighted changed lines landed under `u` after t / size of `u` in lines; can pass 1 when code is rewritten more than once |
-| weighted changed lines of a commit in `u` | its changed lines under `u`, counted as for line share (lockfile, generated and version-bump lines left out, a shared file split), times its line weight: the commit's weight, or for a commit a merged branch brought in, the whole branch's weight (at most 1); 0 for a bot |
+| understanding | verified x exp(-k x share of `u` changed since the last answer), k = 1.0 (config `decay_k`, fitted on every recorded synthetic unit-snapshot, ROADMAP Phase 5): 37% is left once a unit's worth of change has landed, half at 69% |
+| share of `u` changed since t | weighted changed lines landed under `u` after t / size of `u` in lines; can pass 1 when code is rewritten more than once, though no single commit adds more than the unit's size |
+| weighted changed lines of a commit in `u` | its changed lines under `u` (insertions plus deletions; a deleted file counts its size once), counted as for line share (lockfile, generated and version-bump lines left out, a shared file split), **at most the size of `u` just after the commit**, times its line weight: the commit's weight, or for a commit a merged branch brought in, the whole branch's weight (at most 1); 0 for a bot |
+| size of `u` just after a commit | the running sum of every earlier commit's insertions minus deletions under `u` (the same files and split as the size), in history order: no tree is read; at HEAD it matches the blob count to a few lines on the testbeds |
 | size of `u` | lines of the tracked files under `u` at the cut-off (HEAD for `status`), without lockfiles, generated, media or binary files, a shared file split as above; counted once per blob, cached in `.udebt/sizes.json` (gitignored) |
 | understanding, mass model | verified x 0.9^(mass landed on `u` since the last answer): config `decay_model: "mass"` (`decay_per_commit`), the Phase 1 rule, kept to compare |
 | line share of a commit in `u` | changed lines under `u` / all changed lines, lockfile, generated and version-bump lines left out; a file listed by k top-level units counts 1/k of its lines in each, and a parent's part is split again among the sub-units listing it |
 | attribution of a commit to `u` | weight x sqrt(line share); 0 for a bot commit |
-| prior (no quiz yet) | 0.5 x your weighted share of `u` x exp(-1.386 x share of `u` others changed since your last commit) (mass model: 0.9^(mass others landed since)) |
+| prior (no quiz yet) | 0.5 x your weighted share of `u` x exp(-k x share of `u` others changed since your last commit) (mass model: 0.9^(mass others landed since)) |
 | importance | 0.6 x centrality/5 + 0.4 x mass/max mass, centrality rated 1-5 by the mapper |
 | co-change edge (a, b) | sum over commits touching both, with at most 30 files, of weight / (files - 1) |
 | import edge (a, b) | 1 per direction in which a imports b; scaled so imports and co-change carry equal total weight |
@@ -219,9 +220,12 @@ it does not erode your prior. Four deliberate choices:
   fix. A misconception causes bugs.
 - **Understanding decays when the code moves without you, by how much of the unit moved.**
   Every changed line landed on a unit after you last verified it counts, at its commit's
-  weight, against the unit's size: once a tenth of the unit has changed you keep 87% of what
-  you knew, a half 50%, all of it 25%. So debt grows as the AI keeps building, and the same
-  change costs more in a small unit than in a large one. The Phase 1 rule (10 percent off
+  weight, against the unit's size: once a tenth of the unit has changed you keep 90% of what
+  you knew, a half 61%, all of it 37%. So debt grows as the AI keeps building, and the same
+  change costs more in a small unit than in a large one. One commit counts at most the
+  unit's size just after it: rewriting a unit counts it once (not its old plus its new
+  lines), and deleting most of one (data files moved out of git) counts what is left, not
+  the deleted lines against a size that no longer has them. The Phase 1 rule (10 percent off
   per unit of weighted mass, whatever the unit's size) decayed a large repository's units
   far too fast and a small one's too slowly in the synthetic runs (ROADMAP Phase 5); it is
   still there as `decay_model: "mass"`.

@@ -74,8 +74,9 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
     rc, out = run(root, "status", capsys=capsys)
     assert "blackbox for you (excluded)" in out
     idx = float(out.split("Debt index: ")[1].split(" ")[0])
-    # only storage left: the tweak rewrote its one line of code, a large share of the unit
-    assert 20 < idx < 80
+    # only storage left: the tweak rewrote its one line of code, the whole unit, which counts
+    # once (a commit's lines are capped at the unit's size), at the tweak's small weight
+    assert 10 < idx < 80
     # the mass model decays it only a little: one small commit is little mass
     cfg = json.loads((root / ".udebt" / "config.json").read_text())
     (root / ".udebt" / "config.json").write_text(json.dumps({**cfg, "decay_model": "mass"}))

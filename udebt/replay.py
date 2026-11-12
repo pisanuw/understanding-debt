@@ -54,6 +54,10 @@ from .weights import CommitWeight
 
 NAME = "snapshots.json"
 VERSION = 1
+# the scoring rules a stored series was made with, beyond the settings the fingerprint names:
+# 2 = Phase 3.1 (each commit's changed lines capped at its unit's size; no CAUTION event when
+# the understanding is only the own-commit prior)
+RULES = 2
 EVERY = "week"
 HEAVY = 0.5  # a commit this heavy by someone else is marked on that developer's line
 LEVELS = ("OUTSIDE", "HIGH", "CAUTION")
@@ -402,6 +406,7 @@ def fingerprint(h: History, every: str) -> dict[str, Any]:
         "units": hashlib.sha1(units.encode()).hexdigest()[:12],
         "decay": [d.model, d.rate, d.per_mass],
         "window": h.cfg.evidence_window,
+        "rules": RULES,
     }
 
 
@@ -466,7 +471,7 @@ def ensure(
     if old is not None:
         stale = None
         if old.get("fingerprint") != fp:
-            stale = "made with another map, decay model or interval"
+            stale = "made with another map, decay model, interval or scoring rules"
         elif old["points"] and old["points"][-1]["sha"] not in set(h.fp):
             stale = "its last point is no longer on the first-parent line (history rewritten)"
         if stale:

@@ -12,9 +12,10 @@ For each architectural unit u and developer d:
     debt(u, d)         = importance(u) * (1 - understanding(u, d))   [architectural units only]
     debt_index(d)      = 100 * sum(debt) / sum(importance)            [0 = none, 100 = total]
 
-    fade, decay model "share" (default) = exp(-rate * share changed), rate = ln 4, where
-        share changed = weighted changed lines landed on u since / u's size in lines
-        (understanding halves for every half of the unit that changes)
+    fade, decay model "share" (default) = exp(-k * share changed), k = 1 (config decay_k),
+        share changed = weighted changed lines landed on u since / u's size in lines, each
+        commit's lines capped at u's size just after it (provenance.touches_of)
+        (understanding falls to 1/e, 37%, once a unit's worth of change has landed)
     fade, decay model "mass"            = per_mass ** weighted mass landed on u since
 
 Hierarchy (map version 3): a unit may have sub-units.
@@ -57,7 +58,10 @@ def verified_understanding(records: list[dict[str, Any]], window: int = 5) -> fl
     return max(0.0, min(1.0, mean))
 
 
-SHARE_RATE = 1.386  # ln 4: fitted 1.37 on the two synthetic runs (ROADMAP Phase 5)
+# k in exp(-k x share): pooled least-squares fit on every recorded synthetic unit-snapshot,
+# shares capped per commit (Phase 3.1, ROADMAP Phase 5: 0.998 with huggingface_hub's summary,
+# 1.06 without; per repository 2.72, 0.42 and about 0.6). Phase 1.4 used ln 4 = 1.386.
+DECAY_K = 1.0
 PER_MASS = 0.9  # the mass model's factor per unit of weighted mass
 MODELS = ("share", "mass")
 
@@ -67,15 +71,16 @@ class Decay:
     """How understanding fades while a unit changes without you.
 
     `share` (the default): by the share of the unit that changed, exp(-rate * share), where
-    the share is the weighted changed lines landed on the unit over its size in lines. A
-    fixed amount of change is a large part of a small unit and a small part of a large one,
-    so the rate means the same in every repository and for every unit. The exponential
-    composes: fading over two stretches of change is fading over their sum.
+    the share is the weighted changed lines landed on the unit over its size in lines, no
+    commit counting more lines than the unit holds just after it. A fixed amount of change is
+    a large part of a small unit and a small part of a large one, so the rate (config
+    `decay_k`) means the same for every unit. The exponential composes: fading over two
+    stretches of change is fading over their sum.
 
     `mass`: the Phase 1 rule, per_mass ** weighted mass landed, kept to compare the two."""
 
     model: str = "share"
-    rate: float = SHARE_RATE
+    rate: float = DECAY_K
     per_mass: float = PER_MASS
 
     def __post_init__(self) -> None:

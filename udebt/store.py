@@ -22,6 +22,7 @@ from typing import Any
 from . import repo
 
 DIR = ".udebt"
+LEGACY_RATE = 1.386  # the Phase 1.4 default of what is now decay_k
 
 
 def now_iso() -> str:
@@ -32,7 +33,7 @@ def now_iso() -> str:
 class Config:
     model: str | None = None
     decay_model: str = "share"  # share: by the share of a unit changed; mass: per unit of mass
-    share_decay_rate: float = 1.386  # share model: exp(-rate x share changed); ln 4
+    decay_k: float = 1.0  # share model: exp(-k x share changed); fitted (ROADMAP Phase 5)
     decay_per_commit: float = 0.9  # mass model: the factor per unit of weighted mass
     evidence_window: int = 5
     known_threshold: float = 0.6
@@ -56,7 +57,7 @@ class Config:
         """The decay rule these settings describe (scoring.Decay)."""
         from .scoring import Decay
 
-        return Decay(self.decay_model, self.share_decay_rate, self.decay_per_commit)
+        return Decay(self.decay_model, self.decay_k, self.decay_per_commit)
 
     def primary(self, email: str) -> str:
         """The developer key for `email`: the identity group's primary address, else itself."""
@@ -80,6 +81,11 @@ class Config:
         if not path.exists():
             return cls()
         data = json.loads(path.read_text(encoding="utf-8"))
+        # Phase 1.4 called k `share_decay_rate` and wrote its default, ln 4, into every config
+        # it saved: read a value someone chose as decay_k, let the old default go
+        legacy = data.pop("share_decay_rate", None)
+        if legacy is not None and "decay_k" not in data and float(legacy) != LEGACY_RATE:
+            data["decay_k"] = float(legacy)
         known = {k: data.pop(k) for k in list(data) if k in cls.__dataclass_fields__}
         return cls(**known, extra=data)
 
@@ -87,7 +93,7 @@ class Config:
         d = {
             "model": self.model,
             "decay_model": self.decay_model,
-            "share_decay_rate": self.share_decay_rate,
+            "decay_k": self.decay_k,
             "decay_per_commit": self.decay_per_commit,
             "evidence_window": self.evidence_window,
             "known_threshold": self.known_threshold,

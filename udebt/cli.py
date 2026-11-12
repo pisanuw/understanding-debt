@@ -353,6 +353,15 @@ def _note(s_, u, prov, by_score) -> str:
     return pre + "quiz"
 
 
+def _decay_line(d: scoring.Decay) -> str:
+    if d.model == "share":
+        return (
+            f"Decay: understanding x exp(-{d.rate:g} x share of the unit changed since), a "
+            "commit counting at most the unit's size (config decay_k)."
+        )
+    return f"Decay: understanding x {d.per_mass:g} per unit of mass landed since (model mass)."
+
+
 def cmd_status(args) -> int:
     root, store = _ctx(args)
     store.require()
@@ -454,6 +463,7 @@ def cmd_status(args) -> int:
         "ai% = weighted share of the unit's mass by an AI agent (assisted counts half). "
         "you% = share you authored (assisted counts half). Bot commits are left out of both."
     )
+    print(_decay_line(cfg.decay))
     if hier.has_children(units) and not deep:
         print("Sub-units: `udebt status --deep`, or `udebt status <unit>` for one unit.")
     pool = [
@@ -1443,7 +1453,8 @@ def cmd_experiment(args) -> int:
         )
     print(
         "\nsince = weighted mass landed on the unit after the snapshot; share = share of the "
-        "unit changed since (weighted changed lines / size at HEAD); pred = the decay model's "
+        "unit changed since (weighted changed lines, each commit's capped at the unit's size "
+        "after it, / size at HEAD); pred = the decay model's "
         "score for a developer who knew the unit at the snapshot; score = mean of correct 1,"
         " partial 0.5, wrong and unknown 0; cw = confidently wrong (confidence 3); change = "
         "where the lines since went (files the snapshot had: edited; files it lacked: new)."

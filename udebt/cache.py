@@ -5,7 +5,8 @@ three more full passes of its own (effective lines, added files, renames), which
 59,000-commit history took minutes each. The cache keeps, per sha:
 
     the record provenance.parse_log produces: parents, author date, name and email,
-    subject, body and per-file changed lines (what load_commits builds a Commit from);
+    subject, body and per file the changed and the deleted lines (what load_commits builds a
+    Commit from; the deletions track a unit's size for the share decay's cap);
     the weighing inputs, each filled the first time the weights need it: effective lines
     (`eff`), files added (`add`), whether it renames a file (`ren`) and the files whose
     diff is a version bump (`ver`);
@@ -44,7 +45,7 @@ from .history import rename_pairs, rename_shas
 from .provenance import Commit, Signature, classify_all, commit_from, parse_log
 from .weights import WeighInputs, _effective, added_files, version_bumps
 
-FORMAT = 1  # bump when the stored record changes; an older file is rebuilt
+FORMAT = 2  # bump when the stored record changes; an older file is rebuilt (2: deletions)
 NAME = "commits-parsed.json"
 GZIP_OVER = 4_000_000  # bytes of plain JSON above which the file is written gzipped
 INPUT_KINDS = ("eff", "add", "ren", "ver")

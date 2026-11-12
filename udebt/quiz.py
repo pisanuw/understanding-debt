@@ -18,7 +18,7 @@ from .prompts import (
     questions_prompt,
     stable_questions_prompt,
 )
-from .provenance import Commit, landed, line_weight, provenance_of
+from .provenance import Commit, landed, line_weight, provenance_of, touches_of
 from .responsibility import Responsibility, effective_scope
 from .responsibility import load as load_responsibility
 from .sizes import share
@@ -36,18 +36,18 @@ def landed_since(
 ) -> tuple[float, float]:
     """(weighted mass, weighted changed lines) landed on `paths` after commit `since_sha`
     (all of history if that commit is unknown; nothing without one). The lines are each
-    commit's changed lines under the paths times its line weight (weights.line_weights), the
-    numerator of the share-changed decay. Bot commits land nothing: automation does not erode
-    anyone's understanding."""
+    commit's changed lines under the paths, capped at the unit's size just after it
+    (provenance.touches_of), times its line weight (weights.line_weights): the numerator of
+    the share-changed decay. Bot commits land nothing: automation does not erode anyone's
+    understanding."""
     if since_sha is None:
         return 0.0, 0.0
     idx = next((i for i, c in enumerate(commits) if c.sha == since_sha), -1)
-    later = commits[idx + 1 :] if idx >= 0 else commits
     mass = lines = 0.0
-    for c in later:
-        if c.touches(paths):
-            mass += landed(c, weights) * c.attribution(paths, split=split)
-            lines += line_weight(c, line_weights, weights) * c.lines_in(paths, split)
+    for t in touches_of(commits, paths, split):
+        if t.pos > idx:
+            mass += landed(t.commit, weights) * t.att
+            lines += line_weight(t.commit, line_weights, weights) * t.lines
     return round(mass, 3), round(lines, 1)
 
 

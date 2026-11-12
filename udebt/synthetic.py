@@ -46,7 +46,7 @@ from .filekinds import mechanical
 from .llm import LLM
 from .mapping import commits_for, unit_mass, weights_for
 from .prompts import ANSWER_SCHEMA, answer_prompt
-from .provenance import Commit, _under, landed, line_weight
+from .provenance import Commit, Touch, _under, landed, line_weight, touches_of
 from .quiz import generate_questions, grade, unit_sizes_at
 from .scoring import Decay
 from .sizes import share as share_of
@@ -276,14 +276,21 @@ def unit_rows(
         change, edited = classify_change(m_since, old, new)
         extra: dict[str, Any] = {}
         if sizes is not None:
+            # capped at the unit's size after each commit (provenance.touches_of)
             lines = sum(
+                line_weight(t.commit, lws, weights) * t.lines
+                for t in touches_of(commits, paths, split)
+                if t.commit.sha in since_shas
+            )
+            s = share_of(lines, sizes.get(u["id"], 0.0))
+            uncapped = sum(
                 line_weight(c, lws, weights) * c.lines_in(paths, split)
                 for c in since
                 if c.touches(paths)
             )
-            s = share_of(lines, sizes.get(u["id"], 0.0))
             extra = {
                 "lines_changed": round(lines, 1),
+                "lines_uncapped": round(uncapped, 1),
                 "size_lines": sizes.get(u["id"], 0.0),
                 "share_changed": s,
                 "predicted": round(decay.factor(m_since, s), 3),
@@ -610,6 +617,7 @@ def suggest(
     by_sha = {c.sha: c for c in commits}
     line = _git(root, "rev-list", "--first-parent", head).split()
     totals: dict[str, float] = {}
+    unit_touches: dict[str, list[Touch]] = {}
 
     def measure(at: str) -> float:
         shas = [s for s in _git(root, "rev-list", f"{at}..{head}").split() if s in by_sha]
@@ -624,12 +632,15 @@ def suggest(
                 parts.append(unit_mass(since, paths, weights, split) / whole if whole else 0.0)
             return sum(parts) / len(parts)
         total = 0.0
+        in_range = set(shas)
         for u in picked:
-            paths, split = u.get("paths", []), members.split(u["id"])
+            touches = unit_touches.setdefault(
+                u["id"], touches_of(commits, u.get("paths", []), members.split(u["id"]))
+            )
             lines = sum(
-                line_weight(by_sha[s], lws, weights) * by_sha[s].lines_in(paths, split)
-                for s in shas
-                if by_sha[s].touches(paths)
+                line_weight(t.commit, lws, weights) * t.lines
+                for t in touches
+                if t.commit.sha in in_range
             )
             total += share_of(lines, sizes.get(u["id"], 0.0))
         return total / len(picked)

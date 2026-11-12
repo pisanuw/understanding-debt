@@ -62,3 +62,6 @@
 2026-11-12 [note] digitalme 12 points, 312 events (4 HIGH), 184 KB; dsa-instructor 19 points, 240 events (143 HIGH), 5.1 s cold, 306 KB. June refactor: index 51.8 -> 56.3. No quiz drop yet.
 2026-11-12 [note] e2485d4 runs: map paths unvalidated (hf: 104/105 package-relative, 0 files matched); synthetic hf share vs wrongness rho 0.82 p 0.002; sentry-js, mlflow mapped.
 2026-11-12 [code] Map paths resolved against tracked files: exact, else a unique suffix, else dropped to `unresolved`; coverage < 50% or an empty unit retries once (`--no-retry`), then `warnings`.
+2026-11-12 [decision] A commit's changed lines in a unit are capped at the unit's size just after it (running sum of its growth); a deletion counts its size once. chroma-integration 43.9 -> 1.32.
+2026-11-12 [decision] k refit on 108 unit-snapshots plus hf's summary, shares capped: pooled 1.00 (per repo 2.72, 0.42, ~0.6). Config `decay_k` = 1.0 replaces share_decay_rate (ln 4).
+2026-11-12 [code] Parsed-commit cache format 2 keeps per-file deletions; replay fingerprint gains a rules version; synthetic rows add lines_uncapped; status prints the decay rule.
