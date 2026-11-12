@@ -21,8 +21,10 @@ scores are acceptable.
   touching the unit's paths. This is what makes debt grow while the AI builds.
 - **LLM via the `claude` CLI**, subscription-billed, read-only tools (Read, Glob, Grep),
   structured output via `--json-schema`. No API key. `UDEBT_LLM=fake` for offline tests.
-- **Storage is JSON under `.udebt/`**, committed to the repo: `map.json` shared,
-  `records/<email-slug>.jsonl` per developer, append-only.
+- **Storage is JSON under `.udebt/`**, all of it committed to the repo by default:
+  `map.json` shared, `records/<email-slug>.jsonl` per developer, append-only. One file
+  per developer keeps merges conflict-free.
+- **Five questions per quiz session** by default. Short enough to run often.
 - **Python, stdlib only** at runtime. Dev deps: pytest, ruff.
 
 ## Non-goals (for now)
@@ -35,7 +37,5 @@ scores are acceptable.
 
 ## Open questions
 
-- Should `records/` be committed by default, or opt-in per team?
 - Threshold for "architectural decision worth an acknowledgement" when we add
   capture-at-generation-time.
-- How many questions per session before it feels like homework. Default is 5.

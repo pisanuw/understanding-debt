@@ -39,8 +39,8 @@ udebt scope <unit> blackbox    # "I choose not to understand this"; excluded fro
 udebt status --team            # who holds which unit; bus factor per unit
 ```
 
-Commit `.udebt/map.json` so the team shares one map. Commit `.udebt/records/*.jsonl` if the
-team wants the shared view; each file holds one developer's quiz history.
+Commit everything under `.udebt/`. The map is shared, and each `records/<developer>.jsonl`
+file holds one developer's quiz history, so the team view and bus factor work for everyone.
 
 ## The model
 
