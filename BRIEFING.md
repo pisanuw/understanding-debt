@@ -342,6 +342,54 @@ acceptable.
     Unit colours in the breakdown reuse the palette from the start when eight developer
     lines leave fewer than three free slots.
 
+- **Phase 3.2, the question ladder (2026-11-12)**: the first real quiz on digitalme (10
+  answers, none correct) asked only implementation questions; the owner wanted the
+  architecture first. The structure changed, not the wording:
+  - **Five levels** (owner-approved): 1 purpose and placement, 2 decision and alternatives,
+    3 consequence across units, 4 behaviour under failure, 5 implementation (the old
+    questions). Levels 1-3 name no function, variable, file or code block of the repository;
+    they may name an external technology the decision is about (a database, a host, a model
+    provider), since a decision is often a choice between products. Level 4 may name files or
+    components. The grader is told the level: at 1-3 a plain-language answer is not marked
+    down for lacking identifiers, and partial means the role or decision is right but a
+    dependency or consequence is missing.
+  - **Progression is derived from the records**, each storing `level` (`forced: true` under
+    `quiz --level N`): next = depth + 1, depth being the highest n with levels 1..n passed by
+    their latest sitting (one run's answers at that level; all must be correct). Partial,
+    wrong and unknown repeat a level; "wrong at n >= 2 may drop to n - 1" is read as: a
+    *confidently* wrong answer at n >= 2 asks n - 1 first (a misconception about a decision
+    puts the unit's role in doubt), a plain wrong repeats n. Depth-based progression makes
+    records from before the ladder (level 5) and forced answers harmless: neither can skip a
+    level not shown, and a forced level 1 pass is still a pass.
+  - **Score**: v_n = mean evidence of level n's latest sitting; verified = max(0, (v1 + v2 +
+    v3) / 3 + 0.1 x (v4 + v5)), up to 1.2; understanding = min(1, verified x fade). The cap is
+    after the fade on purpose: capped before it, depth could never count on the ladder
+    (level 4 needs 1-3 passed, already 1.0), so "lift above the threshold, never required"
+    is read as headroom: a unit known to level 5 stays at 1.0 until 18% of it changed, and a
+    faded understanding can be lifted back over 0.6. Confidently wrong is -0.5 at its level.
+    The decay machinery and the single fade from the last answer are as before.
+  - **The evidence window** no longer applies on the ladder (each level's latest sitting
+    counts; a window over the unit's last 5 answers would drop levels 1-3 after five level 5
+    answers). It stays for config `evidence_model: "flat"`, the old mean, kept to compare.
+  - **Pre-ladder records** are level 5: depth evidence only (0.1 at most), so a unit answered
+    only before the ladder reads near zero until levels 1-3 are answered. No testbed here has
+    any; the owner's 10 local answers on digitalme would read that way.
+  - **Orientation**: before a unit's level 1 question, for a developer with no level 1-3
+    answer on it (pre-ladder answers do not count, they were about code): purpose (without
+    the dependencies the question asks for), decision with alternatives and why, two or three
+    paths (checked against the tracked files), who shaped it (written by the model from the
+    unit's `history`). Cached on the unit in map.json with the `basis` it was written from
+    (a hash of the unit's fields), so a re-map that changes the unit rewrites it and one that
+    does not keeps it; one call per quiz run for all missing ones, before the questions call,
+    and the question writer sees it. `udebt dig` opens with it and asks its check question at
+    the developer's ladder level.
+  - `udebt quiz --preview` prints orientations, questions and reference answers as Markdown,
+    records nothing (orientations are still cached), and runs `ladder.identifiers_in`, a
+    heuristic for code-like tokens, over the level 1-3 questions. It made the digitalme
+    sample, `.udebt/samples/digitalme-ladder-quiz.md` (2 calls, 38 s).
+  - The synthetic experiment asks at one explicit level (`--level`, default 3), recorded in
+    its report (version 3). The replay fingerprint adds the evidence model; rules version 3.
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.
@@ -417,3 +465,22 @@ acceptable.
 - k differs by repository more than between forms (2.72 digitalme, 0.42 dsa-instructor,
   0.93 huggingface_hub): calibrate it per repository from its own quizzes once there are
   some, with 1.0 as the default?
+- Ladder (Phase 3.2): should decay move a developer back down? Today the ladder moves only on
+  answers, so a unit rewritten since levels 1-3 were passed still asks level 4 next, though its
+  understanding has faded. Re-ask the highest passed level once its faded value is under the
+  threshold?
+- Ladder: only a confidently wrong answer drops a level; should two plain wrong answers in a
+  row at a level n >= 2 drop one too?
+- Ladder: passing levels 1 and 2 is 0.67, over the 0.6 known threshold, so a holder need not
+  have shown level 3. Raise the threshold (0.7) so a holder has shown all three?
+- Orientation leak: on a flow unit the orientation's decision lists the steps of the flow, and
+  the digitalme sample's chat-flow level 1 question (what it relies on before and after
+  generation) is half answered by it. Keep orientations to the choice and its alternatives,
+  or accept that a first level 1 answer partly measures reading?
+- Pre-ladder answers count as level 5 (as the brief said), so the owner's 10 local digitalme
+  answers give those units almost nothing. Ignore them, or count them as they were (flat) until
+  the unit has a level 1-3 answer?
+- Level 1-3 questions may name external technologies (PostgreSQL, Supabase, the model
+  provider). Confirm, or forbid those too?
+- A parent's depth is its own answers only; sub-unit quizzes roll up understanding but not
+  depth. Show the sub-units' minimum depth on the parent?

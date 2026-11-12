@@ -414,6 +414,35 @@ open questions. One `claude` CLI call (the huggingface_hub map; no retry was nee
 The caps and the new k change no event count on digitalme or dsa-instructor (the events are
 the prior's, which neither touches enough to cross a threshold); the muting does it all.
 
+### Phase 3.2: the question ladder
+
+**Status 2026-11-12: done.** From the owner's first real quiz on digitalme (10 answers over
+two sittings: 0 correct, 1 partial, 4 wrong, 5 unknown), every question about one exception
+handler, one call or one function: "I would need to understand the overall architecture
+better before I could understand how the API key is used." Two model calls (the validation
+sample).
+
+| item | status |
+|---|---|
+| ladder | done: 1 purpose and placement, 2 decision and alternatives, 3 consequence across units, 4 behaviour under failure, 5 implementation (`udebt/ladder.py`); levels 1-3 name no identifier |
+| progression | done: derived from the records (each stores `level`): next = depth + 1, a confident wrong at n >= 2 asks n - 1; pre-ladder records are level 5 and move nothing |
+| scoring | done: verified = (v1 + v2 + v3) / 3 + 0.1 (v4 + v5) from each level's latest sitting, understanding = min(1, verified x fade); `evidence_model: "flat"` keeps the old mean |
+| questions prompt | done: one call per run, each unit at its level with its decision, alternatives, why and history, the ladder described, identifiers forbidden at 1-3 explicitly; the grader told the level rules |
+| orientation | done: before the first level 1 question on a unit, cached in map.json (`orientation`, with the basis it was written from), all missing ones in one call; `dig` opens with it |
+| `quiz --level N`, `--preview` | done: a forced level (the old flat questions at 5) recorded `forced`; a Markdown preview that records nothing |
+| depth shown | done: `status` (and `--deep`), `timeline --dev`/`--unit`, the dashboard's units table and breakdown, the export |
+| synthetic | done: `--level` (default 3) recorded in the report (version 3); not run |
+| validation | done: `.udebt/samples/digitalme-ladder-quiz.md`, five units at level 1 with their orientations; no level 1 question names an identifier, by hand and by heuristic |
+
+**Question-set variance should drop once levels are controlled.** The Phase 3.1 refit found
+the same huggingface_hub snapshot scoring 0.75 on one question set and 0.58 on another
+(Phase 5): the stable prompt asked "a decision question and a behaviour question", and what
+the model wrote for each ranged from purpose to one function's edge case. With every question
+of a run at one explicit level, two question sets differ in their wording, not in their
+depth, so the next synthetic run should measure a smaller spread between question sets at a
+fixed level; it is also the first chance to see how the decay curve differs by level (level 3
+should fade with the share changed less steeply than level 5 does).
+
 ## Phase 4: hosted (Netlify, Render, Supabase) with the CLI as the local twin
 
 **Adds**
