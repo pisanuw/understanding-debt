@@ -34,6 +34,7 @@ class Config:
     bus_target: int = 2  # holders above known_threshold every architectural unit should have
     footprint_threshold: float = 0.1  # human share of a unit that seeds responsibility
     cochange_max_files: int = 30  # commits touching more files are left out of co-change
+    group_max_commits: int = 50  # a merged branch up to this long is weighed as one commit
     identities: dict[str, list[str]] = field(default_factory=dict)  # primary email -> aliases
     # CODEOWNERS handle -> email (or list of emails); null marks a handle still to be mapped
     handles: dict[str, Any] = field(default_factory=dict)
@@ -76,6 +77,7 @@ class Config:
             "bus_target": self.bus_target,
             "footprint_threshold": self.footprint_threshold,
             "cochange_max_files": self.cochange_max_files,
+            "group_max_commits": self.group_max_commits,
             "identities": self.identities,
             "handles": self.handles,
             "directed": self.directed,

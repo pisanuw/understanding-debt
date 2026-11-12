@@ -8,6 +8,13 @@ to be a commit count: churn, decay, provenance shares and the own-commit prior.
 The weight is heuristic from cheap git signals (one extra `git log -w` pass gives the
 whitespace-ignored line counts for every commit). `refine()` lets an LLM re-classify the
 heaviest commits; results are cached in .udebt/commits.json so the cost is paid once.
+
+Branch commits are weighed as one piece of work. A repository that squashes each pull
+request lands it as one commit; one that merges keeps its ten small commits, which weighed
+on their own would carry several times the weight for the same work. So the commits a merge
+brings in from its branch form a group: the group is weighed once, as if squashed, and its
+weight is shared among its commits by their effective lines. Commits on the main line (the
+first-parent chain from HEAD) stay as they are.
 """
 
 from __future__ import annotations
@@ -21,11 +28,14 @@ from pathlib import Path
 from typing import Any
 
 from .filekinds import kind as _kind
+from .filekinds import mechanical
 from .history import KEYWORDS, _toplevel
 from .provenance import Commit
 
 # LLM refinement classes and the weight each implies.
 CLASS_WEIGHT = {"architectural": 1.0, "behavioural": 0.6, "refactor": 0.3, "cosmetic": 0.05}
+CACHE_VERSION = 2  # 2: branch commits grouped under their merge
+GROUP_MAX_COMMITS = 50  # a longer branch is a long-lived line of work, not a pull request
 
 
 @dataclass
@@ -35,10 +45,17 @@ class CommitWeight:
     reasons: list[str] = field(default_factory=list)
     effective_lines: int = 0  # whitespace-ignored insertions + deletions
     refined: str | None = None  # LLM class, if refined
+    group: str | None = None  # the merge whose branch brought this commit in, if grouped
+    standalone: float | None = None  # the commit's heuristic weight on its own, if grouped
 
 
 def effective_lines(root: Path) -> dict[str, int]:
     """sha -> insertions + deletions ignoring whitespace and blank lines, one git pass."""
+    return {sha: total for sha, (total, _) in _effective(root).items()}
+
+
+def _effective(root: Path) -> dict[str, tuple[int, int]]:
+    """sha -> (effective lines, effective lines outside lockfiles and generated files)."""
     out = subprocess.run(
         ["git", "log", "--format=%x1e%H", "--numstat", "-w", "--ignore-blank-lines"],
         cwd=root,
@@ -48,19 +65,22 @@ def effective_lines(root: Path) -> dict[str, int]:
         encoding="utf-8",
         errors="replace",
     ).stdout
-    result: dict[str, int] = {}
+    result: dict[str, tuple[int, int]] = {}
     for rec in out.split("\x1e"):
         lines = rec.strip().splitlines()
         if not lines:
             continue
-        sha, total = lines[0].strip(), 0
+        sha, total, counted = lines[0].strip(), 0, 0
         for ln in lines[1:]:
-            m = re.match(r"^(\d+|-)\t(\d+|-)\t", ln)
+            m = re.match(r"^(\d+|-)\t(\d+|-)\t(.*)$", ln)
             if m:
-                total += (int(m.group(1)) if m.group(1).isdigit() else 0) + (
+                n = (int(m.group(1)) if m.group(1).isdigit() else 0) + (
                     int(m.group(2)) if m.group(2).isdigit() else 0
                 )
-        result[sha] = total
+                total += n
+                if not mechanical(m.group(3)):
+                    counted += n
+        result[sha] = (total, counted)
     return result
 
 
@@ -139,55 +159,225 @@ def heuristic_weight(
 
 
 def compute_weights(
-    root: Path, commits: list[Commit], renames: set[str]
+    root: Path,
+    commits: list[Commit],
+    renames: set[str],
+    group_max: int = GROUP_MAX_COMMITS,
 ) -> dict[str, CommitWeight]:
-    eff = effective_lines(root)
+    eff = _effective(root)
     added = added_files(root)
     seen_dirs: set[str] = set()
+    new_dirs: dict[str, set[str]] = {}
     out: dict[str, CommitWeight] = {}
     for i, c in enumerate(commits):  # oldest first
         dirs = {d for d in (_toplevel(f) for f in c.files) if d}
-        new_dirs = (dirs - seen_dirs) if i >= 3 else set()
+        new_dirs[c.sha] = (dirs - seen_dirs) if i >= 3 else set()
         seen_dirs |= dirs
         out[c.sha] = heuristic_weight(
-            c, eff.get(c.sha, 0), added.get(c.sha, set()), renames, new_dirs
+            c, eff.get(c.sha, (0, 0))[0], added.get(c.sha, set()), renames, new_dirs[c.sha]
         )
+    by_sha = {c.sha: c for c in commits}
+    for merge, members in branch_groups(commits).items():
+        work = [by_sha[s] for s in members if by_sha[s].files]  # merges inside land nothing
+        if 2 <= len(work) <= group_max:
+            _weigh_group(by_sha[merge], work, out, eff, added, renames, new_dirs)
     return out
+
+
+# -- branch groups -------------------------------------------------------------------
+
+
+def branch_groups(commits: list[Commit]) -> dict[str, list[str]]:
+    """merge sha -> the commits its branch brought in, oldest first.
+
+    A merge's branch is the first-parent chain of each of its other parents, back to where it
+    meets history already merged. Its own commits form the merge's group; merges on that
+    chain (a pull request merged into a long-lived branch, say) form groups of their own, so
+    every commit belongs to the innermost merge that brought it in. A "merge main into my
+    branch" commit brings in nothing new and has no group. Commits on the main line from HEAD
+    belong to no group."""
+    by_sha = {c.sha: c for c in commits}
+    if not by_sha:
+        return {}
+    order = {c.sha: i for i, c in enumerate(commits)}
+    parent_of = {p for c in commits for p in c.parents}
+    tips = [c.sha for c in commits if c.sha not in parent_of]
+    seen: set[str] = set()  # ancestor-closed: everything merged so far
+    groups: dict[str, list[str]] = {}
+
+    def chain(start: str) -> list[str]:
+        """First-parent chain from `start` back to merged history, oldest first."""
+        out: list[str] = []
+        cur: str | None = start
+        while cur is not None and cur in by_sha and cur not in seen:
+            out.append(cur)
+            ps = by_sha[cur].parents
+            cur = ps[0] if ps else None
+        return out[::-1]
+
+    def walk(line: list[str]) -> None:
+        # Oldest first, so when a merge is reached everything below its first parent is
+        # already in `seen` and its branch stops exactly where it forked.
+        stack: list[tuple[list[str], int, str | None]] = [(line, 0, None)]
+        while stack:
+            line_, i, owner = stack.pop()
+            if i >= len(line_):
+                continue
+            sha = line_[i]
+            stack.append((line_, i + 1, owner))
+            if sha in seen:
+                continue
+            seen.add(sha)
+            if owner is not None and not by_sha[sha].is_merge:
+                groups.setdefault(owner, []).append(sha)
+            for p in by_sha[sha].parents[1:]:
+                sub = chain(p)
+                if sub:
+                    stack.append((sub, 0, sha))
+
+    for tip in tips[::-1]:  # HEAD is the newest tip
+        walk(chain(tip))
+    return {m: sorted(ms, key=order.__getitem__) for m, ms in groups.items()}
+
+
+_DEFAULT_MERGE = re.compile(
+    r"^Merge (pull request #\d+ from|(remote-tracking )?branch(es)?|tag|commit) ", re.I
+)
+
+
+def _title(merge: Commit) -> str | None:
+    """What the work was called: a merge's own subject, or for a default `Merge pull request
+    #12 from ...` message the pull request title on the body's first line."""
+    if not _DEFAULT_MERGE.match(merge.subject):
+        return merge.subject
+    first = merge.body.strip().splitlines()[0].strip() if merge.body.strip() else ""
+    return first or None
+
+
+def _weigh_group(
+    merge: Commit,
+    work: list[Commit],
+    out: dict[str, CommitWeight],
+    eff: dict[str, tuple[int, int]],
+    added: dict[str, set[str]],
+    renames: set[str],
+    new_dirs: dict[str, set[str]],
+) -> None:
+    """Weigh a branch's commits as if squashed into one, then share that weight among them
+    by their effective lines outside lockfiles and generated files, the same lines that
+    decide which units a commit's weight lands in."""
+    files: list[str] = []
+    per_file: dict[str, int] = {}
+    for c in work:
+        for f in c.files:
+            if f not in per_file:
+                files.append(f)
+            per_file[f] = per_file.get(f, 0) + c.file_lines.get(f, 0)
+    squashed = Commit(
+        sha=merge.sha + ":branch",
+        date=merge.date,
+        author_name=merge.author_name,
+        author_email=merge.author_email,
+        subject=_title(merge) or " / ".join(c.subject for c in work),
+        body="",
+        files=files,
+        insertions=sum(c.insertions for c in work),
+        deletions=sum(c.deletions for c in work),
+        file_lines=per_file,
+    )
+    renamed = {squashed.sha} if any(c.sha in renames for c in work) else set()
+    g = heuristic_weight(
+        squashed,
+        sum(eff.get(c.sha, (0, 0))[0] for c in work),
+        set().union(*(added.get(c.sha, set()) for c in work)),
+        renamed,
+        set().union(*(new_dirs.get(c.sha, set()) for c in work)),
+    )
+    basis = [eff.get(c.sha, (0, 0))[1] for c in work]
+    if sum(basis) <= 0:
+        basis = [eff.get(c.sha, (0, 0))[0] for c in work]
+    if sum(basis) <= 0:
+        basis = [1] * len(work)
+    total = sum(basis)
+    note = f"branch of {merge.short}: {len(work)} commits weighed as one ({g.weight})"
+    for c, b in zip(work, basis, strict=True):
+        own = out[c.sha]
+        out[c.sha] = CommitWeight(
+            c.sha,
+            round(g.weight * b / total, 3),
+            [note, f"{b / total:.0%} of its lines", *g.reasons],
+            own.effective_lines,
+            group=merge.sha,
+            standalone=own.weight,
+        )
 
 
 # -- cache -----------------------------------------------------------------------
 
 
+def cache_version(path: Path) -> int:
+    if not path.exists():
+        return CACHE_VERSION
+    return int(json.loads(path.read_text(encoding="utf-8")).get("version", 1))
+
+
 def load_cache(path: Path) -> dict[str, CommitWeight]:
+    """Version 1 and 2 caches both load; version 1 entries simply have no group."""
     if not path.exists():
         return {}
     data = json.loads(path.read_text(encoding="utf-8"))
-    return {sha: CommitWeight(**d) for sha, d in data.get("commits", {}).items()}
+    fields = set(CommitWeight.__dataclass_fields__)
+    return {
+        sha: CommitWeight(**{k: v for k, v in d.items() if k in fields})
+        for sha, d in data.get("commits", {}).items()
+    }
 
 
 def save_cache(path: Path, weights: dict[str, CommitWeight]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = {"version": 1, "commits": {sha: asdict(w) for sha, w in weights.items()}}
+    commits = {}
+    for sha, w in weights.items():
+        d = asdict(w)
+        for k in ("group", "standalone"):  # keep ungrouped entries as small as version 1
+            if d[k] is None:
+                del d[k]
+        commits[sha] = d
+    data = {"version": CACHE_VERSION, "commits": commits}
     path.write_text(json.dumps(data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def ensure_weights(
-    root: Path, cache_path: Path, commits: list[Commit], renames: set[str]
+    root: Path,
+    cache_path: Path,
+    commits: list[Commit],
+    renames: set[str],
+    group_max: int = GROUP_MAX_COMMITS,
 ) -> dict[str, CommitWeight]:
-    """Cached weights, recomputing heuristics only for commits the cache has not seen.
-    Refined entries are never overwritten."""
+    """Cached weights. When history has commits the cache has not seen, or the cache is an
+    older version, the heuristics are recomputed for every commit (a new merge can group
+    commits weighed before) and the LLM classes of refined commits are blended in again on
+    the new heuristic, so a refinement is paid for once and never lost."""
     cached = load_cache(cache_path)
-    missing = [c for c in commits if c.sha not in cached]
-    if missing:
-        fresh = compute_weights(root, commits, renames)
-        for c in missing:
-            cached[c.sha] = fresh[c.sha]
+    stale = cache_version(cache_path) < CACHE_VERSION
+    if stale or any(c.sha not in cached for c in commits):
+        fresh = compute_weights(root, commits, renames, group_max)
+        for sha, w in fresh.items():
+            old = cached.get(sha)
+            if old is not None and old.refined in CLASS_WEIGHT:
+                _blend(w, old.refined)
+            cached[sha] = w
         save_cache(cache_path, cached)
     return cached
 
 
 def mass(commits: list[Commit], weights: dict[str, CommitWeight]) -> float:
     return round(sum(weights[c.sha].weight for c in commits if c.sha in weights), 3)
+
+
+def _blend(w: CommitWeight, cls: str) -> None:
+    w.weight = round(0.5 * w.weight + 0.5 * CLASS_WEIGHT[cls], 3)
+    w.refined = cls
+    w.reasons = [*w.reasons, f"llm: {cls}"]
 
 
 def apply_refinement(weights: dict[str, CommitWeight], grades: list[dict[str, Any]]) -> int:
@@ -200,8 +390,6 @@ def apply_refinement(weights: dict[str, CommitWeight], grades: list[dict[str, An
         cls = g.get("klass")
         if w is None or cls not in CLASS_WEIGHT:
             continue
-        w.weight = round(0.5 * w.weight + 0.5 * CLASS_WEIGHT[cls], 3)
-        w.refined = cls
-        w.reasons = [*w.reasons, f"llm: {cls}"]
+        _blend(w, cls)
         n += 1
     return n

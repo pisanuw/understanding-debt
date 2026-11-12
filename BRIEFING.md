@@ -127,6 +127,15 @@ acceptable.
   never gets more of a file than its parent. One `units.Membership` per map feeds share,
   attribution, churn, provenance, decay, risk and footprint. Blackbox units still count as
   listing a file.
+- **Squash bias fixed by grouping** (owner): a merge's branch commits (the first-parent
+  chain of its other parents, back to merged history) are weighed once as a squashed commit
+  and share that weight by effective lines outside lockfiles. Innermost merge wins, so a pull
+  request merged into a long-lived branch is its own group. Branches over
+  `group_max_commits` (50) stay ungrouped: a 67-commit review branch on dsa-instructor is a
+  line of work, not one change. Merging main into a branch adds nothing. Total mass drops
+  17% on digitalme, 45% on dsa-instructor. A recompute re-blends LLM refinements on the new
+  heuristic. Foxtrot merges (`git pull` merges on the main line) would group a teammate's
+  pushed commits as one; neither local testbed has a pull of main on its main line.
 - **Team view without quizzes** (owner): when no developer has a quiz record, it says
   "no quiz evidence yet; holders need a quiz score >= threshold" and labels the holder
   column `quizzed`.

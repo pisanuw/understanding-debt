@@ -49,7 +49,9 @@ def commits_for(root: Path, store: Store) -> list[Commit]:
 
 
 def weights_for(root: Path, store: Store, commits: list[Commit]) -> dict[str, CommitWeight]:
-    return ensure_weights(root, store.weights_path, commits, rename_shas(root))
+    return ensure_weights(
+        root, store.weights_path, commits, rename_shas(root), store.config.group_max_commits
+    )
 
 
 def unit_mass(
@@ -157,7 +159,9 @@ def build_map(
         raise SystemExit("No tracked files to map. Commit something first.")
     commits = commits_for(root, store)
     renames = rename_shas(root)
-    weights = ensure_weights(root, store.weights_path, commits, renames)
+    weights = ensure_weights(
+        root, store.weights_path, commits, renames, store.config.group_max_commits
+    )
     candidates = decision_candidates(commits, renames, max_history)
     tree = tree_summary(files) if len(files) > FILE_LIST_LIMIT else None
     struct = discover(root, store, files, commits, weights)

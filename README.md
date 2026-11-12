@@ -79,7 +79,20 @@ ignored lines, log scale), dependency and infrastructure changes, new code files
 top-level directories and changes spanning several directories push the weight up; merges
 weigh 0. `udebt weigh --refine` asks the model to classify the heaviest commits as
 architectural, behavioural, refactor or cosmetic and blends that in. Weights are cached in
-`.udebt/commits.json`. When a commit touches several units, each unit receives the commit's
+`.udebt/commits.json` (version 2; a version 1 cache is recomputed, keeping refinements).
+
+**A merged branch is weighed as one commit.** A repository that squashes every pull request
+lands it as one commit; one that merges keeps the branch's commits, and weighed one by one
+ten 20-line commits would carry about 3.9 against 0.61 for the same 200 lines squashed. So
+the commits a merge brings in from its branch (the first-parent chain of its second parent,
+back to history already merged) form a group: the group is weighed once as if squashed
+(combined files and effective lines, the pull request title as the subject), and that weight
+is shared among its commits in proportion to their effective lines outside lockfiles and
+generated files. Each commit then lands its part in units by its own line share as usual. A
+pull request merged into a long-lived branch is its own group; "merge main into my branch"
+brings in nothing; commits on the main line (first parents from HEAD) are weighed alone, and
+so are branches longer than `group_max_commits` (default 50), which are lines of work rather
+than pull requests. `udebt risk` on an unmerged branch still weighs its commits one by one. When a commit touches several units, each unit receives the commit's
 weight times the square root of the share of changed lines that fell in that unit. The
 square root is deliberate: a unit that got a tenth of a large architectural commit carries
 about a third of its debt, because a new dependency or a changed model spills past the lines

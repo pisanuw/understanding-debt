@@ -5,7 +5,7 @@ from conftest import AI_ENV, git
 from udebt import cli
 from udebt.history import rename_shas
 from udebt.provenance import load_commits
-from udebt.weights import compute_weights, ensure_weights
+from udebt.weights import branch_groups, compute_weights, ensure_weights
 
 
 def test_heuristic_weights(mixed_repo):
@@ -49,7 +49,134 @@ def test_cache_keeps_refinements(mixed_repo):
     again = ensure_weights(root, path, cs, set())
     assert again[cs[0].sha].weight == 0.99 and again[cs[0].sha].refined == "architectural"
     data = json.loads(path.read_text())
-    assert data["version"] == 1 and len(data["commits"]) == len(cs)
+    assert data["version"] == 2 and len(data["commits"]) == len(cs)
+
+
+def test_version_1_cache_is_recomputed_keeping_refinements(mixed_repo):
+    root = mixed_repo
+    cs = load_commits(root)
+    path = root / ".udebt" / "commits.json"
+    fresh = compute_weights(root, cs, set())
+    first = cs[0].sha
+    v1 = {
+        sha: {
+            "sha": sha,
+            "weight": 0.123,  # stale numbers from an older heuristic
+            "reasons": ["old"],
+            "effective_lines": w.effective_lines,
+            "refined": "architectural" if sha == first else None,
+        }
+        for sha, w in fresh.items()
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"version": 1, "commits": v1}))
+    again = ensure_weights(root, path, cs, set())
+    assert json.loads(path.read_text())["version"] == 2
+    # recomputed from the current heuristic; the refinement is blended in again, not lost
+    assert again[first].refined == "architectural"
+    assert again[first].weight == round(0.5 * fresh[first].weight + 0.5 * 1.0, 3)
+    assert all(again[c.sha].weight == fresh[c.sha].weight for c in cs[1:])
+
+
+def _feature_repo(root, *, squash: bool):
+    """main with one module, then a feature of ten 20-line commits, merged with a merge commit
+    or squashed into one commit."""
+    root.mkdir()
+    git(root, "init", "-q", "-b", "main")
+    git(root, "config", "user.name", "Dev One")
+    git(root, "config", "user.email", "dev1@example.com")
+    (root / "app").mkdir()
+    (root / "app" / "base.py").write_text("BASE = 1\n")
+    git(root, "add", ".")
+    git(root, "commit", "-q", "-m", "initial")
+    lines: list[str] = []
+    if not squash:
+        git(root, "checkout", "-q", "-b", "feature")
+    for i in range(10):
+        lines += [f"def f{i}_{j}():\n    return {i * 100 + j}\n" for j in range(10)]
+        (root / "app" / "core.py").write_text("".join(lines))
+        if not squash:
+            git(root, "add", ".")
+            git(root, "commit", "-q", "-m", f"core step {i}")
+    if squash:
+        git(root, "add", ".")
+        git(root, "commit", "-q", "-m", "Add core (#1)")
+    else:
+        git(root, "checkout", "-q", "main")
+        (root / "app" / "base.py").write_text("BASE = 2\n")  # main moved on meanwhile
+        git(root, "commit", "-q", "-am", "bump base")
+        git(root, "merge", "-q", "--no-ff", "feature", "-m", "Merge pull request #1 from x/feature")
+    return root
+
+
+def test_squash_and_merge_weigh_alike(tmp_path):
+    merged = _feature_repo(tmp_path / "merged", squash=False)
+    squashed = _feature_repo(tmp_path / "squashed", squash=True)
+
+    def feature_mass(root):
+        cs = load_commits(root)
+        w = compute_weights(root, cs, set())
+        feat = [c for c in cs if "app/core.py" in c.files]
+        return sum(w[c.sha].weight for c in feat), [w[c.sha] for c in feat]
+
+    m_total, m_weights = feature_mass(merged)
+    s_total, (s_weight,) = feature_mass(squashed)
+    assert len(m_weights) == 10 and s_weight.group is None
+    assert abs(m_total - s_total) <= 0.2 * s_total, (m_total, s_total)
+    # before grouping, the ten small commits weighed several times the squashed one
+    standalone = sum(w.standalone for w in m_weights)
+    assert standalone > 4 * s_total
+    assert all(w.group and "weighed as one" in w.reasons[0] for w in m_weights)
+    # main-line commits are left alone
+    cs = load_commits(merged)
+    w = compute_weights(merged, cs, set())
+    bump = next(c for c in cs if c.subject == "bump base")
+    assert w[bump.sha].group is None and w[bump.sha].standalone is None
+    merge = next(c for c in cs if c.is_merge)
+    assert w[merge.sha].weight == 0.0
+
+
+def test_branch_groups_nesting(tmp_path):
+    """A pull request merged into a long-lived branch is its own group; the long-lived
+    branch's direct commits are the outer merge's group; merging main into a branch brings
+    in nothing; main-line commits belong to no group."""
+    root = tmp_path / "g"
+    root.mkdir()
+    git(root, "init", "-q", "-b", "main")
+    git(root, "config", "user.name", "D")
+    git(root, "config", "user.email", "d@example.com")
+
+    def commit(name):
+        (root / f"{name}.py").write_text(f"{name} = 1\n")
+        git(root, "add", ".")
+        git(root, "commit", "-q", "-m", name)
+        return git(root, "rev-parse", "HEAD").strip()
+
+    m0 = commit("m0")
+    git(root, "checkout", "-q", "-b", "develop")
+    d1 = commit("d1")
+    git(root, "checkout", "-q", "-b", "pr")
+    p1, p2 = commit("p1"), commit("p2")
+    git(root, "checkout", "-q", "main")
+    m1 = commit("m1")
+    git(root, "checkout", "-q", "pr")
+    git(root, "merge", "-q", "--no-ff", "main", "-m", "Merge branch 'main' into pr")
+    p3 = commit("p3")
+    git(root, "checkout", "-q", "develop")
+    git(root, "merge", "-q", "--no-ff", "pr", "-m", "Merge pull request #2 from x/pr")
+    pr_merge = git(root, "rev-parse", "HEAD").strip()
+    d2 = commit("d2")
+    git(root, "checkout", "-q", "main")
+    git(root, "merge", "-q", "--no-ff", "develop", "-m", "Merge branch 'develop'")
+    release = git(root, "rev-parse", "HEAD").strip()
+    m2 = commit("m2")
+
+    groups = branch_groups(load_commits(root))
+    assert groups[pr_merge] == [p1, p2, p3]
+    assert groups[release] == [d1, d2]
+    grouped = {s for ms in groups.values() for s in ms}
+    assert not grouped & {m0, m1, m2}
+    assert len(groups) == 2  # "Merge branch 'main' into pr" has no group of its own
 
 
 def test_weigh_refine_and_risk_cli(mixed_repo, monkeypatch, capsys):

@@ -27,3 +27,5 @@
 2026-11-12 [decision] Directed agent work (config `directed`, `udebt directed add`): a matched ai commit stays ai but counts as the developer's assisted work (half) in share, prior, footprint.
 2026-11-12 [decision] A file listed by k units gives each 1/k of its lines (top level, then among the parent's sub-units); one Membership index per map feeds every attribution.
 2026-11-12 [decision] Prior cap stays 0.5. Team view without any quiz says 'no quiz evidence yet; holders need a quiz score >= threshold' and labels the holder column `quizzed`.
+2026-11-12 [decision] Squash bias: a merged branch (second-parent chain, <= group_max_commits 50) is weighed once as if squashed, shared by effective lines. commits.json v2.
+2026-11-12 [note] Grouping cuts total mass: digitalme 83.9 -> 69.7, dsa-instructor 991.9 -> 541.2, go-git 1388 -> 898; squash-merging repos (prefect) unchanged.
