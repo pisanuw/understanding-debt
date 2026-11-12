@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -74,7 +75,8 @@ class ClaudeCLI:
             cmd += ["--tools", ""]
         if self.verbose:
             mode = "read" if read_tools else "none"
-            print(f"[udebt] claude call ({len(prompt)} chars, tools={mode})")
+            # stderr, so a command whose stdout is data (quiz --preview, --format) stays clean
+            print(f"[udebt] claude call ({len(prompt)} chars, tools={mode})", file=sys.stderr)
         proc = subprocess.run(
             cmd, input=prompt, cwd=cwd, capture_output=True, text=True, encoding="utf-8"
         )

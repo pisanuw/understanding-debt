@@ -271,3 +271,23 @@ def test_dig_opens_with_the_orientation_and_checks_at_the_ladder_level(
     assert "level 2 of 5: decision and alternatives" in out
     last = store.load_records("dev1@example.com")[-1]
     assert last["source"] == "dig" and last["level"] == 2
+
+
+def test_status_deep_shows_depth_per_sub_unit(layered_repo, fake, capsys):
+    """alice has passed levels 1-3 on one db sub-unit and level 1 on the other; status
+    --deep shows each sub-unit's depth next to its understanding."""
+    root = layered_repo
+    store = _mapped(root, capsys)
+    db = next(u for u in store.require_map()["units"] if "shop/db/models.py" in u["paths"])
+    first, second = (c["id"] for c in db["children"][:2])
+    dev = "alice@example.com"
+    for rec in understood(first, "2099-01-01T00:00:00+00:00"):
+        store.append_record(dev, rec)
+    store.append_record(dev, r(1, "correct", "2099-01-01T00:00:00+00:00", unit=second))
+    store.append_record(dev, r(2, "wrong", "2099-01-02T00:00:00+00:00", unit=second))
+    assert cli.main(["--repo", str(root), "--as-user", dev, "status", "--deep"]) == 0
+    out = capsys.readouterr().out
+    print(out)
+    rows = {ln.split()[0]: ln for ln in out.splitlines() if ln.startswith("  " + db["id"])}
+    assert " 1.00   3/5 " in rows[first] and " 0.33   1/5 " in rows[second]
+    assert any(" -  " in ln or "   - " in ln for ln in out.splitlines()), "no answer: -"
