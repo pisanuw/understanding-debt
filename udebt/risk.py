@@ -23,7 +23,7 @@ from . import units as hier
 from .filekinds import VERSION_PATHSPECS, version_candidate
 from .provenance import Commit, _under, landed
 from .scoring import UnitScore
-from .weights import CommitWeight, heuristic_weight, parse_version_diff
+from .weights import CommitWeight, heuristic_weight, parse_version_diff, toml_diff_opts
 
 HIGH_MASS, HIGH_UND = 0.3, 0.3
 CAUTION_MASS = 0.1
@@ -101,8 +101,8 @@ def staged_commit(root: Path) -> tuple[Commit, CommitWeight]:
         text=True,
     ).stdout.split()
     diff = subprocess.run(
-        ["git", "diff", "--cached", "-p", "-U0", "--no-renames", "--no-ext-diff", "--no-color"]
-        + ["--", *VERSION_PATHSPECS],
+        ["git", *toml_diff_opts(), "diff", "--cached", "-p", "-U0", "--no-renames"]
+        + ["--no-ext-diff", "--no-color", "--", *VERSION_PATHSPECS],
         cwd=root,
         check=True,
         capture_output=True,

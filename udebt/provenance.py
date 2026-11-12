@@ -387,12 +387,16 @@ _NUMSTAT = re.compile(r"^(\d+|-)\t(\d+|-)\t(.+)$")
 _LOG_FORMAT = "%x1e%H%x1f%P%x1f%aI%x1f%aN%x1f%aE%x1f%s%x1f%b%x1d"  # %aN/%aE honour .mailmap
 
 
-def git_log(root: Path, args: list[str], shas: list[str] | None = None) -> str:
+def git_log(
+    root: Path, args: list[str], shas: list[str] | None = None, git_opts: list[str] | None = None
+) -> str:
     """`git log <args>` over history from HEAD, or over exactly `shas` (fed on stdin with
-    `--no-walk`, so nothing else is walked). Output is decoded leniently."""
-    cmd = ["git", "log", *args]
+    `--no-walk`, so nothing else is walked). `git_opts` go before `log` (`-c key=value`).
+    Output is decoded leniently."""
+    cmd = ["git", *(git_opts or []), "log", *args]
     if shas is not None:
-        cmd[2:2] = ["--no-walk=unsorted", "--stdin"]
+        at = cmd.index("log") + 1
+        cmd[at:at] = ["--no-walk=unsorted", "--stdin"]
     return subprocess.run(
         cmd,
         cwd=root,

@@ -11,6 +11,7 @@ from udebt.weights import (
     branch_groups,
     compute_weights,
     ensure_weights,
+    parse_version_diff,
     version_bumps,
     version_only,
 )
@@ -369,6 +370,70 @@ def test_major_upgrade_commits_keep_their_weight(tmp_path):
         assert by[subject].sha not in bumps
         assert "dependencies changed" in w[by[subject].sha].reasons
         assert w[by[subject].sha].weight >= 0.4
+
+
+def test_toml_dependency_tables():
+    """A version line inside a dependency's own table (`[dependencies.serde]`) is a pin."""
+    diff = (
+        "diff --git a/Cargo.toml b/Cargo.toml\n--- a/Cargo.toml\n+++ b/Cargo.toml\n"
+        '@@ -3 +3 @@ [package]\n-version = "0.1.0"\n+version = "0.2.0"\n'
+        '@@ -9 +9 @@ [dependencies.serde]\n-version = "{a}"\n+version = "{b}"\n'
+    )
+    assert parse_version_diff(diff.format(a="1.0.188", b="1.0.190")) == {"Cargo.toml": True}
+    assert parse_version_diff(diff.format(a="1.0", b="2.0")) == {"Cargo.toml": False}
+    # without the table name (no context) the line reads as the project's own version
+    plain = diff.replace(" [dependencies.serde]", "").replace(" [package]", "")
+    assert parse_version_diff(plain.format(a="1.0", b="2.0")) == {"Cargo.toml": True}
+    # target-specific, dev, workspace and Poetry tables are dependency tables too
+    for table in (
+        "[target.'cfg(unix)'.dependencies.libc]",
+        "[dev-dependencies.tokio]",
+        "[workspace.dependencies.rand]",
+    ):
+        d = diff.replace("[dependencies.serde]", table)
+        assert parse_version_diff(d.format(a="0.2", b="0.3")) == {"Cargo.toml": False}
+    poetry = diff.replace("Cargo.toml", "pyproject.toml").replace(
+        "[dependencies.serde]", "[tool.poetry.dependencies.requests]"
+    )
+    assert parse_version_diff(poetry.format(a="2.31", b="3.0")) == {"pyproject.toml": False}
+    # a version line in any other table is still a version line
+    other = diff.replace("[dependencies.serde]", "[workspace.package]")
+    assert parse_version_diff(other.format(a="1.0", b="2.0")) == {"Cargo.toml": True}
+
+
+def test_cargo_table_major_upgrade_weighs(tmp_path):
+    root = tmp_path / "crate"
+    root.mkdir()
+    git(root, "init", "-q", "-b", "main")
+    git(root, "config", "user.name", "Dev One")
+    git(root, "config", "user.email", "dev1@example.com")
+
+    def cargo(own: str, serde: str) -> None:
+        (root / "Cargo.toml").write_text(
+            f'[package]\nname = "app"\nversion = "{own}"\n\n[dependencies]\nrand = "0.8"\n\n'
+            f'[dependencies.serde]\nversion = "{serde}"\nfeatures = ["derive"]\n'
+        )
+
+    cargo("0.1.0", "1.0.188")
+    (root / "src").mkdir()
+    (root / "src" / "main.rs").write_text("fn main() {}\n")
+    git(root, "add", ".")
+    git(root, "commit", "-q", "-m", "initial")
+    cargo("0.1.0", "1.0.190")
+    git(root, "commit", "-q", "-am", "serde patch")
+    cargo("0.2.0", "1.0.190")
+    git(root, "commit", "-q", "-am", "release 0.2.0")
+    cargo("0.2.0", "2.0.0")
+    git(root, "commit", "-q", "-am", "serde 2")
+    cs = load_commits(root)
+    by = {c.subject: c for c in cs}
+    bumps = version_bumps(root, commits=cs)
+    w = compute_weights(root, cs, set())
+    for subject in ("serde patch", "release 0.2.0"):
+        assert bumps[by[subject].sha] == {"Cargo.toml"}
+        assert w[by[subject].sha].weight == VERSION_BUMP_WEIGHT
+    assert by["serde 2"].sha not in bumps
+    assert "dependencies changed" in w[by["serde 2"].sha].reasons
 
 
 def test_staged_version_bump(tmp_path):

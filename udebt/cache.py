@@ -50,8 +50,8 @@ GZIP_OVER = 4_000_000  # bytes of plain JSON above which the file is written gzi
 INPUT_KINDS = ("eff", "add", "ren", "ver")
 # A weighing input whose rule changed: cached values of an older version are dropped and
 # recomputed (one restricted pass) without re-parsing the history. `ver` 2: a dependency
-# moved to a new major version is no longer a version bump.
-INPUT_VERSIONS = {"ver": 2}
+# moved to a new major version is no longer a version bump; 3: nor in a TOML dependency table.
+INPUT_VERSIONS = {"ver": 3}
 GITIGNORE = "# derived by udebt, rebuilt on demand (`udebt cache status`)\n{name}\n{name}.gz\n"
 
 

@@ -10,7 +10,7 @@ from udebt import cache as cache_mod
 from udebt import cli
 from udebt.history import rename_shas
 from udebt.provenance import load_commits, load_signatures
-from udebt.weights import WeighInputs, compute_weights
+from udebt.weights import CACHE_VERSION, WeighInputs, compute_weights
 
 
 def _with_merge(root):
@@ -163,7 +163,7 @@ def test_cache_cli_and_gitignore(mixed_repo, monkeypatch, capsys):
     rc, out = run("weigh")
     rc, out = run("cache", "status")
     assert rc == 0 and "7 commits cached; 7 reachable from HEAD: 0 new" in out
-    assert "gitignored: yes" in out and "version 4" in out
+    assert "gitignored: yes" in out and f"version {CACHE_VERSION}" in out
     rc, out = run("cache", "rebuild")
     assert rc == 0 and "Rebuilt: parsed 7 commits" in out and "versions 7" in out
     status = subprocess.run(

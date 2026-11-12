@@ -19,9 +19,12 @@ first-parent chain from HEAD) stay as they are.
 
 from __future__ import annotations
 
+import atexit
 import json
 import math
+import os
 import re
+import tempfile
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -34,7 +37,8 @@ from .provenance import Commit, git_log
 
 # LLM refinement classes and the weight each implies.
 CLASS_WEIGHT = {"architectural": 1.0, "behavioural": 0.6, "refactor": 0.3, "cosmetic": 0.05}
-CACHE_VERSION = 4  # 2: branch commits grouped; 3: version bumps; 4: major upgrades weigh
+CACHE_VERSION = 5  # 2: branch commits grouped; 3: version bumps; 4: major upgrades weigh;
+# 5: a major upgrade in a TOML dependency table (`[dependencies.serde]`) weighs too
 VERSION_BUMP_WEIGHT = 0.03  # a release that only moves version numbers, like a lockfile bump
 NEAR_ZERO = {"docs", "lock", "generated", "media"}  # kinds that leave a version bump a bump
 GROUP_MAX_COMMITS = 50  # a longer branch is a long-lived line of work, not a pull request
@@ -111,7 +115,47 @@ _VERSION_LINE = re.compile(
 )
 # A version string: at least major.minor, so `"port": 3000` is not one.
 _VERSION_TOKEN = re.compile(r"v?\d+(\.\d+)+([-+][0-9A-Za-z.-]+)?")
-_HUNK = re.compile(r"^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@")
+_HUNK = re.compile(r"^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@ ?(.*)$")
+# TOML manifests can give a dependency a table of its own: `[dependencies.serde]` then
+# `version = "1.0"` (Cargo, also `[dev-dependencies.x]`, `[target.'cfg(unix)'.dependencies.x]`,
+# `[workspace.dependencies.x]`), or `[tool.poetry.dependencies.x]` in pyproject.toml. There
+# the version line is a pin, not the project's own version. A `-U0` diff shows no context, so
+# git is asked to name the enclosing table in each hunk header (TOML_DIFF_OPTS).
+_TOML_MANIFEST = re.compile(r"(^|/)(Cargo|pyproject)\.toml$")
+_DEP_TABLE = re.compile(r"^\[\s*(?:[^\]]*\.)?(?:dev-|build-)?dependencies\.([^\]]+?)\s*\]")
+_TOML_ATTRIBUTES = "Cargo.toml diff=udebt-toml\npyproject.toml diff=udebt-toml\n"
+_attributes_file: str | None = None
+
+
+def toml_diff_opts() -> list[str]:
+    """`git -c` options that make a diff's hunk headers name the TOML table a change is in
+    (`@@ -9 +9 @@ [dependencies.serde]`), for Cargo.toml and pyproject.toml only. The
+    attributes file is written once per process and removed at exit. A repository's own
+    .gitattributes giving those files a diff driver wins; the table form is then missed."""
+    global _attributes_file
+    if _attributes_file is None or not os.path.exists(_attributes_file):
+        fd, path = tempfile.mkstemp(prefix="udebt-", suffix=".gitattributes")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(_TOML_ATTRIBUTES)
+        atexit.register(lambda: os.path.exists(path) and os.unlink(path))
+        _attributes_file = path
+    return [
+        "-c",
+        f"core.attributesFile={_attributes_file}",
+        "-c",
+        r"diff.udebt-toml.xfuncname=^\[.*\]",
+    ]
+
+
+def _in_dep_table(path: str, section: str, line: str) -> str:
+    """A TOML manifest's `version = "..."` line inside a dependency's own table, as a pin
+    (`serde.version = "1.0"`), so it is compared as a dependency, not as the own version."""
+    if not section or not _TOML_MANIFEST.search(path):
+        return line
+    m = _DEP_TABLE.match(section)
+    if m is None or not re.match(r"\s*version\s*=", line):
+        return line
+    return f"{m.group(1).strip()}.{line.strip()}"
 
 
 def major(token: str) -> tuple[int, ...] | None:
@@ -179,18 +223,19 @@ def version_only(removed: list[str], added: list[str]) -> bool:
 def parse_version_diff(out: str) -> dict[str, bool]:
     """path -> version-only, from one commit's `-p -U0` diff of manifest and version files.
     Hunk headers give the line counts, so a removed line that itself starts with `--` is
-    read as content."""
+    read as content; with toml_diff_opts they also name the TOML table, so a version line in
+    a dependency's own table reads as that dependency's pin."""
     changes: dict[str, tuple[list[str], list[str]]] = {}
     cur: tuple[list[str], list[str]] | None = None
-    old_path = ""
+    old_path = path = section = ""
     minus = plus = 0
     for ln in out.split("\n"):
         if minus or plus:
             if ln.startswith("-") and minus and cur is not None:
-                cur[0].append(ln[1:])
+                cur[0].append(_in_dep_table(path, section, ln[1:]))
                 minus -= 1
             elif ln.startswith("+") and plus and cur is not None:
-                cur[1].append(ln[1:])
+                cur[1].append(_in_dep_table(path, section, ln[1:]))
                 plus -= 1
             elif not ln.startswith("\\"):  # "\ No newline at end of file"
                 minus = plus = 0
@@ -209,6 +254,7 @@ def parse_version_diff(out: str) -> dict[str, bool]:
         elif cur is not None and (m := _HUNK.match(ln)):
             minus = 1 if m.group(1) is None else int(m.group(1))
             plus = 1 if m.group(2) is None else int(m.group(2))
+            section = m.group(3).strip()
     return {p: version_only(r, a) for p, (r, a) in changes.items()}
 
 
@@ -232,7 +278,7 @@ def version_bumps(
     args = ["-p", "-U0", "--no-renames", "--no-ext-diff", "--no-color", "--format=%x1e%H"]
     if shas is None:
         args.append("--full-history")
-    out = git_log(root, [*args, "--", *VERSION_PATHSPECS], shas)
+    out = git_log(root, [*args, "--", *VERSION_PATHSPECS], shas, toml_diff_opts())
     result: dict[str, set[str]] = {}
     for rec in out.split("\x1e"):
         sha, _, diff = rec.partition("\n")
