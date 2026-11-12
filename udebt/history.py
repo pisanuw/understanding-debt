@@ -15,12 +15,11 @@ Bot commits (dependabot, release automation) are never candidates.
 from __future__ import annotations
 
 import re
-import subprocess
 from pathlib import Path
 from typing import Any
 
 from .filekinds import INFRA, MANIFESTS
-from .provenance import Commit
+from .provenance import Commit, git_log
 
 KEYWORDS = re.compile(
     r"\b(migrat\w*|switch\w*|replac\w*|adopt\w*|introduc\w*|rewrit\w*|refactor\w*|restructur\w*|"
@@ -32,16 +31,11 @@ KEYWORDS = re.compile(
 SKIP_TOPLEVEL = {".github", ".vscode", ".idea", "node_modules", "__pycache__", ".udebt"}
 
 
-def rename_shas(root: Path) -> set[str]:
-    out = subprocess.run(
-        ["git", "log", "-M", "--diff-filter=R", "--format=%H", "--name-status"],
-        cwd=root,
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    ).stdout
+def rename_shas(root: Path, shas: list[str] | None = None) -> set[str]:
+    """Commits that rename or move a file, over history from HEAD or over exactly `shas`."""
+    if shas is not None and not shas:
+        return set()
+    out = git_log(root, ["-M", "--diff-filter=R", "--format=%H", "--name-status"], shas)
     shas = set()
     current = None
     for line in out.splitlines():

@@ -45,7 +45,20 @@ acceptable.
   structured output via `--json-schema`. No API key. `UDEBT_LLM=fake` for offline tests.
 - **Storage is JSON under `.udebt/`**, all of it committed to the repo by default:
   `map.json` shared, `records/<email-slug>.jsonl` per developer, append-only. One file
-  per developer keeps merges conflict-free.
+  per developer keeps merges conflict-free. The one exception is the parsed-commit cache.
+- **Parsed-commit cache** (Phase 1.2): `.udebt/commits-parsed.json` (gzipped as
+  `.json.gz` above 4 MB) holds per sha what `git log --numstat` gives (author, date,
+  subject, body, parents, per-file lines) and the weighing inputs (effective lines, added
+  files, renames, version-bump files), each filled the first time the weights need it.
+  `git rev-list HEAD` decides what is used: new shas are parsed with `git log --no-walk
+  --stdin`, unreachable ones are dropped. Classification and directed work are recomputed
+  each load. A `.mailmap` change or a format change rebuilds it. **Gitignored**, through
+  `.udebt/.gitignore` written by `init` and by the cache itself: it is derived, any command
+  rebuilds it, and it grows with history (3.6 MB plain for 2510 commits; roughly 85 MB
+  plain, 20-25 MB gzipped, extrapolated for servo's 59k). `commits.json` stays committed
+  because it holds the LLM refinements nobody wants to pay for twice. The cache sits next
+  to the committed files rather than in `.git/` so that `udebt` never writes inside git's
+  own directory and the cache is easy to find and delete.
 - **Five questions per quiz session** by default. Short enough to run often.
 - **Python, stdlib only** at runtime. Dev deps: pytest, ruff.
 

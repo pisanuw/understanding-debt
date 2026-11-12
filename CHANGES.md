@@ -34,3 +34,5 @@
 2026-11-12 [note] Dogfood .udebt regenerated: commits.json v2, map rescored, both sessions directed by pisan@uw.edu, whose seeded set is now all 12 units (index 74.9).
 2026-11-12 [note] Starter-set offline run on ba564e2 (TESTBEDS.md): servo 0 AI in 59k commits; human-cut version bumps weigh >=0.7 (244 in sentry-js); servo weigh 18 min.
 2026-11-12 [decision] Version-only manifest/version-file edits (own version or pins) are a `version` kind: no +0.3, out of line share; a commit of only bumps weighs 0.03. commits.json v3.
+2026-11-12 [decision] Parsed-commit cache .udebt/commits-parsed.json(.gz): new shas parsed via rev-list, unreachable dropped, classes recomputed; gitignored, commits.json committed.
+2026-11-12 [note] Cache on dsa-instructor: contributors 4.8 -> 0.26 s, weigh 5.2 (14.6 recompute) -> 0.30 s warm; prefect 4.1 -> 0.28, 4.2 (9.4) -> 0.29 s. Cold costs as before.

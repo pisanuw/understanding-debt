@@ -65,11 +65,29 @@ udebt hook install             # warn-only pre-push hook that runs `udebt risk`
 udebt scope <unit> blackbox    # "I choose not to understand this", for you (or --for <dev>)
 udebt scope <unit> blackbox --team   # for everyone: stored in the map
 udebt experiment synthetic --at <rev> [--units N]   # validation: a synthetic developer (3 calls)
+udebt cache [status|rebuild]   # the parsed-commit cache (gitignored)
 ```
 
-Commit everything under `.udebt/`. The map and `responsibility.json` are shared, and each
-`records/<developer>.jsonl` file holds one developer's quiz history, so the team view and
-bus factor work for everyone.
+Commit everything under `.udebt/` except the parsed-commit cache, which `.udebt/.gitignore`
+keeps out. The map and `responsibility.json` are shared, each `records/<developer>.jsonl`
+file holds one developer's quiz history, so the team view and bus factor work for everyone,
+and `commits.json` holds the commit weights with their LLM refinements, paid for once.
+
+**The parsed-commit cache.** Every command reads the whole history, and `weigh` reads it
+four more ways (whitespace-ignored lines, added files, renames, version bumps). The first
+command parses it once into `.udebt/commits-parsed.json` (`commits-parsed.json.gz` above
+4 MB), keyed by sha: each commit's author, date, subject, body, parents and per-file line
+counts, plus the weighing inputs once `weigh` has needed them. After that a command runs
+`git rev-list HEAD`, parses only the commits the cache has not seen (`git log --no-walk`),
+and drops cached commits no longer reachable from HEAD, so a rebase or an amend never leaves
+stale history behind. Classification is recomputed from the cached fields on every load, so
+a new signature in `config.json` applies at once; a `.mailmap` change rebuilds the cache.
+On dsa-instructor (2510 commits) `contributors` goes from 4.8 s to 0.26 s and `weigh` from
+5.2 s (14.6 s when the weights need recomputing) to 0.30 s once the cache is warm; the cold
+run costs what a run cost before. The cache is derived and large on long histories (3.6 MB
+for 2510 commits, about a quarter of that gzipped), so it is gitignored; a teammate's first
+command rebuilds it. `udebt cache` shows what it holds against HEAD; `udebt cache rebuild`
+starts it afresh.
 
 ## The model
 

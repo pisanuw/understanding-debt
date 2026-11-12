@@ -6,3 +6,5 @@ __pycache__/
 build/
 dist/
 .venv/
+.udebt/commits-parsed.json
+.udebt/commits-parsed.json.gz

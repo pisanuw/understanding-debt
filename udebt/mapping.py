@@ -9,7 +9,8 @@ from typing import Any
 
 from . import repo, scoring, structure
 from . import units as hier
-from .history import decision_candidates, rename_shas, tree_summary
+from .cache import open_cache
+from .history import decision_candidates, tree_summary
 from .llm import LLM
 from .prompts import MAP_SCHEMA, map_prompt
 from .provenance import (
@@ -18,20 +19,12 @@ from .provenance import (
     assign_directed,
     landed,
     load_bots,
-    load_commits,
     load_signatures,
     summarize,
     unit_provenance,
 )
 from .store import Store, now_iso
-from .weights import (
-    CommitWeight,
-    WeighInputs,
-    _effective,
-    added_files,
-    ensure_weights,
-    version_bumps,
-)
+from .weights import CommitWeight, ensure_weights
 
 MAP_VERSION = 3
 IGNORED_PREFIXES = (".git/", ".udebt/", "node_modules/", "dist/", "build/", "__pycache__/")
@@ -48,28 +41,33 @@ def mappable_files(root: Path) -> list[str]:
 
 
 def commits_for(root: Path, store: Store) -> list[Commit]:
+    """Every commit reachable from HEAD, oldest first, classified with the configured
+    signatures and marked with the agent work each developer directed. Read through the
+    parsed-commit cache (cache.py): only commits it has not seen are parsed."""
     cfg = store.config
     sigs = load_signatures(cfg.extra.get("ai_signatures"))
-    commits = load_commits(root, sigs, bots=load_bots(cfg.extra.get("bot_signatures")))
+    bots = load_bots(cfg.extra.get("bot_signatures"))
+    commits = open_cache(root, store.dir).commits(sigs, bots)
     assign_directed(commits, cfg.directed, cfg.primary)
     return commits
 
 
 def weights_for(root: Path, store: Store, commits: list[Commit]) -> dict[str, CommitWeight]:
     """Cached commit weights. Also marks each commit's version-bump files, which line share
-    leaves out, so call it before taking any share or attribution."""
-    versions = version_bumps(root, commits=commits)
+    leaves out, so call it before taking any share or attribution. The weighing inputs come
+    from the parsed-commit cache, and only when the weights need recomputing."""
+    pc = open_cache(root, store.dir)
+    versions = pc.versions(commits)
     for c in commits:
         c.version_files = versions.get(c.sha, set())
         c.__dict__.pop("counted_lines", None)  # recomputed without the version lines
-    renames = rename_shas(root)
     return ensure_weights(
         root,
         store.weights_path,
         commits,
-        renames,
+        None,
         store.config.group_max_commits,
-        lambda: WeighInputs(_effective(root), added_files(root), renames, versions),
+        lambda: pc.inputs(commits),
     )
 
 
@@ -177,8 +175,8 @@ def build_map(
     if not files:
         raise SystemExit("No tracked files to map. Commit something first.")
     commits = commits_for(root, store)
-    renames = rename_shas(root)
     weights = weights_for(root, store, commits)
+    renames = open_cache(root, store.dir).renames(commits)
     candidates = decision_candidates(commits, renames, max_history)
     tree = tree_summary(files) if len(files) > FILE_LIST_LIMIT else None
     struct = discover(root, store, files, commits, weights)

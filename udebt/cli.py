@@ -12,6 +12,7 @@ udebt risk [range]              a change's weight per unit against your understa
 udebt dig [<id>]                guided walkthrough of the worst unit (or a chosen one)
 udebt directed add <session>    count agent commits you directed as your assisted work
 udebt experiment synthetic --at <rev>   quiz a synthetic developer frozen at an old snapshot
+udebt cache [status|rebuild]    the parsed-commit cache under .udebt/ (gitignored)
 """
 
 from __future__ import annotations
@@ -1023,6 +1024,61 @@ def cmd_experiment(args) -> int:
     return 0
 
 
+def cmd_cache(args) -> int:
+    """The parsed-commit cache (cache.py): what is on disk, or rebuild it from scratch."""
+    import time
+
+    from . import cache as cache_mod
+    from .weights import cache_version, load_cache
+
+    root, store = _ctx(args)
+    store.require()
+    pc = cache_mod.open_cache(root, store.dir)
+    if args.action == "rebuild":
+        pc.clear()
+        t0 = time.monotonic()
+        commits = commits_for(root, store)
+        t1 = time.monotonic()
+        pc.inputs(commits)
+        t2 = time.monotonic()
+        print(
+            f"Rebuilt: parsed {pc.stats.parsed} commits in {t1 - t0:.1f}s, weighing inputs "
+            f"in {t2 - t1:.1f}s."
+        )
+    st = pc.status()
+    if st["path"] is None:
+        print("No parsed-commit cache yet; any command builds it (or `udebt cache rebuild`).")
+        return 0
+    kind = "gzip" if st["gzip"] else "plain JSON"
+    size = f"{st['bytes'] / 1e6:.2f} MB, {kind}"
+    print(f"Parsed-commit cache: {st['path'].relative_to(root)} ({size})")
+    print(
+        f"  {st['cached']} commits cached; {st['reachable']} reachable from HEAD: "
+        f"{st['new']} new to parse, {st['stale']} unreachable to drop on the next load"
+    )
+    names = {"eff": "effective lines", "add": "added files", "ren": "renames", "ver": "versions"}
+    print("  weighing inputs: " + ", ".join(f"{names[k]} {n}" for k, n in st["inputs"].items()))
+    if not st["format_ok"]:
+        print(f"  format {st['format']} is not {cache_mod.FORMAT}: the next load rebuilds it")
+    if not st["mailmap_ok"]:
+        print("  .mailmap changed since it was written: the next load rebuilds it")
+    ignored = (
+        subprocess.run(
+            ["git", "check-ignore", "-q", str(st["path"])], cwd=root, capture_output=True
+        ).returncode
+        == 0
+    )
+    print(f"  gitignored: {'yes' if ignored else 'NO (it is derived; keep it out of git)'}")
+    weights = load_cache(store.weights_path)
+    refined = sum(1 for w in weights.values() if w.refined)
+    print(
+        f"Weights: {store.weights_path.relative_to(root)}, version "
+        f"{cache_version(store.weights_path)}, {len(weights)} commits ({refined} LLM-refined); "
+        "commit this one"
+    )
+    return 0
+
+
 def cmd_hook(args) -> int:
     root, store = _ctx(args)
     store.require()
@@ -1163,6 +1219,10 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--at", required=True, metavar="REV", help="the snapshot it knows")
     x.add_argument("--units", type=int, help="the N most important units (default all)")
     x.set_defaults(fn=cmd_experiment)
+
+    s = sub.add_parser("cache", help="the parsed-commit cache: status, or rebuild it")
+    s.add_argument("action", nargs="?", choices=["status", "rebuild"], default="status")
+    s.set_defaults(fn=cmd_cache)
 
     s = sub.add_parser("hook", help="git hooks")
     s.add_argument("action", choices=["install"])

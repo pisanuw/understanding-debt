@@ -3,6 +3,7 @@
 map.json             shared architectural map, two levels of units (commit this)
 records/<slug>.jsonl one developer's evidence, append-only (commit this for team view)
 commits.json         per-commit weights (heuristic, LLM-refined for the heaviest); commit this
+commits-parsed.json  parsed git history, a cache (`.json.gz` when large); gitignored, derived
 responsibility.json  each developer's responsibility set and per-developer scope (commit this)
 config.json          settings (model, decay, identities, handles, directed agents, bus target)
 """
@@ -101,7 +102,10 @@ class Store:
         return self.dir.is_dir()
 
     def init(self) -> None:
+        from .cache import ensure_gitignore
+
         self.records_dir.mkdir(parents=True, exist_ok=True)
+        ensure_gitignore(self.dir)
         if not self.config_path.exists():
             self.config_path.write_text(
                 json.dumps(Config().dump(), indent=2) + "\n", encoding="utf-8"
