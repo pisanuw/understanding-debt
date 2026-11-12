@@ -216,6 +216,49 @@ The major-version rule (Phase 1.3, ROADMAP) changes 4 of huggingface_hub's 2,849
 commits (ruff and mypy upgrades within 0.x, each now +0.3; mass 1314.1 to 1315.2) and no
 candidate.
 
+## Runs on e2485d4 (2026-11-12, owner-approved `claude` CLI calls)
+
+**Unit paths are not validated.** A second `udebt map` on huggingface_hub (one call, 49 s)
+returned 104 of 105 unit paths relative to the package (`hf_api.py`, not
+`src/huggingface_hub/hf_api.py`), plus one file that does not exist. Every unit matched 0
+files, so churn was 0, importance fell back to centrality alone (0.60 / 0.48 / 0.36 / 0.24),
+and per-unit provenance was empty. The map was still written, with only "they cover 1% of
+the clustered non-test source files" as a sign. `mapping.py` normalises paths
+(`rstrip("/")`) but never checks them against `repo.tracked_files`. The scratchpad copy was
+repaired by resolving each path against the tracked files (104 by adding the
+`src/huggingface_hub/` prefix) and running `map --rescore`; importance then matched the
+earlier map. The same check passed on the sentry-javascript and mlflow maps (0 unresolved),
+so the failure depends on how the model answers. Possible fix: resolve each path to a
+tracked file or directory (exact, then a unique suffix match), and warn or retry when
+coverage drops below about 50%.
+
+**Synthetic developer, huggingface_hub** (repaired map, `--at bb3d3b55`, 2026-01-29; 797
+commits and mass 371 since; 12 units x 2 questions; 3 calls, 226 s):
+
+- Mean score 0.75, with 0 confidently wrong answers. Of 24 answers, 16 were correct, 4
+  partial, 3 wrong and 1 unknown.
+- **Share changed vs wrongness: rho = 0.82, one-sided permutation p = 0.002**, consistent
+  with share-based decay (060b4a8). Raw mass since vs wrongness: rho = 0.24, p = 0.23, not
+  distinguishable from chance. This is the first support for decay on an external repo, from
+  one snapshot and 12 units.
+- Mostly-new units scored worse (wrongness 0.50, 3 units) than mostly-edited ones (0.17, 9).
+- The prediction ranks units in the right order but is pessimistic: mean predicted 0.53
+  against an observed 0.75.
+
+**Maps** (one call each; every unit path resolves):
+
+| repo | files | source files / clusters | units + sub-units | coverage | decisions (2025–26) | time |
+|---|--:|--:|--:|--:|--:|--:|
+| sentry-javascript | 12,446 | 9,956 / 139 | 12 + 8 | 84% | 22 (13) | 180 s |
+| mlflow | 10,399 | 7,432 / 41 | 12 + 15 | 79% | 26 (17) | 224 s |
+
+The units read as each project's architecture. sentry-javascript has core client/scope,
+tracing, Node and browser SDKs, meta-frameworks, Gen-AI instrumentation (35% AI, the
+highest) and others. mlflow has the tracking server, store abstraction, SQL migrations,
+tracing SDK, model flavors, the web UI, the AI Gateway (26% AI) and others. mlflow's
+decisions are 21 human and 5 assisted, and none is among its 1,563 commits authored by the
+Copilot agent. That may be right (small fixes) or a bias, and has not been checked.
+
 ## Caveats
 
 - **Disclosure-only.** Every AI share is a lower bound. Zed (2%), Ruff (2%) and openai/codex

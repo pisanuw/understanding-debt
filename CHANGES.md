@@ -60,3 +60,4 @@
 2026-11-12 [code] udebt snapshot, timeline (table/csv/json), export (udebt-export v1, CSV tables, no answers unless --with-answers), risk --history, dashboard (self-contained HTML).
 2026-11-12 [decision] Risk events from history: each developer commit with weight >= 0.1, assessed against their understanding at the step before it landed; stored with the series.
 2026-11-12 [note] digitalme 12 points, 312 events (4 HIGH), 184 KB; dsa-instructor 19 points, 240 events (143 HIGH), 5.1 s cold, 306 KB. June refactor: index 51.8 -> 56.3. No quiz drop yet.
+2026-11-12 [note] e2485d4 runs: map paths unvalidated (hf: 104/105 package-relative, 0 files matched); synthetic hf share vs wrongness rho 0.82 p 0.002; sentry-js, mlflow mapped.
