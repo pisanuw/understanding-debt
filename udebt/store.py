@@ -1,7 +1,9 @@
 """On-disk layout under <repo>/.udebt/.
 
-map.json             shared architectural map, two levels of units (commit this)
-records/<slug>.jsonl one developer's evidence, append-only (commit this for team view)
+map.json             shared architectural map, two levels of units, each unit's cached
+                     orientation (commit this)
+records/<slug>.jsonl one developer's evidence, append-only, each answer with its ladder
+                     `level` (commit this for team view)
 commits.json         per-commit weights (heuristic, LLM-refined for the heaviest); commit this
 commits-parsed.json  parsed git history, a cache (`.json.gz` when large); gitignored, derived
 responsibility.json  each developer's responsibility set and per-developer scope (commit this)
@@ -36,7 +38,8 @@ class Config:
     decay_k: float = 1.0  # share model: exp(-k x share changed); fitted (ROADMAP Phase 5)
     decay_floor: float = 0.0  # share model: the part of an understanding no change removes
     decay_per_commit: float = 0.9  # mass model: the factor per unit of weighted mass
-    evidence_window: int = 5
+    evidence_window: int = 5  # the flat evidence model: mean over the last N answers
+    evidence_model: str = "ladder"  # ladder: levels 1-3 a third each, 4-5 depth; or flat
     known_threshold: float = 0.6
     refine_top: int = 40  # how many of the heaviest commits `udebt weigh --refine` classifies
     bus_target: int = 2  # holders above known_threshold every architectural unit should have
@@ -98,6 +101,7 @@ class Config:
             "decay_floor": self.decay_floor,
             "decay_per_commit": self.decay_per_commit,
             "evidence_window": self.evidence_window,
+            "evidence_model": self.evidence_model,
             "known_threshold": self.known_threshold,
             "refine_top": self.refine_top,
             "bus_target": self.bus_target,

@@ -1,3 +1,5 @@
+from conftest import understood
+
 from udebt import scoring
 
 
@@ -39,7 +41,7 @@ def test_debt_and_index():
     u1 = {"id": "a", "importance": 1.0, "scope": "architectural"}
     u2 = {"id": "b", "importance": 0.5, "scope": "architectural"}
     u3 = {"id": "c", "importance": 0.9, "scope": "blackbox"}
-    s1 = scoring.score_unit(u1, [rec("correct")], 0)
+    s1 = scoring.score_unit(u1, understood(), 0)
     s2 = scoring.score_unit(u2, [], 0)
     s3 = scoring.score_unit(u3, [], 0)
     assert s1.debt == 0.0
@@ -57,14 +59,14 @@ def test_quiz_priority_prefers_important_unknowns():
     scores = [
         scoring.score_unit(units[0], [], 0),
         scoring.score_unit(units[1], [], 0),
-        scoring.score_unit(units[2], [rec("correct")], 0),
+        scoring.score_unit(units[2], understood(), 0),
     ]
     assert [s.unit_id for s in scoring.quiz_priority(scores)] == ["high", "low", "known"]
 
 
 def test_team_view():
     u = {"id": "a", "importance": 1.0}
-    dev1 = [scoring.score_unit(u, [rec("correct")], 0)]
+    dev1 = [scoring.score_unit(u, understood(), 0)]
     dev2 = [scoring.score_unit(u, [rec("wrong")], 0)]
     t = scoring.team_view({"d1": dev1, "d2": dev2}, known_threshold=0.6)
     assert t["a"]["understanding"] == 1.0

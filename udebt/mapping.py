@@ -380,7 +380,19 @@ def _units_from(
         if kids:
             u["paths"] = _union(u["paths"], *(c["paths"] for c in kids))
     rep.empty = [u["id"] for u, _p in hier.walk(units) if not u.get("paths")]
+    _keep_orientations(units, previous)
     return units, rep
+
+
+def _keep_orientations(units: list[dict[str, Any]], previous: dict[str, Any]) -> None:
+    """A re-mapped unit keeps its cached orientation when it was written from the same
+    summary, decision, alternatives, why, paths and history (orientation.basis)."""
+    from .orientation import basis
+
+    for u, _parent in hier.walk(units):
+        o = previous.get(u["id"], {}).get("orientation")
+        if isinstance(o, dict) and o.get("basis") == basis(u):
+            u["orientation"] = o
 
 
 def build_map(

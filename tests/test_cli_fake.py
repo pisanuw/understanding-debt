@@ -53,12 +53,17 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
     rc, out = run(root, "quiz", "-n", "2", capsys=capsys)
     assert rc == 0
     assert "[CORRECT ]" in out and "[UNKNOWN ]" in out
+    # a first quiz starts every unit at level 1, after its orientation
+    assert "storage (level 1), scoring (level 1)" in out
+    assert "level 1 of 5: purpose and placement" in out and "Orientation: Persistence" in out
     recs = Store(root).load_records("dev1@example.com")
     assert len(recs) == 2 and recs[0]["head"] == repo.head(root)
-    # storage is now understood; scoring is a known unknown. The quiz answer replaces the
-    # own-commit prior, so admitting ignorance costs the 0.5 prior.
-    expected = round(100 * imp_scoring / (imp_storage + imp_scoring), 1)
+    assert [r["level"] for r in recs] == [1, 1] and recs[0]["ts"] == recs[1]["ts"]
+    # storage passed level 1, a third of understanding; scoring is a known unknown. The quiz
+    # answer replaces the own-commit prior, so admitting ignorance costs the 0.5 prior.
+    expected = round(100 * (imp_storage * 2 / 3 + imp_scoring) / (imp_storage + imp_scoring), 1)
     assert f"Debt index: {expected}" in out
+    assert "1/5" in out and "0/5" in out  # depth: storage passed level 1, scoring none
 
     # a commit touching store.py decays the understanding we just verified
     (root / "udebt" / "store.py").write_text("STATE = {'v': 'final'}\n")
@@ -66,7 +71,7 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
 
     subprocess.run(["git", "commit", "-q", "-am", "tweak"], cwd=root, check=True)
     rc, out = run(root, "status", capsys=capsys)
-    assert "decayed from 1.00 by share" in out
+    assert "decayed from 0.33 by share" in out
 
     # blackbox scope removes a unit from the index; by default only for you
     rc, out = run(root, "scope", "scoring", "blackbox", capsys=capsys)
@@ -76,13 +81,13 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
     idx = float(out.split("Debt index: ")[1].split(" ")[0])
     # only storage left: the tweak rewrote its one line of code, the whole unit, which counts
     # once (a commit's lines are capped at the unit's size), at the tweak's small weight
-    assert 10 < idx < 80
+    assert 100 * (1 - 1 / 3 * 0.9) < idx < 100 * (1 - 1 / 3 * 0.2)
     # the mass model decays it only a little: one small commit is little mass
     cfg = json.loads((root / ".udebt" / "config.json").read_text())
     (root / ".udebt" / "config.json").write_text(json.dumps({**cfg, "decay_model": "mass"}))
     rc, out = run(root, "status", capsys=capsys)
-    assert "decayed from 1.00 by mass" in out and "by share" not in out
-    assert 0 < float(out.split("Debt index: ")[1].split(" ")[0]) < 10
+    assert "decayed from 0.33 by mass" in out and "by share" not in out
+    assert 66.7 < float(out.split("Debt index: ")[1].split(" ")[0]) < 70
     (root / ".udebt" / "config.json").write_text(json.dumps(cfg))
     resp = json.loads((root / ".udebt" / "responsibility.json").read_text())
     assert resp["developers"]["dev1@example.com"]["scope"] == {"scoring": "blackbox"}

@@ -1,4 +1,5 @@
-"""Prediction quiz: pick units, generate questions, ask, grade, record."""
+"""Prediction quiz: pick units, find each one's ladder level, orient, generate questions, ask,
+grade, record (with the level)."""
 
 from __future__ import annotations
 
@@ -6,7 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from . import repo, scoring
+from . import ladder, repo, scoring
 from . import units as hier
 from .ledger import Cutoff, Ledger
 from .llm import LLM
@@ -22,7 +23,7 @@ from .provenance import Commit, landed, line_weight, provenance_of, touches_of
 from .responsibility import Responsibility, effective_scope
 from .responsibility import load as load_responsibility
 from .sizes import share
-from .store import Store
+from .store import Store, now_iso
 from .weights import line_weights
 
 
@@ -131,6 +132,7 @@ def compute_scores(
             decay=decay,
             prior=prior,
             share_since=None if size is None else share(l_since, size),
+            model=cfg.evidence_model,
         )
         pid = parent["id"] if parent else None
         scope, origin = effective_scope(u["id"], pid, team_scope, dev_scope)
@@ -180,6 +182,18 @@ def _parent_name(units: list[dict[str, Any]], uid: str) -> dict[str, str]:
     return {"parent_name": hier.index(units)[pid]["name"]} if pid else {}
 
 
+def levels_for(
+    units: list[dict[str, Any]], records: list[dict[str, Any]], forced: int | None = None
+) -> dict[str, int]:
+    """unit id -> the level to ask it at: `forced` for every unit (`quiz --level N`), else
+    each unit's next ladder level from the developer's records on it (ladder.next_level)."""
+    if forced is not None:
+        return {u["id"]: ladder.check(forced) for u in units}
+    return {
+        u["id"]: ladder.next_level([r for r in records if r.get("unit") == u["id"]]) for u in units
+    }
+
+
 def generate_questions(
     root: Path,
     llm: LLM,
@@ -187,15 +201,26 @@ def generate_questions(
     per_unit: int = 1,
     *,
     stable: bool = False,
+    level: int = 3,
     max_turns: int = 40,
 ) -> list[dict[str, Any]]:
-    """`stable` asks for questions on each unit's decision and current behaviour only, never
-    on what changed (the synthetic-developer experiment), and keeps at most `per_unit` per
-    unit, in unit order."""
-    prompt = (stable_questions_prompt if stable else questions_prompt)(units, per_unit)
+    """Every question of a run in one call. Each unit carries the `level` to ask it at (and,
+    when the developer was just shown one, `shown_orientation`); a question keeps its unit's
+    level whatever the model returns. `stable` asks for questions on each unit as it stands,
+    never on what changed (the synthetic-developer experiment), all at `level`, and keeps
+    at most `per_unit` per unit, in unit order."""
+    if stable:
+        units = [{**u, "level": ladder.check(level)} for u in units]
+        prompt = stable_questions_prompt(units, per_unit, level)
+    else:
+        prompt = questions_prompt(units, per_unit)
     res = llm.structured(prompt, QUESTIONS_SCHEMA, cwd=root, read_tools=True, max_turns=max_turns)
-    valid = {u["id"] for u in units}
-    qs = [q for q in res.get("questions", []) if q.get("unit_id") in valid]
+    asked = {u["id"]: int(u.get("level", 1)) for u in units}
+    qs = [
+        {**q, "level": asked[q["unit_id"]]}
+        for q in res.get("questions", [])
+        if q.get("unit_id") in asked
+    ]
     if stable:
         order = {u["id"]: i for i, u in enumerate(units)}
         kept: dict[str, int] = {}
@@ -210,12 +235,24 @@ def generate_questions(
     return qs
 
 
-def ask_interactively(questions: list[dict[str, Any]], inp=None, out=print) -> list[dict[str, Any]]:
-    """Collect answers and confidence. Empty answer means 'I don't know' (a known unknown)."""
+def ask_interactively(
+    questions: list[dict[str, Any]],
+    inp=None,
+    out=print,
+    orientations: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """Collect answers and confidence. Empty answer means 'I don't know' (a known unknown).
+    Each question shows its ladder level; `orientations` (unit id -> rendered text) is shown
+    before that unit's first question."""
     inp = inp or input  # resolved at call time so tests can patch builtins.input
+    shown: set[str] = set()
     answered = []
     for i, q in enumerate(questions, 1):
-        out(f"\n[{i}/{len(questions)}] unit: {q['unit_id']}")
+        uid = q["unit_id"]
+        out(f"\n[{i}/{len(questions)}] unit: {uid}, {ladder.label(ladder.level_of(q))}")
+        if orientations and uid in orientations and uid not in shown:
+            shown.add(uid)
+            out(orientations[uid] + "\n")
         out(q["question"])
         out("(Enter on an empty line to finish. Leave blank if you don't know.)")
         lines = []
@@ -266,19 +303,31 @@ def grade(
 
 
 def record(
-    store: Store, root: Path, email: str, results: list[dict[str, Any]], source: str = "quiz"
+    store: Store,
+    root: Path,
+    email: str,
+    results: list[dict[str, Any]],
+    source: str = "quiz",
+    *,
+    forced: bool = False,
 ) -> None:
-    """Append graded answers to the developer's evidence. `source` says where the question
-    came from (`quiz`, or `dig` for a walkthrough's check question); both are quiz evidence."""
+    """Append graded answers to the developer's evidence, each with the ladder `level` it was
+    asked at (`forced` when `quiz --level` chose it). `source` says where the question came
+    from (`quiz`, or `dig` for a walkthrough's check question); both are quiz evidence. One
+    run's answers share one timestamp: on a unit they are one sitting (ladder.py)."""
     h = repo.head(root)
+    ts = now_iso()
     for r in results:
         store.append_record(
             email,
             {
+                "ts": ts,
                 "type": "quiz",
                 "source": source,
                 "dev": email,
                 "unit": r["unit_id"],
+                "level": ladder.level_of(r),
+                **({"forced": True} if forced else {}),
                 "head": h,
                 "question": r["question"],
                 "reference": r["reference_answer"],

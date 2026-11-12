@@ -6,7 +6,7 @@ udebt map                       two-level architectural units with the claude CL
 udebt units                     list units and sub-units with scope and importance
 udebt responsibility [dev]      who is expected to understand which units (seed, add, remove)
 udebt scope <id> <scope>        mark a unit architectural | blackbox, for you or --team
-udebt quiz [-n N] [--deep]      answer prediction questions, get graded, record evidence
+udebt quiz [-n N] [--deep]      questions up the ladder (purpose first), graded, recorded
 udebt status [unit] [--deep]    debt per unit and a 0-100 debt index (--team: bus target)
 udebt risk [range]              a change's weight per unit against your understanding
 udebt history [--candidates]    decisions that shaped the repo (or the commits the mapper sees)
@@ -28,7 +28,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from . import __version__, repo, scoring, structure
+from . import __version__, ladder, repo, scoring, structure
+from . import orientation as orient
 from . import responsibility as resp_mod
 from . import risk as risk_mod
 from . import units as hier
@@ -52,7 +53,14 @@ from .provenance import (
     summarize,
     unit_provenance,
 )
-from .quiz import ask_interactively, compute_scores, generate_questions, grade, pick_units
+from .quiz import (
+    ask_interactively,
+    compute_scores,
+    generate_questions,
+    grade,
+    levels_for,
+    pick_units,
+)
 from .quiz import record as record_results
 from .store import Store
 from .weights import apply_refinement, save_cache
@@ -268,7 +276,8 @@ def cmd_quiz(args) -> int:
     email = _email(args, root)
     llm = _llm(store, args)
     resp = resp_mod.load(store)
-    scores = compute_scores(root, store, units, email, resp=resp)
+    records = store.load_records(email)
+    scores = compute_scores(root, store, units, email, records=records, resp=resp)
     mine = _my_set(resp, store.config.primary(email), units)
     within = None
     if mine and not args.unit:
@@ -279,24 +288,102 @@ def cmd_quiz(args) -> int:
     picked = pick_units(units, scores, args.num, args.unit or None, deep=args.deep, within=within)
     if not picked:
         raise SystemExit("Nothing to quiz: every unit in view is blackbox or out of your set.")
+    levels = levels_for(picked, records, args.level)
+    on_unit = {u["id"]: [r for r in records if r.get("unit") == u["id"]] for u in picked}
+    need = [u["id"] for u in picked if orient.wanted(on_unit[u["id"]], levels[u["id"]])]
+    # a preview prints Markdown on stdout, so its progress goes to stderr
+    say = (lambda *a: print(*a, file=sys.stderr)) if args.preview else print
     where = " (from your responsibility set)" if within else ""
-    print(f"Quizzing {email}{where} on: {', '.join(u['id'] for u in picked)}")
-    print("Generating questions from the code...")
+    how = f"forced to level {args.level}" if args.level else "levels from the ladder"
+    say(
+        f"Quizzing {email}{where}, {how}: "
+        + ", ".join(f"{u['id']} (level {levels[u['id']]})" for u in picked)
+    )
     try:
+        orients: dict[str, dict[str, Any]] = {}
+        if need:
+            n_new = sum(1 for uid in need if orient.cached(hier.index(units)[uid]) is None)
+            if n_new:
+                say(f"Writing the orientation for {n_new} unit(s) you have not been quizzed on...")
+            orients = orient.ensure(root, store, llm, m, need)
+        for u in picked:
+            u["level"] = levels[u["id"]]
+            if u["id"] in orients:
+                u["shown_orientation"] = orient.text(orients[u["id"]])
+        say("Generating questions from the code...")
         questions = generate_questions(root, llm, picked, per_unit=args.per_unit)
-        answered = ask_interactively(questions)
+        if args.preview:
+            print(_preview(root, email, picked, questions, orients))
+            return 0
+        rendered = {uid: orient.render(o, hier.index(units)[uid]) for uid, o in orients.items()}
+        answered = ask_interactively(questions, orientations=rendered)
         print("\nGrading against the code...")
         results = grade(root, llm, answered)
     except LLMError as e:
         raise SystemExit(str(e)) from e
-    record_results(store, root, email, results)
+    record_results(store, root, email, results, forced=args.level is not None)
     print()
     for r in results:
-        print(f"[{r['verdict'].upper():<8}] {r['unit_id']}: {r['question']}")
+        print(f"[{r['verdict'].upper():<8}] {r['unit_id']} (level {r['level']}): {r['question']}")
         print(f"           {r['feedback']}")
     print()
     args.unit_ref = None
     return cmd_status(args)
+
+
+def _preview(root: Path, email: str, picked, questions, orients) -> str:
+    """`quiz --preview`: the orientations and questions a run would show, as Markdown, with
+    each reference answer and a check that no level 1-3 question names an identifier."""
+    from datetime import UTC, datetime
+
+    out = [
+        f"# Ladder quiz preview: {root.name}, for {email}",
+        "",
+        f"Generated by `udebt quiz --preview` at HEAD `{repo.head(root)[:8]}` on "
+        f"{datetime.now(UTC).date().isoformat()}: {len(questions)} question(s) on "
+        f"{len(picked)} unit(s), none answered or recorded. Each unit is asked at the level the "
+        "ladder gives this developer (`udebt quiz --level N` forces one); an orientation is "
+        "shown before the first question on a unit they have no level 1-3 answer on.",
+        "",
+        "Levels: " + "; ".join(f"{n} {lv.name}" for n, lv in ladder.LEVELS.items()) + ".",
+    ]
+    by_unit = {u["id"]: u for u in picked}
+    flagged = []
+    oriented: set[str] = set()
+    for i, q in enumerate(questions, 1):
+        uid = q["unit_id"]
+        u = by_unit[uid]
+        n = ladder.level_of(q)
+        out += ["", f"## {i}. {u['name']} (`{uid}`): {ladder.label(n)}", ""]
+        if uid in orients and uid not in oriented:
+            oriented.add(uid)
+            out += ["**Orientation**", "", orient.markdown(orients[uid]), ""]
+        out += [f"**Question.** {q['question']}", ""]
+        ev = ", ".join(f"`{e}`" for e in q.get("evidence", []))
+        out += [
+            "<details><summary>Reference answer (for the grader)</summary>",
+            "",
+            q.get("reference_answer", ""),
+            "",
+            f"Evidence: {ev or '(none)'}",
+            "",
+            "</details>",
+        ]
+        ids = ladder.identifiers_in(q["question"]) if n in ladder.ARCHITECTURAL else []
+        if ids:
+            flagged.append(f"question {i}: {', '.join(ids)}")
+    out += [
+        "",
+        "## Identifier check",
+        "",
+        "Level 1-3 questions must name no function, variable, file or code block. "
+        + (
+            "These may: " + "; ".join(flagged) + "."
+            if flagged
+            else "The heuristic check (`ladder.identifiers_in`) found none."
+        ),
+    ]
+    return "\n".join(out) + "\n"
 
 
 def _prov_line(commits, mine: set[str] | None = None) -> str:
@@ -353,6 +440,10 @@ def _note(s_, u, prov, by_score) -> str:
     return pre + "quiz"
 
 
+def _depth(s_: scoring.UnitScore) -> str:
+    return "-" if s_.depth is None else f"{s_.depth}/{ladder.TOP}"
+
+
 def _decay_line(d: scoring.Decay) -> str:
     if d.model == "share":
         fade = f"exp(-{d.rate:g} x share of the unit changed since)"
@@ -403,8 +494,8 @@ def cmd_status(args) -> int:
     print(f"\nUnderstanding debt for {email} at {repo.head(root)[:8]}")
     print(_prov_line(commits, mine))
     print(
-        f"{'unit':<{w}} {'set':>3} {'imp':>5} {'ai%':>4} {'you%':>4} {'und':>5}  {'debt':>5}  "
-        f"{'':<10} note"
+        f"{'unit':<{w}} {'set':>3} {'imp':>5} {'ai%':>4} {'you%':>4} {'und':>5} {'depth':>5}  "
+        f"{'debt':>5}  {'':<10} note"
     )
     # sort the top level by debt; sub-units follow their parent, also by debt
     tops = sorted([u for u, d in shown if d == 0], key=lambda u: -by_score[u["id"]].debt)
@@ -436,7 +527,8 @@ def cmd_status(args) -> int:
         label = ("  " * depth) + u["id"]
         print(
             f"{label:<{w}} {mark:>3} {s_.importance:>5.2f} {int(100 * prov.ai_share):>4} "
-            f"{int(100 * prov.dev_share):>4} {s_.understanding:>5.2f}  {s_.debt:>5.2f}  "
+            f"{int(100 * prov.dev_share):>4} {s_.understanding:>5.2f} {_depth(s_):>5}  "
+            f"{s_.debt:>5.2f}  "
             f"{_bar(1 - s_.understanding):<10} {_note(s_, u, prov, by_score)}  "
             f"[{u['name']}]{extra}"
         )
@@ -465,6 +557,10 @@ def cmd_status(args) -> int:
     print(
         "ai% = weighted share of the unit's mass by an AI agent (assisted counts half). "
         "you% = share you authored (assisted counts half). Bot commits are left out of both."
+    )
+    print(
+        "depth = highest level passed on the question ladder (1-3 the architecture, which "
+        "makes understanding; 4-5 optional depth); `udebt quiz` asks the next level."
     )
     print(_decay_line(cfg.decay))
     if hier.has_children(units) and not deep:
@@ -690,16 +786,21 @@ def cmd_dig(args) -> int:
     email = _email(args, root)
     llm = _llm(store, args)
     resp = resp_mod.load(store)
-    scores = compute_scores(root, store, m["units"], email, resp=resp)
+    records = store.load_records(email)
+    scores = compute_scores(root, store, m["units"], email, records=records, resp=resp)
     mine = _my_set(resp, store.config.primary(email), m["units"])
     within = hier.at_level(mine, m["units"], False) if mine else None
     picked = pick_units(m["units"], scores, 1, [args.unit] if args.unit else None, within=within)
     if not picked:
         raise SystemExit("Nothing to dig into: name a unit, e.g. `udebt dig <unit>`.")
     unit = picked[0]
+    level = ladder.next_level([r for r in records if r.get("unit") == unit["id"]])
     print(f"Digging into `{unit['id']}` ({unit['name']})...\n")
     try:
-        body, question = walkthrough(root, llm, unit)
+        o = orient.ensure(root, store, llm, m, [unit["id"]]).get(unit["id"])
+        if o:
+            print(orient.render(o, unit) + "\n")
+        body, question = walkthrough(root, llm, unit, level, orient.text(o) if o else None)
     except LLMError as e:
         raise SystemExit(str(e)) from e
     print(body)
@@ -716,6 +817,7 @@ def cmd_dig(args) -> int:
         [
             {
                 "unit_id": unit["id"],
+                "level": level,
                 "question": question,
                 "reference_answer": "(graded against the code)",
                 "evidence": unit.get("paths", []),
@@ -1664,6 +1766,19 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--per-unit", type=int, default=1, help="questions per unit (default 1)")
     s.add_argument("--unit", action="append", help="quiz only this unit id (repeatable)")
     s.add_argument("--deep", action="store_true", help="pick among sub-units")
+    s.add_argument(
+        "--level",
+        type=int,
+        choices=range(1, ladder.TOP + 1),
+        metavar="N",
+        help="ask every question at ladder level N (1-5) instead of each unit's next level; "
+        "5 is the implementation questions of before the ladder (for experiments)",
+    )
+    s.add_argument(
+        "--preview",
+        action="store_true",
+        help="print the orientations and questions as Markdown; answer and record nothing",
+    )
     s.set_defaults(fn=cmd_quiz, team=False)
 
     s = sub.add_parser("status", help="show debt")

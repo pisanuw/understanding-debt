@@ -5,12 +5,23 @@ Model
 For each architectural unit u and developer d:
 
     evidence(record)   = 1.0 correct | 0.5 partial | 0.0 wrong | -0.5 confidently wrong
-    verified(u, d)     = clamp(mean(evidence of last K records), 0, 1)
-    understanding(u,d) = verified * fade(since the last record)
+    v_n(u, d)          = mean evidence of the latest sitting at ladder level n (ladder.py;
+                         one answer unless --per-unit), 0 with none; a record without a
+                         level (before the ladder) is level 5
+    verified(u, d)     = max(0, (v_1 + v_2 + v_3) / 3 + 0.1 * (v_4 + v_5))   [0 to 1.2]
+                         levels 1-3 are the architecture, a third each; 4-5 optional depth
+    understanding(u,d) = min(1, verified * fade(since the last record))
     prior(u, d)        = 0.5 * dev_share * fade(others' changes since dev's last commit)
                          [no quiz records]
     debt(u, d)         = importance(u) * (1 - understanding(u, d))   [architectural units only]
     debt_index(d)      = 100 * sum(debt) / sum(importance)            [0 = none, 100 = total]
+
+    So passing levels 1 to 3 is full understanding, and depth is never needed to reach the
+    known threshold; levels 4-5 lift verified past 1, which is headroom against decay (a
+    unit known to level 5 stays at 1.0 until fade < 1/1.2) and lifts a decayed
+    understanding back over the threshold. A confidently wrong answer at any level is
+    negative evidence for that level. evidence_model "flat" is the rule before the ladder:
+    verified = clamp(mean evidence of the last K answers on u, 0, 1), levels ignored.
 
     fade, decay model "share" (default) = exp(-k * share changed), k = 1 (config decay_k),
         share changed = weighted changed lines landed on u since / u's size in lines, each
@@ -37,6 +48,8 @@ import math
 from dataclasses import dataclass, replace
 from typing import Any
 
+from . import ladder
+
 VERDICT_SCORE = {"correct": 1.0, "partial": 0.5, "wrong": 0.0, "unknown": 0.0}
 
 
@@ -50,12 +63,46 @@ def evidence(record: dict[str, Any]) -> float:
 
 
 def verified_understanding(records: list[dict[str, Any]], window: int = 5) -> float | None:
-    """Mean evidence over the last `window` records, clamped to [0, 1]. None without records."""
+    """The flat model (before the ladder): mean evidence over the last `window` records,
+    clamped to [0, 1], levels ignored. None without records."""
     if not records:
         return None
     recent = sorted(records, key=lambda r: r.get("ts", ""))[-window:]
     mean = sum(evidence(r) for r in recent) / len(recent)
     return max(0.0, min(1.0, mean))
+
+
+DEPTH_BONUS = 0.1  # per depth level (4, 5) passed: up to 0.2 over the architecture's 1.0
+EVIDENCE_MODELS = ("ladder", "flat")
+
+
+def level_values(records: list[dict[str, Any]]) -> dict[int, float]:
+    """Ladder level -> mean evidence of its latest sitting (ladder.sittings)."""
+    return {
+        n: sum(evidence(r) for r in sit) / len(sit) for n, sit in ladder.sittings(records).items()
+    }
+
+
+def ladder_verified(records: list[dict[str, Any]]) -> float | None:
+    """Verified understanding on the ladder, before decay: a third for each architectural
+    level (1-3) by its latest sitting, plus DEPTH_BONUS for each depth level (4-5), at least
+    0 and at most 1.2. None without records."""
+    if not records:
+        return None
+    v = level_values(records)
+    arch = sum(v.get(n, 0.0) for n in ladder.ARCHITECTURAL) / len(ladder.ARCHITECTURAL)
+    depth = DEPTH_BONUS * sum(v.get(n, 0.0) for n in ladder.DEPTH)
+    return max(0.0, arch + depth)
+
+
+def verified(records: list[dict[str, Any]], window: int = 5, model: str = "ladder") -> float | None:
+    """Verified understanding under `model`: "ladder" (ladder_verified) or "flat"
+    (verified_understanding over the last `window` answers)."""
+    if model not in EVIDENCE_MODELS:
+        raise ValueError(f"evidence_model must be one of {', '.join(EVIDENCE_MODELS)}: {model}")
+    if model == "flat":
+        return verified_understanding(records, window)
+    return ladder_verified(records)
 
 
 # k in exp(-k x share): pooled least-squares fit on every recorded synthetic unit-snapshot,
@@ -158,6 +205,7 @@ class UnitScore:
     scope_origin: str = "team"  # team | you: where the effective scope comes from
     share_since: float | None = None  # share of the unit changed since the last evidence
     prior_share: float | None = None  # share others changed since the developer's last commit
+    depth: int | None = None  # highest ladder level passed (ladder.depth); None: no evidence
 
     @property
     def measured(self) -> bool:
@@ -179,10 +227,13 @@ def score_unit(
     decay: float | Decay = PER_MASS,
     prior: float = 0.0,
     share_since: float | None = None,
+    model: str = "ladder",
 ) -> UnitScore:
-    v = verified_understanding(records, window)
+    """`model` is the evidence model (config evidence_model): "ladder" or "flat"."""
+    v = verified(records, window, model)
     if v is not None:
-        understanding, source = decayed(v, commits_since, decay, share_since), "quiz"
+        understanding = min(1.0, decayed(v, commits_since, decay, share_since))
+        source = "quiz"
     elif prior > 0:
         understanding, source = prior, "prior"
     else:
@@ -197,6 +248,7 @@ def score_unit(
         source=source,
         prior=prior,
         share_since=share_since if v is not None else None,
+        depth=ladder.depth(records),
     )
 
 

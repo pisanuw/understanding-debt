@@ -121,27 +121,35 @@ class FakeLLM:
             covered = {p for u in canned for p in u["paths"]}
             return {"units": canned + _units_from_clusters(prompt, covered)}
         if "TASK: questions" in prompt or "TASK: stable-questions" in prompt:
-            ids = [
-                line.split(":", 1)[1].strip()
-                for line in prompt.splitlines()
-                if line.startswith("- unit_id:")
-            ]
+            units = _unit_blocks(prompt)
             m = re.search(r"Write\s+(?:exactly\s+)?(\d+)\s+question", prompt)
             n = int(m.group(1)) if m else 1
-            shapes = [  # a unit's first question is the one a single-question quiz gets
-                "What happens in {u} when the input is empty?",
-                "Why does {u} keep its state that way?",
-            ]
             return {
                 "questions": [
                     {
-                        "unit_id": u,
-                        "question": shapes[k % 2].format(u=u) + (f" ({k + 1})" if k > 1 else ""),
-                        "reference_answer": f"{u} returns a default.",
-                        "evidence": [f"udebt/{u}.py"],
+                        "unit_id": u["id"],
+                        "level": u["level"],
+                        "question": _FAKE_QUESTIONS[u["level"]][k % 2].format(u=u["id"])
+                        + (f" ({k + 1})" if k > 1 else ""),
+                        "reference_answer": f"{u['id']} returns a default.",
+                        "evidence": [f"udebt/{u['id']}.py"],
                     }
-                    for u in ids
+                    for u in units
                     for k in range(n)
+                ]
+            }
+        if "TASK: orientation" in prompt:
+            return {
+                "orientations": [
+                    {
+                        "unit_id": u["id"],
+                        "purpose": f"The {u['id']} unit keeps what the rest of the tool reads.",
+                        "decision": "Plain files rather than a database, for no dependencies.",
+                        "where": [{"path": p, "what": "where it lives"} for p in u["paths"]]
+                        + [{"path": "no/such/file.py", "what": "an invented path"}],
+                        "shaped_by": "Dev One wrote it by hand.",
+                    }
+                    for u in _unit_blocks(prompt)
                 ]
             }
         if "TASK: weigh" in prompt:
@@ -178,7 +186,39 @@ class FakeLLM:
 
     def text(self, prompt, *, cwd, read_tools=True, max_turns=40):
         self.calls.append(prompt)
+        if "TASK: dig" not in prompt:
+            raise LLMError(f"FakeLLM has no canned text for this prompt: {prompt[:80]}")
         return "# Walkthrough\n\nThis is a fake walkthrough.\n\nCHECK QUESTION: What is 1+1?\n"
+
+
+# per level, a unit's first question (the one a single-question quiz gets) and its second;
+# levels 1-3 name no identifier, as the real prompt requires
+_FAKE_QUESTIONS = {
+    1: ["What is the {u} unit for, and what would stop working without it?",
+        "Which other parts of the tool rely on the {u} unit?"],
+    2: ["What was chosen for the {u} unit, and what was rejected?",
+        "What constraint forced the choice behind the {u} unit?"],
+    3: ["If the decision behind the {u} unit were reversed, what else would have to change?",
+        "If the {u} unit were replaced, which other units would notice first?"],
+    4: ["What happens in {u} when the input is empty?",
+        "What happens in {u} when it is called twice?"],
+    5: ["What happens in {u} when the input is empty?",
+        "Why does {u} keep its state that way?"],
+}  # fmt: skip
+
+
+def _unit_blocks(prompt: str) -> list[dict[str, Any]]:
+    """The units listed in a questions or orientation prompt: id, level (1 when none is
+    given) and paths."""
+    out: list[dict[str, Any]] = []
+    for ln in prompt.splitlines():
+        if ln.startswith("- unit_id:"):
+            out.append({"id": ln.split(":", 1)[1].strip(), "level": 1, "paths": []})
+        elif out and ln.startswith("  level:"):
+            out[-1]["level"] = int(ln.split(":", 1)[1].split()[0])
+        elif out and ln.startswith("  paths:"):
+            out[-1]["paths"] = [p.strip() for p in ln.split(":", 1)[1].split(",") if p.strip()]
+    return out
 
 
 _CANNED_UNITS: list[dict[str, Any]] = [

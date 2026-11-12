@@ -21,14 +21,16 @@ human commits, AI-assisted commits and AI-authored commits, and uses the `claude
    must understand, each linked to the commits that shaped it and who made them;
 4. **assign** each developer a responsibility set, the units they are expected to understand,
    from CODEOWNERS or their contribution footprint, for a lead to curate;
-5. **quiz** a developer with decision-centric questions (why X rather than Y, what breaks if
-   you revert it, what happens when it fails) graded against the code;
+5. **quiz** a developer up a ladder of questions, graded against the code: what each unit is
+   for first, after a short orientation, then the decision that shaped it, what reversing it
+   would change across units, and only then failure modes and implementation detail;
 6. **score** debt per unit and as a 0-100 index over a developer's set, and for the team
    against a bus-factor target, with a weak prior from the developer's own commits so the
    view is useful before the first quiz;
 7. **flag** changes that land weight in units the author does not understand, most strongly
    outside their responsibility set;
-8. **dig** into the worst unit with a short guided walkthrough that ends in a check question;
+8. **dig** into the worst unit with a short guided walkthrough, opening with the unit's
+   orientation and ending in a check question at the developer's level on the ladder;
 9. **replay** all of it over the history: debt per developer and unit at every week (or N
    units of mass), the risk events of the past, an export for the hosted version and a
    static dashboard.
@@ -64,7 +66,9 @@ udebt status --deep            # the same with sub-units; `udebt status <unit>` 
 udebt status --team            # holders per unit against the bus target; units below it
 udebt history                  # the decisions that shaped the repo, oldest first, with who made them
 udebt history --candidates     # the commits `map` would show the model as decision candidates (no LLM)
-udebt quiz -n 5 [--deep]       # five decision questions from your set (sub-units with --deep)
+udebt quiz -n 5 [--deep]       # five questions from your set, each at your level on the ladder
+udebt quiz --level N           # force ladder level N (1-5) for every question, for experiments
+udebt quiz --preview           # print the orientations and questions as Markdown; record nothing
 udebt dig [unit]               # walkthrough of the highest-debt unit, then a check question
 udebt risk [range|--staged]    # weight a change lands in each unit vs your understanding; --deep per sub-unit
 udebt hook install             # warn-only pre-push hook that runs `udebt risk`
@@ -182,8 +186,13 @@ For each architectural unit `u` and developer `d`:
 | quantity | definition |
 |---|---|
 | evidence of one answer | correct 1.0, partial 0.5, wrong 0.0, unknown 0.0, **confidently wrong -0.5** |
-| verified understanding | mean evidence over the last 5 answers on `u`, clamped to [0, 1] |
-| understanding | verified x exp(-k x share of `u` changed since the last answer), k = 1.0 (config `decay_k`, fitted on every recorded synthetic unit-snapshot, ROADMAP Phase 5): 37% is left once a unit's worth of change has landed, half at 69% |
+| level of an answer | the question ladder's level it was asked at, 1 to 5 (below); an answer recorded before the ladder counts as level 5, the implementation questions the old prompt asked |
+| level value v_n | mean evidence of the latest sitting at level n on `u` (one quiz run's answers at that level, usually one), 0 with none: the most recent verdict per level counts |
+| verified understanding | max(0, (v_1 + v_2 + v_3) / 3 + 0.1 x (v_4 + v_5)): levels 1-3 (the architecture) a third each, levels 4-5 (optional depth) 0.1 each, so at most 1.2 |
+| understanding | min(1, verified x exp(-k x share of `u` changed since the last answer)), k = 1.0 (config `decay_k`, fitted on every recorded synthetic unit-snapshot, ROADMAP Phase 5): 37% is left once a unit's worth of change has landed, half at 69%. Passing levels 1-3 is full understanding; depth above 1 is headroom against the fade (a unit known to level 5 reads 1.0 until 18% of it has changed) and can lift a faded understanding back over the known threshold, but is never needed to reach it |
+| depth | the highest level n with every level 1..n passed (its latest sitting all correct); 0 when level 1 is not |
+| next level on `u` | depth + 1, at most 5; one lower when the latest sitting was confidently wrong at level 2 or more |
+| verified, flat model | mean evidence over the last 5 answers on `u`, clamped to [0, 1], levels ignored: config `evidence_model: "flat"` (`evidence_window`), the rule before the ladder |
 | share of `u` changed since t | weighted changed lines landed under `u` after t / size of `u` in lines; can pass 1 when code is rewritten more than once, though no single commit adds more than the unit's size |
 | weighted changed lines of a commit in `u` | its changed lines under `u` (insertions plus deletions; a deleted file counts its size once), counted as for line share (lockfile, generated and version-bump lines left out, a shared file split), **at most the size of `u` just after the commit**, times its line weight: the commit's weight, or for a commit a merged branch brought in, the whole branch's weight (at most 1); 0 for a bot |
 | size of `u` just after a commit | the running sum of every earlier commit's insertions minus deletions under `u` (the same files and split as the size), in history order: no tree is read; at HEAD it matches the blob count to a few lines on the testbeds |
@@ -238,6 +247,58 @@ the team view lists every architectural unit whose bus factor is below `bus_targ
 with who is responsible for it. Holders need a quiz score: the own-commit prior stops at 0.5,
 below the threshold, so until someone takes a quiz the team view says "no quiz evidence yet"
 and labels the holder column `quizzed` rather than reading as "nobody knows anything".
+
+## The question ladder
+
+The first real quiz on digitalme asked only implementation questions ("if you deleted the
+`except (asyncio.CancelledError, GeneratorExit)` block in `event_stream()` ...") and the
+developer got none right: "I would need to understand the overall architecture better before I
+could understand how the API key is used." Asked for consequences, the model finds the most
+specific consequence it can. So every question now sits on a ladder, and a developer climbs it
+unit by unit:
+
+| level | asks | the question may name |
+|---|---|---|
+| 1 purpose and placement | what the unit is for, what depends on it, what it depends on | nothing from the code: components by role, in plain language |
+| 2 decision and alternatives | what was chosen, what was rejected, what constraint forced it | nothing from the code |
+| 3 consequence across units | what else changes if the decision were reversed or replaced | nothing from the code |
+| 4 behaviour under failure | module-level edge cases and failure modes | file or component names, no code |
+| 5 implementation | code paths, specific functions (the questions before the ladder) | anything |
+
+- **Everyone starts each unit at level 1.** A correct answer at level n unlocks n + 1 on that
+  unit for the next quiz; partial, wrong or unknown asks level n again (another question); a
+  confidently wrong answer at level 2 or more asks n - 1 first, since a misconception about a
+  decision says the picture of the unit's role may be wrong too. With `--per-unit N`, a level
+  passes when all N answers of the run are correct.
+- **The level is derived from the records**, never kept apart: every answer is recorded with
+  its `level` (and `forced` when `--level` chose it). Because each level needs the ones before
+  it, an answer from before the ladder (level 5) or at a forced level never moves anyone past
+  a level they have not shown; both still count in the score at their level.
+- **Levels 1-3 are the understanding** (the table above): a third each, the latest answer
+  per level counting, decayed as before. Levels 4 and 5 are depth: 0.1 each on top, so a
+  developer who knows a unit down to its code keeps 1.0 through the first changes, and depth
+  can lift a faded understanding back over the threshold, but nobody needs it to get there. A
+  confidently wrong answer at any level is still negative evidence (-0.5 for that level).
+- **Level 1-3 questions name no function, variable, file or code block.** The question prompt
+  says so for each level, and lets them name an external technology the decision is about (a
+  database, a hosting platform, a model provider). The grader is told the level too: at levels
+  1-3 a correct plain-language answer is correct without any identifier, and partial means the
+  role or decision is right but a dependency or a consequence is missing.
+  `udebt quiz --preview` checks the questions it prints with a heuristic for code-like tokens.
+- **An orientation comes first.** Before the level 1 question on a unit the developer has no
+  level 1-3 answer on, the quiz prints a short orientation: what the unit is for, the decision
+  with its alternatives and why, the two or three paths to open first, and who shaped it (from
+  the unit's `history`). The model writes it once per unit and it is cached on the unit in
+  `map.json` (`orientation`, shared by the team, rewritten when `udebt map` changes the unit);
+  a quiz run asks for every missing one in one call before the questions call, and the
+  question writer sees it, so the level 1 question asks what follows from it rather than what
+  it says. `udebt dig` opens with the same orientation.
+- **`udebt status` shows depth** next to understanding (`1/5`, `-` with no answer).
+- **`udebt quiz --level N`** asks every question at level N, the old flat behaviour at 5, for
+  experiments. `evidence_model: "flat"` in config scores the old way, the mean of the last 5 answers.
+
+A quiz run costs one call for the questions, one for the grades and, on units met for the
+first time, one for their orientations.
 
 ## Units and sub-units
 

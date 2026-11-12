@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from . import ladder
+
 _UNIT_FIELDS: dict[str, Any] = {
     "id": {"type": "string", "description": "short kebab-case identifier"},
     "name": {"type": "string"},
@@ -74,15 +76,44 @@ QUESTIONS_SCHEMA: dict[str, Any] = {
                 "type": "object",
                 "properties": {
                     "unit_id": {"type": "string"},
+                    "level": {"type": "integer", "minimum": 1, "maximum": ladder.TOP},
                     "question": {"type": "string"},
                     "reference_answer": {"type": "string"},
                     "evidence": {"type": "array", "items": {"type": "string"}},
                 },
-                "required": ["unit_id", "question", "reference_answer", "evidence"],
+                "required": ["unit_id", "level", "question", "reference_answer", "evidence"],
             },
         }
     },
     "required": ["questions"],
+}
+
+ORIENTATION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "orientations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "unit_id": {"type": "string"},
+                    "purpose": {"type": "string"},
+                    "decision": {"type": "string"},
+                    "where": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {"path": {"type": "string"}, "what": {"type": "string"}},
+                            "required": ["path", "what"],
+                        },
+                    },
+                    "shaped_by": {"type": "string"},
+                },
+                "required": ["unit_id", "purpose", "decision", "where", "shaped_by"],
+            },
+        }
+    },
+    "required": ["orientations"],
 }
 
 GRADE_SCHEMA: dict[str, Any] = {
@@ -273,73 +304,122 @@ History (commits most likely to carry decisions, oldest first):
 """
 
 
+def ladder_block() -> str:
+    """The five levels, as the question writer and the grader see them."""
+    return "\n".join(
+        f'{n}. {lv.name}: asks {lv.asks}. May name {lv.names}.\n   Shape: "{lv.example}"'
+        for n, lv in ladder.LEVELS.items()
+    )
+
+
+NO_IDENTIFIERS = """Levels 1, 2 and 3 test the architecture, not the code. A question at these
+levels must not name any function, method, class, variable, constant, file, directory,
+module, endpoint or configuration key of this repository, and must not quote or paraphrase a
+line or block of code. Name components by their role, in plain language ("the part that
+streams replies to the browser", "the check that a user may open the admin pages"), as a
+colleague would at a whiteboard. It may name an external technology, service or library
+the decision is about (a database, a hosting platform, a model provider). Ask about the
+unit's main decision and its place in the system, not its most specific consequence: a
+developer who understands the shape of the system should be able to answer without opening a
+file. A level 4 question may name a file or a component, but no code. A level 5 question may
+name anything."""
+
+
+def _history_line(h: dict[str, Any], who: bool = False) -> str:
+    klass = h["klass"] + ("/" + h["agent"] if who and h.get("agent") else "")
+    author = f" {h.get('author') or '?'}:" if who else ""
+    return f"{h['sha']} {h['date']} [{klass}]{author} {h['subject'][:70]}"
+
+
+def _unit_lines(u: dict[str, Any], *, history: bool = True, level: bool = True) -> str:
+    parent = f" (a part of {u['parent_name']})" if u.get("parent_name") else ""
+    lines = [f"- unit_id: {u['id']}", f"  name: {u['name']}{parent}"]
+    if level:
+        n = int(u.get("level", 1))
+        lines.append(f"  level: {n} ({ladder.LEVELS[n].name})")
+    lines += [
+        f"  summary: {u.get('summary', '')}",
+        f"  decision: {u.get('decision', '')}",
+        f"  alternatives: {u.get('alternatives', '')}",
+        f"  why: {u.get('why', '')}",
+        f"  paths: {', '.join(u.get('paths', []))}",
+    ]
+    if history:
+        shaped = "; ".join(_history_line(h) for h in (u.get("history") or [])[:5])
+        lines.append(f"  shaped_by: {shaped or '(unknown)'}")
+    if u.get("shown_orientation"):
+        lines.append(f"  orientation the developer has just read: {u['shown_orientation']}")
+    return "\n".join(lines)
+
+
 def questions_prompt(units: list[dict[str, Any]], per_unit: int) -> str:
-    unit_lines = []
-    for u in units:
-        hist = u.get("history") or []
-        shaped = "; ".join(
-            f"{h['sha']} {h['date']} [{h['klass']}] {h['subject'][:70]}" for h in hist[:5]
-        )
-        parent = f" (a part of {u['parent_name']})" if u.get("parent_name") else ""
-        unit_lines.append(
-            f"- unit_id: {u['id']}\n  name: {u['name']}{parent}\n"
-            f"  summary: {u.get('summary', '')}\n"
-            f"  decision: {u.get('decision', '')}\n  alternatives: {u.get('alternatives', '')}\n"
-            f"  why: {u.get('why', '')}\n  paths: {', '.join(u.get('paths', []))}\n"
-            f"  shaped_by: {shaped or '(unknown)'}"
-        )
+    """One call for every question of a quiz run. Each unit carries the `level` to ask it at
+    (ladder.next_level, or a forced level) and, when the developer was just shown one, the
+    orientation text (`shown_orientation`)."""
+    oriented = any(u.get("shown_orientation") for u in units)
+    orientation_rule = (
+        """
+Some units carry the orientation the developer has just read: what the unit is for, its
+decision and alternatives, where it lives and who shaped it. A level 1 question on such a
+unit must not be answerable by repeating that text: ask what follows from it, such as which
+other parts of the system rely on the unit and what it relies on, or where it sits in a
+request or a run.
+"""
+        if oriented
+        else ""
+    )
     return f"""TASK: questions
 
-You are testing whether a developer understands the DECISIONS that shaped the repository in the
-current directory. Write {per_unit} question(s) for each unit below. Mix these shapes, favouring
-the first two:
-- consequence: "If you reverted/replaced X with <alternative>, what else would have to change?"
-- rationale: "Why does the code do X rather than Y? What constraint forces it?" Only ask this when
-  the code or commit history actually reveals the reason; otherwise ask a consequence question.
-- prediction: "What happens when X fails / is empty / is called twice?"
-- ownership: "Which component decides Z? Where does it get configured?"
+You are testing whether a developer understands the ARCHITECTURE of the repository in the
+current directory: what each unit is for, the decisions that shaped it, and what those
+decisions mean for the rest of the system. Questions climb a ladder of five levels, and a
+developer is asked a level only once they have shown the levels above it. Each unit below
+names the level to ask it at. Write {per_unit} question(s) for each unit, every one at exactly
+that unit's level, and return that level with each question.
 
-Every question must have an answer the code (or the cited commits) determines, so it can be graded
-objectively. Avoid trivia (exact names, line counts, versions). Use the read-only tools to verify
-every reference answer against the actual code; `git show <sha>` is not available, so rely on the
-code and the commit subjects given. Cite the files you relied on in `evidence`. Keep each
+The ladder:
+{ladder_block()}
+
+{NO_IDENTIFIERS}
+{orientation_rule}
+Every question must have an answer the code (or the cited commits) determines, so it can be
+graded objectively. Avoid trivia (exact names, line counts, versions) at every level. Use the
+read-only tools to verify every reference answer against the actual code; `git show <sha>` is
+not available, so rely on the code and the commit subjects given. The reference answer is for
+the grader, not the developer: it may name files and functions, and says what a correct
+plain-language answer must contain. Cite the files you relied on in `evidence`. Keep each
 question to two sentences and each reference answer to three.
 
 Units:
-{chr(10).join(unit_lines)}
+{chr(10).join(_unit_lines(u) for u in units)}
 """
 
 
-def stable_questions_prompt(units: list[dict[str, Any]], per_unit: int) -> str:
+def stable_questions_prompt(units: list[dict[str, Any]], per_unit: int, level: int = 3) -> str:
     """Questions for the synthetic-developer experiment (synthetic.py). The same questions go
     to answerers who know different snapshots, so they must be answerable from the code as
     it stands, whatever version a developer learnt: about the unit's decision and current
     behaviour, never about what changed or when. No commit history is shown, so the writer
-    is not steered towards the latest changes."""
-    unit_lines = []
-    for u in units:
-        parent = f" (a part of {u['parent_name']})" if u.get("parent_name") else ""
-        unit_lines.append(
-            f"- unit_id: {u['id']}\n  name: {u['name']}{parent}\n"
-            f"  summary: {u.get('summary', '')}\n"
-            f"  decision: {u.get('decision', '')}\n  alternatives: {u.get('alternatives', '')}\n"
-            f"  why: {u.get('why', '')}\n  paths: {', '.join(u.get('paths', []))}"
-        )
+    is not steered towards the latest changes. Every question is at one explicit ladder
+    `level`, so runs at the same level stay comparable."""
+    lv = ladder.LEVELS[level]
     return f"""TASK: stable-questions
 
 You are writing a short quiz on how the repository in the current directory works. Write
-exactly {per_unit} question(s) for each unit below, each answerable from the code as it is now.
+exactly {per_unit} question(s) for each unit below, each answerable from the code as it is now,
+every one at level {level} of the question ladder below ({lv.name}), and return that level with
+each question.
 
-Ask about the unit as it stands: the decision it embodies and how the code behaves today.
-Do not ask what changed, when, or why something was changed, and do not ask about commit
-history or about the newest feature in preference to the core of the unit. A developer who
-knows this unit's code well should be able to answer from the code alone. Give each unit's
-questions different shapes, in this order:
-1. decision: "Why does the code do X rather than <alternative>? What constraint forces it?"
-   or "If X were replaced with <alternative>, what else would have to change?"
-2. behaviour: "What happens when X fails / is empty / is called twice?" or "Which component
-   decides Z, and what does it do with it?"
-Further questions, if asked for, alternate between the two shapes on other parts of the unit.
+The ladder:
+{ladder_block()}
+
+{NO_IDENTIFIERS}
+
+Ask about the unit as it stands: its purpose, the decision it embodies and how the code
+behaves today. Do not ask what changed, when, or why something was changed, and do not ask
+about commit history or about the newest feature in preference to the core of the unit. A
+developer who knows this unit's code well should be able to answer from the code alone. When
+asked for several questions per unit, ask each about a different part of the unit.
 
 Every question must have an answer the code determines, so it can be graded objectively.
 Avoid trivia (exact names, line counts, versions, file names). Use the read-only tools to
@@ -347,15 +427,53 @@ verify every reference answer against the actual code, and cite the files you re
 `evidence`. Keep each question to two sentences and each reference answer to three.
 
 Units:
-{chr(10).join(unit_lines)}
+{chr(10).join(_unit_lines({**u, "level": level}, history=False) for u in units)}
+"""
+
+
+def orientation_prompt(units: list[dict[str, Any]]) -> str:
+    """One call for every unit a quiz run needs an orientation for and the map lacks."""
+    blocks = []
+    for u in units:
+        hist = "\n".join(f"    - {_history_line(h, who=True)}" for h in u.get("history") or [])
+        blocks.append(
+            _unit_lines(u, history=False, level=False) + f"\n  history:\n{hist or '    (none)'}"
+        )
+    return f"""TASK: orientation
+
+A developer who did not build the repository in the current directory is about to be quizzed
+on the units below, starting with what each one is for. Before the first question on a unit
+they read a short orientation, written once and shared by the whole team. Write one for each
+unit, in plain language, for a capable developer who has never opened these files:
+
+- purpose: one or two sentences on what the unit is for: the job it does for the rest of the
+  system. Name other components by their role. Do not list what depends on it or what it
+  depends on: the first question asks that.
+- decision: two or three sentences: what was chosen, the alternatives that were not, and why
+  (say plainly when neither the code nor the history shows why).
+- where: the two or three paths a reader should open first (files or directories relative to
+  the repository root, as listed under the unit), each with a few words on what is there.
+- shaped_by: one sentence on who shaped the unit and when, from its history below: who
+  authored the commits that made the decision, and whether a human wrote them alone ([human]),
+  with an AI co-author ([assisted]) or an AI agent authored them ([ai]). Write "The history
+  list does not say." when the unit has none.
+
+Keep each orientation under 120 words in all. Use the read-only tools to check the summary
+and the paths against the code. Do not quote code and do not invent paths. Return `unit_id`
+exactly as given.
+
+Units:
+{chr(10).join(blocks)}
 """
 
 
 def grade_prompt(items: list[dict[str, Any]]) -> str:
     blocks = []
     for i, it in enumerate(items):
+        n = ladder.level_of(it)
         blocks.append(
-            f"### {i}\nUNIT: {it['unit_id']}\nQUESTION: {it['question']}\n"
+            f"### {i}\nUNIT: {it['unit_id']}\nLEVEL: {n} ({ladder.LEVELS[n].name})\n"
+            f"QUESTION: {it['question']}\n"
             f"REFERENCE: {it['reference_answer']}\nEVIDENCE: {', '.join(it.get('evidence', []))}\n"
             f"ANSWER: {it['answer']}\n"
         )
@@ -363,9 +481,18 @@ def grade_prompt(items: list[dict[str, Any]]) -> str:
 
 Grade each developer ANSWER against the code in the current directory. The REFERENCE was written
 earlier by another model and may itself be wrong; if the answer and reference disagree, check the
-EVIDENCE files with the read-only tools and trust the code. Verdicts:
+EVIDENCE files with the read-only tools and trust the code.
+
+Each item carries its LEVEL on the question ladder: 1 purpose and placement, 2 decision and
+alternatives, 3 consequence across units (the architecture); 4 behaviour under failure, 5
+implementation (depth). At levels 1-3 the question is about the architecture in plain
+language, so grade the developer's grasp of roles, decisions and consequences, not their recall
+of names: a correct answer that names no file, function or identifier is correct, and is never
+marked down for lacking them. Verdicts:
 - correct: the answer captures the behaviour or decision, even if worded differently
-- partial: right direction but missing a consequence or wrong on a detail that matters
+- partial: right direction but missing a consequence or wrong on a detail that matters; at
+  levels 1-3, partial means the role or the decision is right but a dependency or a
+  consequence that matters is missing
 - wrong: contradicts how the code works, or asserts something the code does not do
 - unknown: the developer said they do not know, or the answer is empty
 
@@ -399,23 +526,46 @@ Confidence: 1 = a guess, 2 = fairly sure, 3 = certain. Return `index` matching t
 """
 
 
-def dig_prompt(unit: dict[str, Any]) -> str:
-    return f"""You are helping a developer who did not write this code understand ONE architectural
+_DIG_WHERE = """**Where it lives** — the two to four files or functions that embody it, each with
+   one line on what to look for there. Reference them as path:line where you can."""
+_DIG_REST = f"""{_DIG_WHERE}
+{{n}}. **What depends on it** — what breaks or changes if this decision is reversed.
+{{m}}. **The trap** — the one misconception a reader is most likely to form, and the fact
+   that corrects it."""
+
+
+def dig_prompt(unit: dict[str, Any], level: int = 1, orientation: str | None = None) -> str:
+    """The walkthrough of one unit. `orientation` is the unit's orientation (orientation.py),
+    which the developer has just read as the walkthrough's first section; the check question
+    is asked at the developer's ladder `level` for the unit."""
+    lv = ladder.LEVELS[level]
+    data = {k: v for k, v in unit.items() if k not in ("orientation", "shown_orientation")}
+    if orientation:
+        first = f"""The developer has just read this orientation, the walkthrough's first section:
+
+{orientation}
+
+Do not repeat it. Write the rest of the walkthrough in Markdown, at most 350 words, with
+these sections:
+1. """ + _DIG_REST.format(n=2, m=3)
+    else:
+        first = """Write a walkthrough in Markdown, at most 400 words, with these sections:
+1. **The decision** — what was chosen, in one paragraph, and the alternative that was
+   rejected.
+2. """ + _DIG_REST.format(n=3, m=4)
+    return f"""TASK: dig
+
+You are helping a developer who did not write this code understand ONE architectural
 unit well enough to change it safely. Use the read-only tools to look at the actual code first.
 
-Unit: {json.dumps(unit, indent=2)}
+Unit: {json.dumps(data, indent=2)}
 
 The unit's `history` lists the commits that shaped it, each marked human, assisted (human with an
 AI co-author) or ai (AI-authored). Mention who made the decision and when if that is known.
 
-Write a walkthrough in Markdown, at most 400 words, with these sections:
-1. **The decision** — what was chosen, in one paragraph, and the alternative that was rejected.
-2. **Where it lives** — the two to four files or functions that embody it, each with one line on
-   what to look for there. Reference them as path:line where you can.
-3. **What depends on it** — what breaks or changes if this decision is reversed.
-4. **The trap** — the one misconception a reader is most likely to form, and the fact that
-   corrects it.
+{first}
 
-End with exactly one line beginning `CHECK QUESTION:` followed by a prediction question whose
-answer the code determines. Do not include the answer.
+End with exactly one line beginning `CHECK QUESTION:` followed by one question at level {level}
+of the question ladder ({lv.name}: {lv.asks}), whose answer the code determines. The question
+may name {lv.names}. Do not include the answer.
 """

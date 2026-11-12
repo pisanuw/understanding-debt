@@ -5,7 +5,7 @@ import re
 import subprocess
 
 import pytest
-from conftest import git
+from conftest import git, understood
 
 from udebt import cli, replay
 from udebt.ledger import Cutoff, Ledger
@@ -98,11 +98,8 @@ def test_evidence_counts_only_from_when_it_was_recorded(fixture_repo, capsys):
     root = fixture_repo
     store = _mapped(root, capsys)
     head = git(root, "rev-parse", "HEAD").strip()
-    store.append_record(
-        "dev1@example.com",
-        {"type": "quiz", "dev": "dev1@example.com", "unit": "storage", "head": head,
-         "verdict": "correct", "confidence": 2, "ts": "2099-01-01T00:00:00+00:00"},
-    )  # fmt: skip
+    for r in understood("storage", "2099-01-01T00:00:00+00:00", head):
+        store.append_record("dev1@example.com", {"type": "quiz", "dev": "dev1@example.com", **r})
     h = replay.load(root, store)
     ts = replay.parse_ts(h.records["dev1@example.com"][0]["ts"])
     before = replay.snapshot_at(h, h.fp_time[-1], len(h.fp) - 1)

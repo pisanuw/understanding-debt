@@ -3,7 +3,7 @@
 import math
 
 import pytest
-from conftest import git
+from conftest import git, understood
 
 from udebt import scoring
 from udebt.cache import ensure_gitignore
@@ -36,7 +36,7 @@ def test_decay_models():
     assert scoring.prior_understanding(1.0, 10.0, d, 0.0) == 0.5
     assert abs(scoring.prior_understanding(1.0, 0.0, d, math.log(2)) - 0.25) < 1e-9
     assert abs(scoring.prior_understanding(1.0, 2.0, 0.9) - 0.405) < 1e-12
-    s = scoring.score_unit({"id": "u"}, [{"verdict": "correct"}], 3.0, decay=d, share_since=1.0)
+    s = scoring.score_unit({"id": "u"}, understood(), 3.0, decay=d, share_since=1.0)
     assert s.share_since == 1.0 and abs(s.understanding - math.exp(-1)) < 1e-12
 
 
@@ -126,10 +126,7 @@ def test_the_same_mass_fades_a_small_unit_more(tmp_path):
     root, store, first = _two_units(tmp_path)
     commits = commits_for(root, store)
     weights = weights_for(root, store, commits)
-    recs = [
-        {"unit": u, "verdict": "correct", "confidence": 2, "ts": "2026-01-01", "head": first}
-        for u in ("small", "big")
-    ]
+    recs = [r for u in ("small", "big") for r in understood(u, "2026-01-01", first)]
     sizes = unit_sizes_at(root, store, store.require_map()["units"])
     assert sizes == {"small": 5.0, "big": 500.0}
 

@@ -1,5 +1,7 @@
 import json
 
+from conftest import understood
+
 from udebt import scoring
 from udebt import units as hier
 from udebt.quiz import compute_scores, pick_units
@@ -43,9 +45,9 @@ def test_unit_helpers():
 
 
 def test_inherit_rollup_and_split():
-    parent = scoring.score_unit({"id": "api", "importance": 0.8}, [rec("api", "correct")], 0)
+    parent = scoring.score_unit({"id": "api", "importance": 0.8}, understood("api"), 0)
     auth = scoring.score_unit({"id": "api/auth", "importance": 0.6}, [], 0, prior=0.2)
-    routes = scoring.score_unit({"id": "api/routes", "importance": 0.2}, [rec("x", "correct")], 0)
+    routes = scoring.score_unit({"id": "api/routes", "importance": 0.2}, understood("x"), 0)
     # a sub-unit without its own quiz takes half the parent's quiz when that beats its prior
     inh = scoring.inherit(auth, parent.understanding)
     assert inh.understanding == 0.5 and inh.source == "parent"
@@ -66,7 +68,7 @@ def test_compute_scores_hierarchy_and_v2_maps(layered_repo):
     root = layered_repo
     store = Store(root)
     store.init()
-    recs = [rec("api", "correct", head=None), rec("api/routes", "wrong")]
+    recs = [*understood("api"), rec("api/routes", "wrong")]
     scores = {s.unit_id: s for s in compute_scores(root, store, UNITS, "new@x.com", records=recs)}
     assert scores["api/auth"].source == "parent" and scores["api/auth"].understanding == 0.5
     assert scores["api/routes"].source == "quiz" and scores["api/routes"].understanding == 0.0

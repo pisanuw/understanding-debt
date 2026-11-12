@@ -71,3 +71,8 @@
 2026-11-12 [note] hf map 2c61ae8: 87/87 paths exact, coverage 78%, no retry; offline, prefix-stripped paths resolve 84 by suffix, 6 exact, 3 dropped. Refit: pooled k 1.02, floor fit 0.35 not adopted.
 2026-11-12 [doc] README, BRIEFING (path rules, caps, k = 1.0, muted CAUTION, line cap), ROADMAP Phase 3.1 and the Phase 5 refit with question-set variance, TESTBEDS Phase 3.1 re-check.
 2026-11-12 [note] Synthetic replication, 6 runs on 3 repos: share changed predicts wrongness every time (rho 0.57-0.82, p<0.03); raw mass once; 0.9^mass far too steep.
+2026-11-12 [decision] Phase 3.2 question ladder: 1 purpose and placement, 2 decision, 3 consequence across units (no identifiers), 4 failure, 5 implementation. Start at 1; correct unlocks the next.
+2026-11-12 [decision] Ladder progression from records: next = depth + 1 (levels 1..n passed by their latest sitting); partial/wrong/unknown repeat; a confident wrong at n >= 2 asks n - 1 first.
+2026-11-12 [decision] Ladder score: verified = (v1+v2+v3)/3 + 0.1(v4+v5), latest sitting per level; und = min(1, verified x fade), so depth is headroom. evidence_model flat keeps the old mean.
+2026-11-12 [code] Records store `level` (`forced` under quiz --level N); pre-ladder records are level 5 and never move the ladder. quiz --preview prints Markdown, records nothing; status shows depth.
+2026-11-12 [code] Orientation before a unit's first level 1 question: purpose, decision, 2-3 paths, who shaped it; one batched call per quiz, cached on the unit in map.json; dig opens with it.

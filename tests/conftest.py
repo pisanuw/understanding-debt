@@ -32,6 +32,15 @@ def fixture_repo(tmp_path: Path) -> Path:
     return root
 
 
+def understood(unit=None, ts="2026-01-02T00:00:00+00:00", head=None, **extra) -> list[dict]:
+    """Evidence of full understanding on the question ladder: levels 1-3 passed, one sitting
+    each. (A single record without a level is level 5, worth only the depth bonus.)"""
+    base = {"verdict": "correct", "confidence": 2, "ts": ts, "head": head, **extra}
+    if unit is not None:
+        base["unit"] = unit
+    return [{**base, "level": n} for n in (1, 2, 3)]
+
+
 AI_ENV = {"GIT_AUTHOR_NAME": "Claude", "GIT_AUTHOR_EMAIL": "noreply@anthropic.com"}
 
 
