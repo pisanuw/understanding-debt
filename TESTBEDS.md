@@ -138,7 +138,37 @@ which ba564e2 now builds in.
 - **Speed on large histories.** On servo each `contributors` run took about 8–9 minutes and
   `weigh` 18.5 minutes, because every command re-parses `git log --numstat` for the whole
   history. The stress tier (vscode 171k commits, llvm 608k) needs a parsed-commit cache.
-- `udebt map` (the `claude` CLI) has not been run on these yet.
+
+## First `udebt map` (huggingface_hub, ba564e2, 2026-11-12)
+
+The owner approved the run. It took one `claude` CLI call (subscription, no API key) and 45 s.
+Structure: 287 source files, 11 clusters. The map has 12 architectural units and 4 CLI
+sub-units covering 81% of non-test source files: `hf-api`, `http-layer`, `download-cache`,
+`config-constants`, `auth-model`, `upload-commit`, `cli`, `inference-client`,
+`generated-inference-types`, `hf-filesystem-buckets`, `repocards-mixin`, `dev-tooling-ci`.
+The units read as a fair architecture of the library.
+
+`status` for the top contributor (515 commits): debt index 92, with priors of 0.02–0.15 per
+unit. Per-unit `ai%` is 0–26%, all-time and weighted, against 38% of commits in the last
+year.
+
+**History mining misses the AI era.** `udebt history` lists only 2 decision commits, and 7
+of the map's 9 history links point at one commit ("V1.0 release (#3464)").
+`decision_candidates` gave the mapper 40 commits:
+
+- 34 of the 40 are from 2021–2022, and only 2 from after 2023. 25 touch
+  `api-inference-community/`, a subproject removed from the repo in April 2022.
+- Only 23% of the files each candidate touched still exist at HEAD, and 22 of the 40 touch
+  no surviving file, so the mapper cannot link them to any current unit.
+- **Ties go to the oldest commit.** The sort key is `(-score, date)`. 44 commits tie at the
+  cut-off score of 6, and all 25 open slots went to 2021–2023. None of the 14 tied commits
+  from 2024–2026 got one.
+- The last 12 months have 153 scored candidates (max score 7, 64 AI-involved, 88% of their
+  files still exist), and one of them got a slot.
+
+Possible fixes: weight candidates by the share of their files that survive at HEAD, break ties
+toward recent commits or give each period a quota, and score with the commit weights that
+now exist instead of a separate count.
 
 ## Caveats
 
@@ -150,8 +180,8 @@ which ba564e2 now builds in.
   heuristics.
 - **Identity.** Humans are counted by email with GitHub noreply addresses folded to the
   login, and no `.mailmap` is applied, so team sizes are somewhat inflated.
-- **Untested end to end.** `udebt map` has not yet been run on any of these; the offline
-  commands have (see the starter-set run).
+- **Mostly untested end to end.** `udebt map` has run on huggingface_hub only, and no quiz
+  has been taken on any testbed.
 - The critical-packages dataset that seeded the library candidates measured the year ending
   2026-07-29. These numbers are for the year ending 2026-11-12 and are generally higher.
 
