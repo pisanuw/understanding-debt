@@ -8,7 +8,9 @@ three more full passes of its own (effective lines, added files, renames), which
     subject, body and per-file changed lines (what load_commits builds a Commit from);
     the weighing inputs, each filled the first time the weights need it: effective lines
     (`eff`), files added (`add`), whether it renames a file (`ren`) and the files whose
-    diff is a version bump (`ver`).
+    diff is a version bump (`ver`);
+    for a commit that renames, the (old, new) path pairs (`mv`), which history mining
+    reads to follow a file to its name at HEAD.
 
 On load, `git rev-list HEAD` lists the reachable shas in log order. Only shas the cache
 lacks are parsed (`git log --no-walk --stdin`, so nothing else is walked) and appended;
@@ -37,7 +39,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .history import rename_shas
+from .history import rename_pairs, rename_shas
 from .provenance import Commit, Signature, classify_all, commit_from, parse_log
 from .weights import WeighInputs, _effective, added_files, version_bumps
 
@@ -248,6 +250,26 @@ class ParsedCache:
         self._ensure(["ren"], commits)
         cached = self.data["commits"]
         return {c.sha for c in commits if cached.get(c.sha, {}).get("ren")}
+
+    def moves(self, commits: list[Commit]) -> dict[str, list[tuple[str, str]]]:
+        """sha -> the (old, new) paths it renames, for history mining's survival. Read only
+        for the commits the `ren` input marks as renaming, and kept as `mv`."""
+        self._ensure(["ren"], commits)
+        cached = self.data["commits"]
+        missing = [
+            c.sha for c in commits if (e := cached.get(c.sha)) and e.get("ren") and "mv" not in e
+        ]
+        if missing:
+            got = rename_pairs(self.root, missing)
+            for s in missing:
+                cached[s]["mv"] = [list(p) for p in got.get(s, ())]
+            self.stats.inputs["mv"] = self.stats.inputs.get("mv", 0) + len(missing)
+            self._write()
+        return {
+            c.sha: [(a, b) for a, b in e["mv"]]
+            for c in commits
+            if (e := cached.get(c.sha)) and e.get("mv")
+        }
 
     def inputs(self, commits: list[Commit]) -> WeighInputs:
         self._ensure(INPUT_KINDS, commits)

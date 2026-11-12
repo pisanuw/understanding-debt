@@ -78,8 +78,12 @@ def test_unit_provenance_and_prior(mixed_repo):
 
 
 def test_decision_candidates(mixed_repo):
+    from udebt.weights import compute_weights
+
     cs = load_commits(mixed_repo)
-    cands = decision_candidates(cs, rename_shas(mixed_repo), max_n=10)
+    renames = rename_shas(mixed_repo)
+    weights = compute_weights(mixed_repo, cs, renames)
+    cands = decision_candidates(cs, renames, max_n=10, weights=weights)
     by_subject = {c["subject"]: c for c in cands}
     assert "initial" in by_subject and "founding" in by_subject["initial"]["reasons"]
     assert "persist to json" in by_subject

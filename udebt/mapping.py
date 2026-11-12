@@ -71,6 +71,31 @@ def weights_for(root: Path, store: Store, commits: list[Commit]) -> dict[str, Co
     )
 
 
+def history_candidates(
+    root: Path,
+    store: Store,
+    commits: list[Commit],
+    weights: dict[str, CommitWeight],
+    max_n: int = 40,
+) -> list[dict[str, Any]]:
+    """The decision candidates the mapper sees (history.decision_candidates), scored from
+    the commit weights, discounted by how much of each commit survives at HEAD (renames
+    followed through the parsed-commit cache) and spread over the history's periods by the
+    configured quota. No LLM call. Call after weights_for, which marks version bumps."""
+    pc = open_cache(root, store.dir)
+    cfg = store.config
+    return decision_candidates(
+        commits,
+        pc.renames(commits),
+        max_n,
+        weights=weights,
+        alive=set(repo.tracked_files(root)),
+        moves=pc.moves(commits),
+        n_periods=cfg.history_periods,
+        quota=cfg.history_quota,
+    )
+
+
 def unit_mass(
     commits: list[Commit],
     paths: list[str],
@@ -176,8 +201,7 @@ def build_map(
         raise SystemExit("No tracked files to map. Commit something first.")
     commits = commits_for(root, store)
     weights = weights_for(root, store, commits)
-    renames = open_cache(root, store.dir).renames(commits)
-    candidates = decision_candidates(commits, renames, max_history)
+    candidates = history_candidates(root, store, commits, weights, max_history)
     tree = tree_summary(files) if len(files) > FILE_LIST_LIMIT else None
     struct = discover(root, store, files, commits, weights)
 

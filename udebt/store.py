@@ -5,7 +5,8 @@ records/<slug>.jsonl one developer's evidence, append-only (commit this for team
 commits.json         per-commit weights (heuristic, LLM-refined for the heaviest); commit this
 commits-parsed.json  parsed git history, a cache (`.json.gz` when large); gitignored, derived
 responsibility.json  each developer's responsibility set and per-developer scope (commit this)
-config.json          settings (model, decay, identities, handles, directed agents, bus target)
+config.json          settings (model, decay, identities, handles, directed agents, bus target,
+                     history quota)
 """
 
 from __future__ import annotations
@@ -36,6 +37,8 @@ class Config:
     footprint_threshold: float = 0.1  # human share of a unit that seeds responsibility
     cochange_max_files: int = 30  # commits touching more files are left out of co-change
     group_max_commits: int = 50  # a merged branch up to this long is weighed as one commit
+    history_periods: int = 4  # history mining cuts history into this many equal-mass periods
+    history_quota: int = 5  # decision candidates each period is guaranteed (of 40)
     identities: dict[str, list[str]] = field(default_factory=dict)  # primary email -> aliases
     # CODEOWNERS handle -> email (or list of emails); null marks a handle still to be mapped
     handles: dict[str, Any] = field(default_factory=dict)
@@ -79,6 +82,8 @@ class Config:
             "footprint_threshold": self.footprint_threshold,
             "cochange_max_files": self.cochange_max_files,
             "group_max_commits": self.group_max_commits,
+            "history_periods": self.history_periods,
+            "history_quota": self.history_quota,
             "identities": self.identities,
             "handles": self.handles,
             "directed": self.directed,

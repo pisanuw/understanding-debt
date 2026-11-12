@@ -9,6 +9,7 @@ udebt scope <id> <scope>        mark a unit architectural | blackbox, for you or
 udebt quiz [-n N] [--deep]      answer prediction questions, get graded, record evidence
 udebt status [unit] [--deep]    debt per unit and a 0-100 debt index (--team: bus target)
 udebt risk [range]              a change's weight per unit against your understanding
+udebt history [--candidates]    decisions that shaped the repo (or the commits the mapper sees)
 udebt dig [<id>]                guided walkthrough of the worst unit (or a chosen one)
 udebt directed add <session>    count agent commits you directed as your assisted work
 udebt experiment synthetic --snapshots <rev>,...   synthetic developers frozen at old snapshots
@@ -34,6 +35,7 @@ from .mapping import (
     build_map,
     commits_for,
     discover,
+    history_candidates,
     mappable_files,
     rescore_map,
     weights_for,
@@ -542,6 +544,8 @@ def _team_status(root, store, units, commits, weights, resp, deep) -> int:
 def cmd_history(args) -> int:
     root, store = _ctx(args)
     store.require()
+    if args.candidates:
+        return _print_candidates(root, store, args.json)
     m = store.require_map()
     email = _email(args, root)
     mine = store.config.emails_for(email)
@@ -574,6 +578,45 @@ def cmd_history(args) -> int:
         "w is the commit's weight (0-1)."
     )
     print("you+ai = you committed it with an AI co-author. ai = an agent authored it.")
+    return 0
+
+
+def _print_candidates(root: Path, store: Store, as_json: bool) -> int:
+    """The decision candidates `udebt map` would hand the model, without calling it."""
+    commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
+    cands = history_candidates(root, store, commits, weights)
+    if as_json:
+        import json as _json
+
+        print(_json.dumps(cands, indent=2))
+        return 0
+    cfg = store.config
+    years: dict[str, int] = {}
+    for h in cands:
+        years[h["date"][:4]] = years.get(h["date"][:4], 0) + 1
+    ai = sum(1 for h in cands if h["klass"] in ("ai", "assisted"))
+    n = max(1, len(cands))
+    print(f"\n{len(cands)} decision candidates `udebt map` would show the model, oldest first")
+    print(f"{cfg.history_periods} periods of equal mass, {cfg.history_quota} slots guaranteed each")
+    print("by year: " + ", ".join(f"{y} {k}" for y, k in sorted(years.items())))
+    print(
+        f"mean survival {sum(h['survival'] for h in cands) / n:.2f}; "
+        f"AI-involved {ai} ({ai / n:.0%})\n"
+    )
+    print(
+        f"{'date':<10} {'sha':<7} {'p':>1} {'class':<9} {'score':>5} {'w':>5} {'alive':>5}  subject"
+    )
+    for h in cands:
+        print(
+            f"{h['date']:<10} {h['sha']:<7} {h['period'] + 1:>1} {h['klass']:<9} "
+            f"{h['score']:>5.2f} {h['weight']:>5.2f} {h['survival']:>5.0%}  {h['subject'][:58]}"
+        )
+        print(f"{'':<36}{'; '.join(h['reasons'])}")
+    print(
+        "\np = period (1 oldest); score = (w + decision bonuses) x alive, +0.5 if founding; "
+        "w = commit weight; alive = share of its files still at HEAD (renames followed)."
+    )
     return 0
 
 
@@ -1226,9 +1269,14 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--deep", action="store_true", help="show sub-units")
     s.set_defaults(fn=cmd_status)
 
-    sub.add_parser("history", help="timeline of decisions and who made them").set_defaults(
-        fn=cmd_history
+    s = sub.add_parser("history", help="timeline of decisions and who made them")
+    s.add_argument(
+        "--candidates",
+        action="store_true",
+        help="list the decision candidates `udebt map` would show the model (no map, no LLM)",
     )
+    s.add_argument("--json", action="store_true", help="with --candidates: as JSON")
+    s.set_defaults(fn=cmd_history)
 
     s = sub.add_parser("alias", help="record other emails you have committed under")
     s.add_argument("emails", nargs="+")

@@ -519,6 +519,18 @@ def ensure_weights(
     return cached
 
 
+def decision_weight(w: CommitWeight) -> float:
+    """How much a commit itself did, for ranking decision candidates (history.py). A branch
+    commit's weight is its share of its branch's weight, which is right for mass but ranks a
+    decision by how many other commits its branch had; so a grouped commit is ranked by its
+    weight on its own (`standalone`), with its LLM class blended in as for any commit."""
+    if w.group is None or w.standalone is None:
+        return w.weight
+    if w.refined in CLASS_WEIGHT:
+        return round(0.5 * w.standalone + 0.5 * CLASS_WEIGHT[w.refined], 3)
+    return w.standalone
+
+
 def mass(commits: list[Commit], weights: dict[str, CommitWeight]) -> float:
     return round(sum(weights[c.sha].weight for c in commits if c.sha in weights), 3)
 
