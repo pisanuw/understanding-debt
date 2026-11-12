@@ -11,6 +11,7 @@ udebt status [unit] [--deep]    debt per unit and a 0-100 debt index (--team: bu
 udebt risk [range]              a change's weight per unit against your understanding
 udebt dig [<id>]                guided walkthrough of the worst unit (or a chosen one)
 udebt directed add <session>    count agent commits you directed as your assisted work
+udebt experiment synthetic --at <rev>   quiz a synthetic developer frozen at an old snapshot
 """
 
 from __future__ import annotations
@@ -987,6 +988,41 @@ def cmd_directed(args) -> int:
     return 0
 
 
+def cmd_experiment(args) -> int:
+    from . import synthetic
+
+    root, store = _ctx(args)
+    store.require()
+    llm = _llm(store, args)
+    email = _email(args, root)
+    try:
+        report, path = synthetic.run(root, store, llm, args.at, n_units=args.units, dev=email)
+    except LLMError as e:
+        raise SystemExit(str(e)) from e
+    rows = report["units"]
+    w = min(44, max([22, *(len(r["unit"]) + 2 for r in rows)]))
+    print(f"\n{'unit':<{w}} {'imp':>5} {'since':>6} {'share':>5} {'files':>9}  verdict")
+    for r in sorted(rows, key=lambda r: -r["mass_since"]):
+        conf = ",".join(str(q["confidence"]) for q in r["questions"] if q["answer"])
+        files = f"{r['files_at_rev']}/{r['files_now']}"
+        print(
+            f"{r['unit']:<{w}} {r['importance']:>5.2f} {r['mass_since']:>6.2f} "
+            f"{r['share_since']:>5.2f} {files:>9}  {r['verdict'] or '(no question)'}"
+            f"{f' (conf {conf})' if conf else ''}"
+        )
+    sm = report["summary"]
+    print(
+        f"\nsince = weighted mass landed on the unit after {report['at_sha'][:8]}; share = of "
+        "all its mass; files = at the snapshot / now."
+    )
+    print(f"Mass since vs wrongness: {sm['reading']}")
+    rho_s = sm["spearman_share_since_vs_wrongness"]
+    if rho_s is not None:
+        print(f"Share since vs wrongness: rho = {rho_s} (p = {sm['p_one_sided_share']})")
+    print(f"Report: {path.relative_to(root)}  (nothing recorded in .udebt/records/)")
+    return 0
+
+
 def cmd_hook(args) -> int:
     root, store = _ctx(args)
     store.require()
@@ -1117,6 +1153,16 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--deep", action="store_true", help="assess sub-units, not top-level units")
     s.add_argument("--strict", action="store_true", help="exit 1 on HIGH or OUTSIDE")
     s.set_defaults(fn=cmd_risk)
+
+    s = sub.add_parser("experiment", help="validation experiments")
+    ex = s.add_subparsers(dest="experiment", required=True)
+    x = ex.add_parser(
+        "synthetic",
+        help="quiz a synthetic developer frozen at an older snapshot (3 claude calls)",
+    )
+    x.add_argument("--at", required=True, metavar="REV", help="the snapshot it knows")
+    x.add_argument("--units", type=int, help="the N most important units (default all)")
+    x.set_defaults(fn=cmd_experiment)
 
     s = sub.add_parser("hook", help="git hooks")
     s.add_argument("action", choices=["install"])

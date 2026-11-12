@@ -145,6 +145,19 @@ class FakeLLM:
                     for i, sh in enumerate(shas)
                 ]
             }
+        if "TASK: answer" in prompt:
+            # the synthetic developer: knows every other question, is blank on the rest
+            n = sum(1 for ln in prompt.splitlines() if ln.startswith("### "))
+            return {
+                "answers": [
+                    {
+                        "index": i,
+                        "answer": "It returns a default." if i % 2 == 0 else "",
+                        "confidence": 2,
+                    }
+                    for i in range(n)
+                ]
+            }
         if "TASK: grade" in prompt:
             n = prompt.count("ANSWER:")
             verdicts = []

@@ -136,6 +136,14 @@ acceptable.
   17% on digitalme, 45% on dsa-instructor. A recompute re-blends LLM refinements on the new
   heuristic. Foxtrot merges (`git pull` merges on the main line) would group a teammate's
   pushed commits as one; neither local testbed has a pull of main on its main line.
+- **Synthetic-developer experiment** (`udebt experiment synthetic`): three calls (questions
+  on HEAD, answers on the snapshot, grades on HEAD), all top-level architectural units by
+  importance unless `--units N`, one question each. The snapshot worktree loses its `.git`
+  file so the answerer cannot follow it back to HEAD, and the prompt does not hint that the
+  code moved on. Mass since is over `rev..HEAD` (ancestry, not dates). Nothing goes to
+  `records/`; the report is `experiments/synthetic-<sha8>-<Lisbon date>.json` and names
+  the resolved sha, since `<rev>` may contain `~`. First result on digitalme: rho -0.27, no
+  support for decay; recorded as is (ROADMAP Phase 5).
 - **Team view without quizzes** (owner): when no developer has a quiz record, it says
   "no quiz evidence yet; holders need a quiz score >= threshold" and labels the holder
   column `quizzed`.

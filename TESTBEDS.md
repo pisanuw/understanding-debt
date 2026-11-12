@@ -37,10 +37,11 @@ per-integration CODEOWNERS give ready-made responsibility sets.
   vllm 82, home-assistant 81, kibana 80, but huggingface_hub 0, sentry-javascript 1 and
   mlflow 13. The starter set tests the mechanics; outcome validation needs the stress tier.
   `testbeds.json` records reverts per repo.
-- **Synthetic developers (suggestion).** Have the `claude` CLI answer the quiz from a
-  snapshot of the repo taken N weighted commits ago. Its known-stale knowledge should score
-  worse on exactly the units that changed since, which checks decay and unit attribution
-  with no humans involved.
+- **Synthetic developers.** Have the `claude` CLI answer the quiz from a snapshot of the
+  repo taken N weighted commits ago. Its known-stale knowledge should score worse on exactly
+  the units that changed since, which checks decay and unit attribution with no humans
+  involved. Implemented as `udebt experiment synthetic`; the first result (digitalme, no
+  support yet, floor effect) is in ROADMAP Phase 5.
 - **Real people.** The owner's own repos, and students if a course uses one of these
   projects.
 
@@ -82,6 +83,11 @@ more, top-5 share of 0.75 or less, and a rising trend.
 | `claude[bot]` GitHub app | author `claude[bot]` | ComfyUI_frontend 262, supabase 85, MCP TS SDK 38 | | |
 | OpenCode | `noreply@opencode.ai` | vitest 50, sst/opencode 171 | | |
 | `Made-with: Cursor` | trailer only, no co-author | mattermost 160, airflow 32 | | |
+
+**Status (Phase 1.1, 2026-11-12):** every signal in this table is now built in, and so are
+the bot class, case-insensitive matching, the vscode footer and grouping of merged branches
+(the observations below). Re-measured on clones at the pinned shas (last 12 months, non-merge,
+non-bot): go-git 5.0% -> 56.9%, PrefectHQ/prefect 18.3% -> 78.8%.
 
 Other observations:
 

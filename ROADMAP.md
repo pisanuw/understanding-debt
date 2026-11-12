@@ -107,6 +107,32 @@ advisory; the hook never blocks.
 **Exit** when on digitalme and dsa-instructor the contributor lists match what the owner
 knows, a mass reformat scores under 0.1 and the June 2026 async refactor scores near 1.0.
 
+### Phase 1.1: classifier gaps and squash bias
+
+**Status 2026-11-12: done.** From the gaps TESTBEDS.md found on external history, and three
+owner additions.
+
+| item | status |
+|---|---|
+| `Assisted-by:` naming an AI (kernel, Fedora, LLVM; agentic-commits `(provider/model)` form) | done; also `Generated-by:` and `Made-with:`; first agent named wins, unknown AI -> generic `assisted-by` |
+| Devin, `claude[bot]`, OpenCode, Jules, Codex connector, Amazon Q | done, as author identities and trailers |
+| vscode `Authored with GitHub Copilot on behalf of @user` | done: `ai`, agent Copilot |
+| case-insensitive emails and names | done for every signature pattern |
+| `bot` class (dependabot, renovate, github-actions, semantic-release, other `*[bot]`, config `bot_signatures`) | done: lands no mass anywhere; contributors' Bot label reads the class |
+| squash bias | done: a merged branch is weighed once as if squashed, shared by effective lines; `commits.json` v2 |
+| directed agent work (owner addition) | done: config `directed`, `udebt directed add`; half weight for the directing developer |
+| prior cap (owner addition) | kept at 0.5; team view says "no quiz evidence yet" |
+| shared files (owner addition) | done: a file in k units gives each 1/k of its lines |
+| `udebt risk` on an unmerged branch | not grouped yet: a range of ten small commits still weighs them one by one |
+
+Exit check on real history. AI share of non-merge, non-bot commits in the last 12 months,
+before and after: go-git (`Assisted-by:`) 5.0% -> 56.9% (TESTBEDS full classifier 57%),
+PrefectHQ/prefect (Devin) 18.3% -> 78.8% (79%); digitalme 44.1% and dsa-instructor 97.5%,
+unchanged, since only Claude Code works there. Grouping cuts total mass on digitalme from
+83.9 to 69.7, on dsa-instructor from 991.9 to 541.2 and on go-git from 1388 to 898; prefect
+squashes every pull request and is unchanged. A test repository with a ten-commit branch and
+its squashed twin now weighs within 20%, against 6x before.
+
 ## Phase 2: conceptual units and responsibility
 
 **Adds**
@@ -211,6 +237,56 @@ on every number.
   do not reuse questions, calibration reporting (confidence vs correctness) per developer.
 - Outcome validation: do units with high team debt see more reverts, hotfixes or
   incident-linked commits? This is the publishable claim and the product's proof.
+- **Synthetic developers** (owner, second round; `udebt experiment synthetic --at <rev>`):
+  the `claude` CLI takes the quiz with its knowledge frozen at an older snapshot. Questions
+  come from HEAD and are graded against HEAD as in `udebt quiz`; only the answerer reads the
+  snapshot, a temporary worktree with its `.git` link removed, told that this is the only
+  code it knows. Prediction: wrongness rises with the weighted mass landed on a unit since
+  the snapshot (Spearman, one-sided permutation test). Three model calls per run.
+
+**First result, 2026-11-12** (digitalme, snapshot `44f520b`, the commit before the June
+refactor; HEAD `f93102b`, 136 commits later; all 12 top-level units, one question each).
+Mass since is in Phase 1.1 weights (merged branches grouped, shared files split).
+
+| unit | mass since | share of its mass | files then/now | verdict (confidence) |
+|---|--:|--:|--:|---|
+| admin-persona-fix-loop | 7.19 | 0.57 | 3/5 | unknown (1) |
+| frontend-spa | 6.81 | 0.49 | 21/35 | partial (2) |
+| content-pipeline | 6.07 | 0.77 | 19/37 | wrong (2) |
+| cost-control | 5.99 | 0.51 | 3/5 | wrong (1) |
+| chat-flow | 4.92 | 0.49 | 5/6 | wrong (2) |
+| auth-rbac | 4.33 | 0.56 | 3/4 | wrong (1) |
+| analytics-persistence | 3.51 | 0.61 | 1/3 | partial (1) |
+| persona-retrieval | 3.12 | 0.24 | 23/25 | partial (3) |
+| faq-cache-tts | 2.85 | 0.61 | 3/6 | partial (1) |
+| safety-guardrails | 1.78 | 0.45 | 3/5 | wrong (3) |
+| email-notifications | 1.08 | 0.35 | 2/3 | unknown (1) |
+| contacts-db | 0.45 | 0.16 | 5/5 | wrong (3) |
+
+Spearman(mass since, wrongness) = **-0.27**, one-sided p = 0.81: **no support for decay**
+in this run, and the sign is the wrong way. Reading it honestly:
+
+- **Floor effect.** No answer was correct. Every unit had changed (mass since >= 0.45), and
+  the question writer favours decisions from history, which are the recent changes, so even
+  contacts-db, the least changed unit (decay predicts 0.95 of a verified understanding), was
+  asked about the one detail that changed (an equality filter became a substring match).
+- **The sign comes from the confidence penalty.** Without it (wrong and unknown both 1) the
+  correlation is 0.00. Heavily changed units contain files the snapshot lacks, so the
+  answerer says it cannot find them: a known unknown, no penalty. Lightly changed units have
+  familiar code with one changed detail, so it answers confidently from the old code: a
+  misconception, -0.5. That is exactly the debt udebt cares most about, and decay by mass
+  rates it as nearly none.
+- **Too small to conclude.** Twelve units, one question each, one snapshot, one run.
+
+Next: run snapshots closer to HEAD so some units have no mass since (a real control), ask
+two or three questions per unit with some on decisions older than the snapshot, repeat
+across snapshots and on dsa-instructor, and only then consider the model change the result
+points at (below). The answerer behaved as intended: it named the files it could not find
+and answered from the old code where it could.
+
+What it suggests for the model, untested: decay may need to distinguish edits to code a
+developer has seen (misconceptions) from new code (known gaps), rather than summing both as
+mass; and a small edit to a decision a question can hit may matter more than its line count.
 
 ## Decisions assumed in this roadmap
 

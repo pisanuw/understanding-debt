@@ -108,6 +108,26 @@ GRADE_SCHEMA: dict[str, Any] = {
 }
 
 
+ANSWER_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "answers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "index": {"type": "integer"},
+                    "answer": {"type": "string"},
+                    "confidence": {"type": "integer", "minimum": 1, "maximum": 3},
+                },
+                "required": ["index", "answer", "confidence"],
+            },
+        }
+    },
+    "required": ["answers"],
+}
+
+
 WEIGH_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -299,6 +319,29 @@ EVIDENCE files with the read-only tools and trust the code. Verdicts:
 
 Give two sentences of feedback per item: what was right, and the one thing to look at in the code.
 Return `index` matching the ### number.
+
+{chr(10).join(blocks)}
+"""
+
+
+def answer_prompt(questions: list[dict[str, Any]]) -> str:
+    """The synthetic developer (synthetic.py): it answers from the snapshot in the current
+    directory and is not told the repository has moved on since."""
+    blocks = [
+        f"### {i}\nUNIT: {q['unit_id']}\nQUESTION: {q['question']}\n"
+        for i, q in enumerate(questions)
+    ]
+    return f"""TASK: answer
+
+You are a developer on the repository in the current directory, taking a short quiz about it.
+The code in the current directory is the only version of this code you know: you have never
+seen any other, so answer from what this code does and from nothing else. Use the read-only
+tools to look before you answer, and only open files inside the current directory.
+
+Answer each question in at most three sentences, as you would to a colleague. If the question
+mentions something you cannot find here, answer from your best understanding of the code you
+know and say how sure you are; leave the answer empty only if you have no idea at all.
+Confidence: 1 = a guess, 2 = fairly sure, 3 = certain. Return `index` matching the ### number.
 
 {chr(10).join(blocks)}
 """
