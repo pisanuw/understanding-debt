@@ -11,6 +11,16 @@
    "sha": "060b4a8ef164a1e7323f0977d91a48d3e3c4d0f6",
    "weight": 0.85
   },
+  "069e7507cf8ebcbd8f8df7a5102342d39a4f72d4": {
+   "effective_lines": 150,
+   "reasons": [
+    "150 effective lines",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "069e7507cf8ebcbd8f8df7a5102342d39a4f72d4",
+   "weight": 0.684
+  },
   "09a75770c47ec3838f6f65446ecf9a82da28edc0": {
    "effective_lines": 35,
    "reasons": [
@@ -72,6 +82,15 @@
    "refined": null,
    "sha": "323d3bfb1f39636a8cca0e78d09cb3ace62bfdb6",
    "weight": 1.0
+  },
+  "327f6b86c80201dd84e0c108277620546a92d7a4": {
+   "effective_lines": 281,
+   "reasons": [
+    "documentation only"
+   ],
+   "refined": null,
+   "sha": "327f6b86c80201dd84e0c108277620546a92d7a4",
+   "weight": 0.05
   },
   "32f7a0c29ab833d10758cff0a66faa715a6897c1": {
    "effective_lines": 652,
@@ -214,6 +233,35 @@
    "sha": "6cf99753bfaf58c88e051916bac06249a4e1b0e1",
    "weight": 0.531
   },
+  "789f1110247d82ab6de8fdbdec98b9696c16c0be": {
+   "effective_lines": 44,
+   "reasons": [
+    "documentation only"
+   ],
+   "refined": null,
+   "sha": "789f1110247d82ab6de8fdbdec98b9696c16c0be",
+   "weight": 0.05
+  },
+  "7a59a73d5d8dc8695b8acc933b95d2f13ebb241f": {
+   "effective_lines": 121,
+   "reasons": [
+    "121 effective lines",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "7a59a73d5d8dc8695b8acc933b95d2f13ebb241f",
+   "weight": 0.664
+  },
+  "9111b03ad5d63405e2c27b364b9c09540d31be84": {
+   "effective_lines": 272,
+   "reasons": [
+    "272 effective lines",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "9111b03ad5d63405e2c27b364b9c09540d31be84",
+   "weight": 0.741
+  },
   "9b7d0e25f69586a2ab49bc75b6399f2288b14afd": {
    "effective_lines": 579,
    "reasons": [
@@ -302,6 +350,25 @@
    "refined": null,
    "sha": "d682805f48eb5edb8ba249e7fada3b9e28442618",
    "weight": 0.0
+  },
+  "dd26ff46c6f168dcb85ce48c8349d09149fd63ca": {
+   "effective_lines": 521,
+   "reasons": [
+    "521 effective lines",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "dd26ff46c6f168dcb85ce48c8349d09149fd63ca",
+   "weight": 0.8
+  },
+  "e2485d4f3ecc3e7a63fa46ce0321521422424d2e": {
+   "effective_lines": 234,
+   "reasons": [
+    "234 effective lines"
+   ],
+   "refined": null,
+   "sha": "e2485d4f3ecc3e7a63fa46ce0321521422424d2e",
+   "weight": 0.627
   },
   "e2a508610931e946f1d1e6950cd3dbdd222659ba": {
    "effective_lines": 2,
