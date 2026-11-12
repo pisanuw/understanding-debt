@@ -109,6 +109,37 @@ Other observations:
   testbeds need full clones (kibana 18 GB, ClickHouse 15 GB, PostHog 9 GB on GitHub's size
   figure) or a commit cache.
 
+## Starter-set run (offline commands, 2026-11-12)
+
+Full clones at the pinned shas, with `udebt init`, `contributors` and `weigh` and no LLM
+calls. huggingface_hub, sentry-javascript and mlflow are measured on ba564e2 (Phase 1.1,
+built-in signatures only). servo was measured on 286cdd4 and the extended signatures,
+which ba564e2 now builds in.
+
+| repo | commits | ai / assisted / bot (all history) | bot weight if counted | `weigh` | weight 1.0 | AI share, last 12m non-bot: count vs weight | mean weight AI vs human |
+|---|--:|--:|--:|--:|--:|---|---|
+| huggingface_hub | 2,920 | 1 / 325 / 71 | 2.0% | 7 s | 136 (5%) | 38% vs 44% | 0.59 vs 0.46 |
+| sentry-javascript | 17,695 | 39 / 1,658 / 2,032 | 9.3% | 43 s | 1,793 (10%) | 45% vs 46% | 0.65 vs 0.61 |
+| mlflow | 14,478 | 1,563 / 1,870 / 713 | 4.0% | 91 s | 672 (5%) | 61% vs 59% | 0.53 vs 0.59 |
+| servo (control) | 59,283 | 0 / 0 / 4,129 | 3.2% | 1,112 s | 1,584 (3%) | 0% | – |
+
+- **The control holds over the full history**: servo has 0 AI and 0 assisted commits out of
+  59,283.
+- **Bots now land no mass.** The bot class keeps 2–9% of the weighted mass out of decay and
+  churn, which matters most in sentry-javascript.
+- **AI and human commits weigh about the same**, so weighting moves AI share by only a few
+  points either way.
+- **Version bumps weigh as dependency changes.** A release that edits the `version` field of
+  every `package.json` gets "dependencies changed" (+0.3) and touches every package. On
+  ba564e2, bot-cut releases land no mass (the bot class), but human-cut ones still do:
+  244 release commits in sentry-javascript weigh 0.7 or more (most from 2013–2020, 48 in
+  2026), and 18 in mlflow. In a monorepo each one decays every unit. A version-only
+  manifest diff should weigh near zero, as ROADMAP Phase 1 intended.
+- **Speed on large histories.** On servo each `contributors` run took about 8–9 minutes and
+  `weigh` 18.5 minutes, because every command re-parses `git log --numstat` for the whole
+  history. The stress tier (vscode 171k commits, llvm 608k) needs a parsed-commit cache.
+- `udebt map` (the `claude` CLI) has not been run on these yet.
+
 ## Caveats
 
 - **Disclosure-only.** Every AI share is a lower bound. Zed (2%), Ruff (2%) and openai/codex
@@ -119,7 +150,8 @@ Other observations:
   heuristics.
 - **Identity.** Humans are counted by email with GitHub noreply addresses folded to the
   login, and no `.mailmap` is applied, so team sizes are somewhat inflated.
-- **Untested end to end.** `udebt map` has not yet been run on any of these.
+- **Untested end to end.** `udebt map` has not yet been run on any of these; the offline
+  commands have (see the starter-set run).
 - The critical-packages dataset that seeded the library candidates measured the year ending
   2026-07-29. These numbers are for the year ending 2026-11-12 and are generally higher.
 
