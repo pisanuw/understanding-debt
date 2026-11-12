@@ -355,9 +355,12 @@ def _note(s_, u, prov, by_score) -> str:
 
 def _decay_line(d: scoring.Decay) -> str:
     if d.model == "share":
+        fade = f"exp(-{d.rate:g} x share of the unit changed since)"
+        if d.floor:
+            fade = f"({d.floor:g} + {1 - d.floor:g} x {fade})"
         return (
-            f"Decay: understanding x exp(-{d.rate:g} x share of the unit changed since), a "
-            "commit counting at most the unit's size (config decay_k)."
+            f"Decay: understanding x {fade}, a commit counting at most the unit's size "
+            "(config decay_k" + (", decay_floor)." if d.floor else ").")
         )
     return f"Decay: understanding x {d.per_mass:g} per unit of mass landed since (model mass)."
 
@@ -867,14 +870,25 @@ def cmd_risk(args) -> int:
     if not risks:
         print("No architectural unit touched.")
         return 0
+    muted = [r for r in risks if r.muted]
+    risks = [r for r in risks if not r.muted]
     w = min(44, max([22, *(len(r.unit_id) + 2 for r in risks)]))
-    print(f"{'level':<8} {'unit':<{w}} {'set':<4} {'mass':>5} {'und':>5}  files")
+    if risks:
+        print(f"{'level':<8} {'unit':<{w}} {'set':<4} {'mass':>5} {'und':>5}  files")
     for r in risks:
         in_set = {True: "in", False: "OUT", None: "-"}[r.in_set]
         parts = f"  [sub-units: {', '.join(r.parts)}]" if r.parts else ""
         print(
             f"{r.level:<8} {r.unit_id:<{w}} {in_set:<4} {r.mass:>5.2f} {r.understanding:>5.2f}  "
             f"{', '.join(r.files)}{parts}"
+        )
+    if muted:
+        ids = ", ".join(r.unit_id for r in muted)
+        print(
+            f"Not flagged: {ids} (mass {', '.join(f'{r.mass:.2f}' for r in muted)}): your "
+            f"understanding there is only the own-commit prior, which stops at 0.5, under the "
+            f"{cfg.known_threshold} threshold. A quiz settles it: "
+            f"`udebt quiz --unit {muted[0].unit_id.split()[0]}`."
         )
     worst = next((r for r in risks if r.level != "OK"), None)
     if worst and worst.level == "OUTSIDE":
@@ -1445,8 +1459,10 @@ def cmd_experiment(args) -> int:
         pooled, pair = report["pooled"], report["paired"]
         print(
             f"\nPooled over snapshots (n = {pooled['n']}, not independent: the same "
-            f"questions): {pooled['reading']}"
+            f"questions): mass since vs 1 - score: {pooled['reading']}"
         )
+        if "share_changed" in pooled:
+            print(f"share changed vs 1 - score: {pooled['share_changed']['reading']}")
         print(
             f"Same unit, two snapshots, more mass since: worse {pair['concordant']}, better "
             f"{pair['discordant']}, same {pair['tied']} (tau {pair['tau']})"

@@ -227,7 +227,9 @@ def test_hierarchy_responsibility_and_risk(layered_repo, monkeypatch, capsys):
     assert rc == 0 and "->  OUTSIDE" in out and "outside your responsibility set" in out
     first = out.split("files\n")[1].splitlines()[0].split()
     assert first[:3] == ["OUTSIDE", web["id"], "OUT"]
-    assert any(ln.split()[1:3] == [db["id"], "in"] for ln in out.splitlines() if ln[:1] in "CHO")
+    # db is in her set and she wrote it: only her own-commit prior stands, so no CAUTION row
+    assert not any(ln.split()[1:2] == [db["id"]] for ln in out.splitlines() if ln[:1] in "CHO")
+    assert f"Not flagged: {db['id']} (mass" in out and "only the own-commit prior" in out
     assert "bob@example.com" in out  # who to ask
     rc, _ = run(
         root, "--as-user", "alice@example.com", "risk", "HEAD~1..HEAD", "--strict", capsys=capsys
@@ -236,8 +238,7 @@ def test_hierarchy_responsibility_and_risk(layered_repo, monkeypatch, capsys):
     rc, out = run(
         root, "--as-user", "alice@example.com", "risk", "HEAD~1..HEAD", "--deep", capsys=capsys
     )
-    rows = [ln.split() for ln in out.split("files\n")[1].splitlines() if ln.strip()]
-    assert any(r[1].startswith(db["id"] + "/") and r[2] == "in" for r in rows[:3])
+    assert f"Not flagged: {db['id']}/" in out, "per sub-unit, on the prior: named, not flagged"
 
     # a lead adds the web unit to alice's set: the change is no longer OUTSIDE
     rc, out = run(root, "responsibility", "alice@example.com", "add", web["id"], capsys=capsys)

@@ -470,6 +470,21 @@ def paired(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
     return {"concordant": conc, "discordant": disc, "tied": ties, "tau": tau}
 
 
+def pooled(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
+    """Every graded unit-snapshot together (not independent: the same questions): the
+    correlation of mass since with wrongness at the top level, as before, and under
+    `share_changed` the share changed since (the share decay model's input, the variable that
+    predicts in every run so far) and under `mass_share` the mass since over the unit's mass."""
+    rows = [r for s in snapshots for r in _rows_list(s) if r["wrongness"] is not None]
+    out = correlation([(r["mass_since"], r["wrongness"]) for r in rows])
+    with_share = [r for r in rows if "share_changed" in r]
+    if with_share:
+        pts = [(r["share_changed"], r["wrongness"]) for r in with_share]
+        out["share_changed"] = correlation(pts)
+    out["mass_share"] = correlation([(r["share_since"], r["wrongness"]) for r in rows])
+    return out
+
+
 def _rows_list(snap: dict[str, Any]) -> list[dict[str, Any]]:
     return list(snap["units"].values())
 
@@ -517,7 +532,12 @@ def run(
         "questions": None,
         "snapshots": [],
     }
-    report["decay"] = {"model": decay.model, "rate": decay.rate, "per_mass": decay.per_mass}
+    report["decay"] = {
+        "model": decay.model,
+        "rate": decay.rate,
+        "per_mass": decay.per_mass,
+        "floor": decay.floor,
+    }
     for rev, at in snaps:
         header, rows = unit_rows(root, at, head, picked, m["units"], commits, weights, sizes, decay)
         report["snapshots"].append({"at": rev, **header, "graded": False, "units": rows})
@@ -579,14 +599,7 @@ def run(
         save()
 
     graded = [s for s in report["snapshots"] if s["graded"]]
-    report["pooled"] = correlation(
-        [
-            (r["mass_since"], r["wrongness"])
-            for s in graded
-            for r in _rows_list(s)
-            if r["wrongness"] is not None
-        ]
-    )
+    report["pooled"] = pooled(graded)
     report["paired"] = paired(graded)
     save()
     return report, path

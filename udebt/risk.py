@@ -7,6 +7,11 @@ root of its line share under that unit) says how much that matters.
 With responsibility sets, the strongest signal is OUTSIDE: the change lands real weight in a
 unit outside the author's set that they do not understand, so nobody expected them to know it
 and nothing says they do. Levels, strongest first: OUTSIDE, HIGH, CAUTION, OK.
+
+CAUTION is not raised where the author's understanding is only the own-commit prior: the
+prior stops at 0.5, under the 0.6 threshold, so every change a sole developer makes to their
+own code would be CAUTION (308 of digitalme's 312 replayed events). Such a unit is OK and
+`muted`; `udebt risk` names it in one line. HIGH and OUTSIDE still fire on a prior.
 Verdicts are advisory; `--strict` turns OUTSIDE and HIGH into a non-zero exit for teams that
 opt in.
 """
@@ -40,6 +45,7 @@ class UnitRisk:
     files: list[str]
     in_set: bool | None = None  # None: the developer has no responsibility set
     parts: list[str] | None = None  # sub-units of a top-level unit that the change touched
+    muted: bool = False  # CAUTION from the own-commit prior alone: reported OK, named apart
 
 
 ORDER = {"OUTSIDE": 0, "HIGH": 1, "CAUTION": 2, "OK": 3}
@@ -137,12 +143,14 @@ def assess(
     responsible: set[str] | None = None,
     hierarchy: list[dict[str, Any]] | None = None,
     deep: bool = False,
+    mute_prior: bool = True,
 ) -> list[UnitRisk]:
     """Risk per unit that the changes touch. Top level by default; with `deep`, per sub-unit,
     plus a `<parent> (rest)` row for files only the parent covers, so nothing drops out of
     view. `responsible` is the developer's set (None when they have none); `hierarchy` is
     the whole map, needed to tell whether a unit is in the set through its parent or a
-    touched sub-unit."""
+    touched sub-unit. With `mute_prior`, a CAUTION whose understanding is only the
+    own-commit prior is OK and `muted`."""
     hierarchy = hierarchy if hierarchy is not None else units
     members = hier.Membership(hierarchy)
     rows: list[tuple[dict[str, Any], list[str]]] = []  # (unit, paths to exclude)
@@ -186,6 +194,8 @@ def assess(
             in_set = hier.covers(responsible, u["id"], hierarchy) or (
                 not exclude and any(k["id"] in responsible for k in parts)
             )
+        level = verdict(mass, s.understanding, known_threshold, in_set)
+        muted = mute_prior and level == "CAUTION" and s.source == "prior"
         out.append(
             UnitRisk(
                 u["id"] + (" (rest)" if exclude else ""),
@@ -193,10 +203,11 @@ def assess(
                 mass,
                 s.understanding,
                 s.source,
-                verdict(mass, s.understanding, known_threshold, in_set),
+                "OK" if muted else level,
                 files[:6],
                 in_set,
                 None if exclude else ([k["id"].split("/", 1)[1] for k in parts] or None),
+                muted,
             )
         )
     return sorted(out, key=lambda r: (ORDER[r.level], -r.mass))

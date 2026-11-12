@@ -254,7 +254,7 @@ footer p { margin: 4px 0; }
   var dec = D.settings.decay || {};
   document.getElementById("meta").textContent = "HEAD " + String(D.head || "").slice(0, 8) +
     " · generated " + day(D.generated_at) + " · decay " + dec.model +
-    (dec.model === "share" ? " (exp(-" + dec.rate + " x share changed))" : " (" + dec.per_mass + " per unit of mass)") +
+    (dec.model === "share" ? " (" + (dec.floor ? dec.floor + " + " + (1 - dec.floor) + " x " : "") + "exp(-" + dec.rate + " x share changed))" : " (" + dec.per_mass + " per unit of mass)") +
     " · known threshold " + D.settings.known_threshold + " · bus target " + D.settings.bus_target;
 
   var devSel = document.getElementById("dev");

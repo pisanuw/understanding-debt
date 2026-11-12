@@ -34,6 +34,7 @@ class Config:
     model: str | None = None
     decay_model: str = "share"  # share: by the share of a unit changed; mass: per unit of mass
     decay_k: float = 1.0  # share model: exp(-k x share changed); fitted (ROADMAP Phase 5)
+    decay_floor: float = 0.0  # share model: the part of an understanding no change removes
     decay_per_commit: float = 0.9  # mass model: the factor per unit of weighted mass
     evidence_window: int = 5
     known_threshold: float = 0.6
@@ -57,7 +58,7 @@ class Config:
         """The decay rule these settings describe (scoring.Decay)."""
         from .scoring import Decay
 
-        return Decay(self.decay_model, self.decay_k, self.decay_per_commit)
+        return Decay(self.decay_model, self.decay_k, self.decay_per_commit, self.decay_floor)
 
     def primary(self, email: str) -> str:
         """The developer key for `email`: the identity group's primary address, else itself."""
@@ -94,6 +95,7 @@ class Config:
             "model": self.model,
             "decay_model": self.decay_model,
             "decay_k": self.decay_k,
+            "decay_floor": self.decay_floor,
             "decay_per_commit": self.decay_per_commit,
             "evidence_window": self.evidence_window,
             "known_threshold": self.known_threshold,

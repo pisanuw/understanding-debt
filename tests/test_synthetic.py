@@ -163,6 +163,7 @@ def test_experiment_several_snapshots_share_one_question_set(fixture_repo, spy, 
     near, far = (s["units"]["storage"]["mass_since"] for s in rep["snapshots"])
     assert 0 < near < far
     assert rep["pooled"]["n"] == 4
+    assert rep["pooled"]["share_changed"]["n"] == 4 and rep["pooled"]["mass_share"]["n"] == 4
     # storage moved more since the older snapshot but scored the same; scoring never moved
     assert rep["paired"] == {"concordant": 0, "discordant": 0, "tied": 1, "tau": None}
 

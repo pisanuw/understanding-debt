@@ -17,8 +17,8 @@ UNITS = [
 ]
 
 
-def score(uid, und, parent=None):
-    return UnitScore(uid, 0.5, None, 0, und, "architectural", "prior", parent=parent)
+def score(uid, und, parent=None, source="quiz"):
+    return UnitScore(uid, 0.5, None, 0, und, "architectural", source, parent=parent)
 
 
 SCORES = {
@@ -79,3 +79,25 @@ def test_deep_rows_include_what_only_the_parent_covers():
         abs(rs["api (rest)"].mass - 0.7**0.5) < 1e-3 and abs(rs["api/auth"].mass - 0.3**0.5) < 1e-3
     )
     assert risk.touched_units(UNITS, ["web/x.js", "docs/a.md"]) == {"web"}
+
+
+def test_caution_from_the_prior_alone_is_muted():
+    """The prior stops at 0.5, under the threshold: a sole author's every change would be
+    CAUTION. HIGH and OUTSIDE still fire on a prior."""
+    prior = {
+        "api": score("api", 0.45, source="prior"),
+        "api/auth": score("api/auth", 0.45, "api", source="prior"),
+        "api/routes": score("api/routes", 0.45, "api", source="prior"),
+        "web": score("web", 0.2, source="prior"),
+    }
+    changes, w = change({"api/auth.py": 50, "web/app.js": 50})
+    rs = {r.unit_id: r for r in risk.assess(UNITS, prior, changes, w, 0.6)}
+    assert rs["api"].level == "OK" and rs["api"].muted, "CAUTION on the prior: muted"
+    assert rs["web"].level == "HIGH" and not rs["web"].muted, "mass 0.71 at 0.2: HIGH stays"
+    rs = {r.unit_id: r for r in risk.assess(UNITS, prior, changes, w, 0.6, responsible={"web"})}
+    assert rs["api"].level == "OUTSIDE", "outside the set: OUTSIDE stays"
+    rs = {r.unit_id: r for r in risk.assess(UNITS, prior, changes, w, 0.6, mute_prior=False)}
+    assert rs["api"].level == "CAUTION" and not rs["api"].muted
+    quizzed = {**prior, "api": score("api", 0.45)}
+    rs = {r.unit_id: r for r in risk.assess(UNITS, quizzed, changes, w, 0.6)}
+    assert rs["api"].level == "CAUTION", "a quizzed understanding below the threshold"

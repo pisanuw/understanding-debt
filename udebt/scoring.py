@@ -75,24 +75,30 @@ class Decay:
     commit counting more lines than the unit holds just after it. A fixed amount of change is
     a large part of a small unit and a small part of a large one, so the rate (config
     `decay_k`) means the same for every unit. The exponential composes: fading over two
-    stretches of change is fading over their sum.
+    stretches of change is fading over their sum. `floor` (config `decay_floor`, default 0)
+    keeps that part of an understanding however much changes: floor + (1 - floor) x
+    exp(-rate * share), the form the Phase 3.1 refit tried and did not adopt (ROADMAP Phase 5).
 
     `mass`: the Phase 1 rule, per_mass ** weighted mass landed, kept to compare the two."""
 
     model: str = "share"
     rate: float = DECAY_K
     per_mass: float = PER_MASS
+    floor: float = 0.0
 
     def __post_init__(self) -> None:
         if self.model not in MODELS:
             raise ValueError(f"decay_model must be one of {', '.join(MODELS)}: {self.model}")
+        if not 0.0 <= self.floor < 1.0:
+            raise ValueError(f"decay_floor must be in [0, 1): {self.floor}")
 
     def factor(self, mass: float, share: float | None = None) -> float:
         """What remains of an understanding after `mass` (weighted mass) or `share` (share
         of the unit changed) has landed on its unit. The share model needs the share; with
         none (no size known) it falls back to the mass rule."""
         if self.model == "share" and share is not None:
-            return math.exp(-self.rate * max(0.0, share))
+            fade = math.exp(-self.rate * max(0.0, share))
+            return self.floor + (1.0 - self.floor) * fade if self.floor else fade
         return self.per_mass ** max(0.0, mass)
 
     @classmethod

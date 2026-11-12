@@ -247,3 +247,17 @@ def test_decay_k_is_the_config_name(tmp_path):
     assert cfg.decay_k == 2.0 and cfg.decay.rate == 2.0, "a chosen rate carries over"
     cfg_path.write_text(json.dumps({"decay_k": 0.5, "share_decay_rate": 2.0}))
     assert Config.load(cfg_path).decay_k == 0.5
+
+
+def test_a_floor_keeps_part_of_the_understanding(tmp_path):
+    import json
+
+    d = scoring.Decay(floor=0.3)
+    assert d.factor(0.0, 0.0) == 1.0 and abs(d.factor(0.0, 50.0) - 0.3) < 1e-9
+    assert math.isclose(d.factor(0.0, 1.0), 0.3 + 0.7 * math.exp(-1))
+    assert scoring.Decay("mass", floor=0.3).factor(2.0) == 0.9**2, "the mass rule has none"
+    with pytest.raises(ValueError):
+        scoring.Decay(floor=1.0)
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps({"decay_floor": 0.25}))
+    assert Config.load(cfg_path).decay.floor == 0.25 and Config().decay.floor == 0.0

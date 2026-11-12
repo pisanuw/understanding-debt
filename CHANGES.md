@@ -65,3 +65,5 @@
 2026-11-12 [decision] A commit's changed lines in a unit are capped at the unit's size just after it (running sum of its growth); a deletion counts its size once. chroma-integration 43.9 -> 1.32.
 2026-11-12 [decision] k refit on 108 unit-snapshots plus hf's summary, shares capped: pooled 1.00 (per repo 2.72, 0.42, ~0.6). Config `decay_k` = 1.0 replaces share_decay_rate (ln 4).
 2026-11-12 [code] Parsed-commit cache format 2 keeps per-file deletions; replay fingerprint gains a rules version; synthetic rows add lines_uncapped; status prints the decay rule.
+2026-11-12 [decision] CAUTION raised only by the own-commit prior is muted: replay drops it, live `risk` names it in a line; HIGH, OUTSIDE stay. Events: digitalme 312 -> 12, dsa-instructor 240 -> 144.
+2026-11-12 [code] Synthetic report's pooled section also correlates share changed and mass share; optional config decay_floor (floor + (1 - floor) x exp(-k s)), default 0.

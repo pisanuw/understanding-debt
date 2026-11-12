@@ -23,8 +23,9 @@ nothing. A different map or decay model makes the stored series stale: `--rebuil
 
 Risk events are the "high-debt member landed a heavy change" moments: every commit a
 developer authored (or directed) with weight >= 0.1, assessed by risk.assess against that
-developer's understanding just before it landed. They are kept in the same file and
-extended the same way.
+developer's understanding just before it landed. A CAUTION that only the own-commit prior
+raises is no event (risk.assess mutes it); HIGH and OUTSIDE are. They are kept in the same
+file and extended the same way.
 """
 
 from __future__ import annotations
@@ -404,7 +405,7 @@ def fingerprint(h: History, every: str) -> dict[str, Any]:
         "every": every,
         "map": h.map.get("generated_at"),
         "units": hashlib.sha1(units.encode()).hexdigest()[:12],
-        "decay": [d.model, d.rate, d.per_mass],
+        "decay": [d.model, d.rate, d.per_mass, d.floor],
         "window": h.cfg.evidence_window,
         "rules": RULES,
     }
@@ -627,7 +628,7 @@ def export_data(
         "generated_at": now_iso(),
         "settings": {
             "every": data["fingerprint"]["every"],
-            "decay": {"model": d.model, "rate": d.rate, "per_mass": d.per_mass},
+            "decay": {"model": d.model, "rate": d.rate, "per_mass": d.per_mass, "floor": d.floor},
             "known_threshold": cfg.known_threshold,
             "bus_target": cfg.bus_target,
             "heavy": HEAVY,

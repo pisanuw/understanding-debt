@@ -202,8 +202,11 @@ def test_weigh_refine_and_risk_cli(mixed_repo, monkeypatch, capsys):
     assert rc == 0 and "Refined 2 commits" in out and "*" in out
     # risk of the last commit (dev2's one-liner on scoring) for dev1
     rc, out = run("risk", "HEAD~1..HEAD")
-    # small mass, and dev1's prior on scoring is under the known threshold -> CAUTION
-    assert rc == 0 and "scoring" in out and "->  CAUTION" in out
+    # small mass on a unit dev1 knows only through the own-commit prior, which is under the
+    # known threshold: that alone is not flagged, but it is named
+    assert rc == 0 and "->  OK" in out and "Not flagged: scoring (mass" in out
+    rc, out = run("--as-user", "dev3@example.com", "risk", "HEAD~1..HEAD")
+    assert "->  CAUTION" in out and "scoring" in out, "no prior at all: CAUTION as before"
     # a stranger with zero understanding touching storage heavily
     (root / "udebt" / "store.py").write_text("\n".join(f"y{i} = {i}" for i in range(400)) + "\n")
     (root / "requirements.txt").write_text("sqlalchemy\n")
