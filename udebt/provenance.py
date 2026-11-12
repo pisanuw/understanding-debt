@@ -127,7 +127,7 @@ AI_WORDS = re.compile(
     re.I,
 )
 # Attribution trailers: the kernel/Fedora/LLVM `Assisted-by:` and project variants. The
-# value names the tool, e.g. `Assisted-by: Claude Code`, `Assisted-by: Claude:claude-opus`
+# value names the tool, e.g. `Assisted-by: Claude Code`, `Assisted-by: Claude:<model>`
 # (kernel), or the agentic-commits form `Assisted-by: <agent> <version> (<provider>/<model>)`.
 ATTRIBUTION = re.compile(r"(?im)^(assisted-by|generated-by|made-with)\s*:\s*(.+)$")
 _PROVIDER_MODEL = re.compile(r"\(\s*[\w.-]+/[\w.:@-]+\s*\)")

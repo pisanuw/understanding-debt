@@ -165,14 +165,15 @@ def test_classify_more_agents_and_trailers():
     # Assisted-by (kernel/Fedora/LLVM) names the agent; the first one named wins
     for value, agent in [
         ("Claude Code", "claude-code"),
-        ("Claude:claude-opus-4 coccinelle", "claude-code"),
+        ("Claude:some-model coccinelle", "claude-code"),
         ("Copilot <c@github.com>", "github-copilot"),
         ("Gemini CLI 0.3", "gemini"),
         ("OpenCode with Claude Opus 4.6", "opencode"),
-        ("GitHub Copilot (claude-sonnet-4-6)", "github-copilot"),
-        ("aider 0.80 (openai/gpt-4o)", "aider"),  # agentic-commits form
-        ("goose 1.2 (anthropic/claude-sonnet-4)", "assisted-by"),  # unknown agent
-        ("Qwen3-Coder", "assisted-by"),
+        ("GitHub Copilot (some-model)", "github-copilot"),
+        ("aider 0.80 (vendor/some-model)", "aider"),  # agentic-commits form
+        ("goose 1.2 (vendor/some-model)", "assisted-by"),  # unknown agent
+        ("an LLM", "assisted-by"),
+        ("Qwen coder", "assisted-by"),
     ]:
         assert cls(body=f"Fix it\n\nAssisted-by: {value}") == ("assisted", agent), value
     assert cls(body="Assisted-By: claude code") == ("assisted", "claude-code")

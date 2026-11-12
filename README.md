@@ -265,7 +265,7 @@ Every pattern matches case-insensitively. Built in (`udebt/provenance.py`,
 
 **Attribution trailers.** `Assisted-by:` (the Linux kernel, Fedora and LLVM convention),
 `Generated-by:` and `Made-with:` count when their value names an AI: `Assisted-by: Claude
-Code`, `Assisted-by: Claude:claude-opus-4` (kernel), `Assisted-by: Copilot`,
+Code`, `Assisted-by: Claude:<model>` (kernel), `Assisted-by: Copilot`,
 `Generated-by: Claude Opus ...`, `Made-with: Cursor`, and the
 [agentic-commits](https://github.com/grushetsky/agentic-commits) form
 `Assisted-by: <agent> <version> (<provider>/<model>)`. Each signature's `names` recognise
