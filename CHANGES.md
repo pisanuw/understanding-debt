@@ -40,3 +40,4 @@
 2026-11-12 [code] experiment synthetic: --snapshots (one shared HEAD question set), --per-unit 2, decision/behaviour questions, edited-vs-new split, paired counts, --suggest, --resume.
 2026-11-12 [note] Synthetic rerun, digitalme, snapshots at mass 2.3/25.7/50.4: score 1.00/0.46/0.21, 30 of 31 pairs worse; within-snapshot rho 0.39, 0.00. Decay over time, not units.
 2026-11-12 [decision] No model change from one synthetic run: decay looks faster than 0.9/mass and spills past unit paths; wait for human quizzes (BRIEFING open questions).
+2026-11-12 [note] First map on huggingface_hub (12 units, 45 s): decision_candidates misses the AI era; 22 of 40 touch no file alive at HEAD; ties go to oldest.
