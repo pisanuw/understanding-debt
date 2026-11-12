@@ -3,15 +3,26 @@
 A synthetic developer is the `claude` CLI taking the quiz with its knowledge frozen at an
 older snapshot of the repository. Questions are written from HEAD and graded against HEAD,
 exactly as `udebt quiz` does; only the answerer sees the snapshot, and is told the code it
-sees is the only code it knows. Its stale knowledge should go wrong exactly where the code
-moved since the snapshot, so the units with more weighted mass landed since should score
-worse. That tests decay and unit attribution with no human subjects.
+sees is the only code it knows. Its stale knowledge should go wrong where the code moved
+since the snapshot, so the units with more weighted mass landed since should score worse.
+That tests decay and unit attribution with no human subjects.
 
-Three model calls per run, whatever the number of units: questions (read tools on HEAD),
-answers (read tools on the snapshot only), grades (read tools on HEAD). Nothing is written to
-`.udebt/records/`; the report goes to `.udebt/experiments/synthetic-<sha>-<date>.json`.
+One run can freeze several developers at once, at several snapshots, all answering one
+shared question set written from HEAD, so the snapshot is the only variable. The questions
+ask about each unit's decision and current behaviour, never about what changed, so a unit
+that has not moved since a snapshot can be answered correctly from it. Model calls: one for
+the questions (read tools on HEAD), then per snapshot one for the answers (read tools on
+the snapshot only) and one for the grades (read tools on HEAD): 1 + 2 x snapshots.
 
-The snapshot is a temporary `git worktree` with its `.git` link removed, so the answerer has
+Per snapshot and unit the report gives the mass landed since (the same attribution as
+everywhere else), the mean score (correct 1, partial 0.5, wrong and unknown 0), confident
+wrong answers, and whether the mass since went mostly to files that existed at the snapshot
+(edits to code the developer saw: the misconceptions) or mostly to new files (the known
+gaps). The report is written after every call, so `--resume` can finish a run that stopped
+without paying again for the calls already made. Nothing is written to `.udebt/records/`;
+the report goes to `.udebt/experiments/`.
+
+Each snapshot is a temporary `git worktree` with its `.git` link removed, so the answerer has
 no path back to the live repository; it is deleted and pruned afterwards.
 """
 
@@ -31,12 +42,14 @@ from typing import Any
 
 from . import repo, scoring
 from . import units as hier
+from .filekinds import mechanical
 from .llm import LLM
 from .mapping import commits_for, unit_mass, weights_for
 from .prompts import ANSWER_SCHEMA, answer_prompt
-from .provenance import _under
+from .provenance import Commit, _under, landed
 from .quiz import generate_questions, grade
 from .store import Store, now_iso
+from .weights import CommitWeight
 
 
 def _git(root: Path, *args: str) -> str:
@@ -66,10 +79,12 @@ def snapshot(root: Path, sha: str) -> Iterator[Path]:
         subprocess.run(["git", "worktree", "prune"], cwd=root, capture_output=True)
 
 
-def answer(snap: Path, llm: LLM, questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def answer(
+    snap: Path, llm: LLM, questions: list[dict[str, Any]], max_turns: int = 60
+) -> list[dict[str, Any]]:
     """The synthetic developer's answers, read from the snapshot only. One call."""
     res = llm.structured(
-        answer_prompt(questions), ANSWER_SCHEMA, cwd=snap, read_tools=True, max_turns=60
+        answer_prompt(questions), ANSWER_SCHEMA, cwd=snap, read_tools=True, max_turns=max_turns
     )
     by_index = {int(a["index"]): a for a in res.get("answers", []) if "index" in a}
     out = []
@@ -159,43 +174,96 @@ def lisbon_date() -> str:
         return datetime.now(UTC).date().isoformat()
 
 
-def run(
-    root: Path,
-    store: Store,
-    llm: LLM,
-    rev: str,
-    *,
-    n_units: int | None = None,
-    dev: str | None = None,
-    out=print,
-) -> tuple[dict[str, Any], Path]:
-    m = store.require_map()
-    units = m["units"]
-    at = resolve(root, rev)
-    head = repo.head(root)
-    if subprocess.run(["git", "merge-base", "--is-ancestor", at, head], cwd=root).returncode:
-        raise SystemExit(f"{rev} is not an ancestor of HEAD.")
-    if at == head:
-        raise SystemExit(f"{rev} is HEAD: nothing has changed since, so there is nothing to test.")
+REPORT_VERSION = 2  # 2: several snapshots, N questions per unit, one shared question set
+UNCHANGED_MASS = 0.005  # below this a unit has not moved since the snapshot
+MAX_TURNS = {"questions": 100, "answers": 100, "grades": 80}  # room for 2 x 12 questions
+
+
+def resolve_snapshots(root: Path, revs: list[str], head: str) -> list[tuple[str, str]]:
+    """(rev as given, sha) for each snapshot, nearest to HEAD first, duplicates dropped. Each
+    must be a proper ancestor of HEAD."""
+    out: dict[str, str] = {}
+    for rev in revs:
+        at = resolve(root, rev)
+        if at == head:
+            raise SystemExit(
+                f"{rev} is HEAD: nothing has changed since, so there is nothing to test."
+            )
+        if subprocess.run(["git", "merge-base", "--is-ancestor", at, head], cwd=root).returncode:
+            raise SystemExit(f"{rev} is not an ancestor of HEAD.")
+        out.setdefault(at, rev)
+    since = {at: len(_git(root, "rev-list", f"{at}..{head}").split()) for at in out}
+    return [(out[at], at) for at in sorted(out, key=since.__getitem__)]
+
+
+def pick_units(units: list[dict[str, Any]], n_units: int | None) -> list[dict[str, Any]]:
+    """The architectural top-level units, most important first, the first `n_units`."""
     pool = [u for u in units if u.get("scope", "architectural") == "architectural"]
     picked = sorted(pool, key=lambda u: -float(u.get("importance", 0)))[: n_units or len(pool)]
     if not picked:
         raise SystemExit("No architectural units to quiz.")
+    return picked
 
-    commits = commits_for(root, store)
-    weights = weights_for(root, store, commits)
+
+def change_lines(
+    since: list[Commit],
+    paths: list[str],
+    files_then: set[str],
+    split: hier.Split | None = None,
+) -> tuple[float, float]:
+    """(lines in files that existed at the snapshot, lines in files that did not) changed
+    under `paths` by the commits since, counted as line share counts them (no lockfiles,
+    generated files or version bumps; a shared file split among the units listing it). Bots
+    land nothing and are left out. A commit with no line counts (binary files) counts its
+    files instead."""
+    part = split or (lambda _f: 1.0)
+    old = new = 0.0
+    for c in since:
+        if c.klass == "bot":
+            continue
+        lines = c.counted_lines or {
+            f: 1 for f in c.files if not mechanical(f) and f not in c.version_files
+        }
+        for f, n in lines.items():
+            if _under(f, paths):
+                if f in files_then:
+                    old += n * part(f)
+                else:
+                    new += n * part(f)
+    return round(old, 1), round(new, 1)
+
+
+def classify_change(mass_since: float, old: float, new: float) -> tuple[str, float | None]:
+    """unchanged, mostly-edited (most changed lines in files the snapshot had) or mostly-new,
+    and the edited share."""
+    share = round(old / (old + new), 3) if old + new else None
+    if mass_since < UNCHANGED_MASS:
+        return "unchanged", share
+    return ("mostly-edited" if (share or 0.0) >= 0.5 else "mostly-new"), share
+
+
+def unit_rows(
+    root: Path,
+    at: str,
+    head: str,
+    units: list[dict[str, Any]],
+    all_units: list[dict[str, Any]],
+    commits: list[Commit],
+    weights: dict[str, CommitWeight],
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    """The snapshot's header and one row per unit, before any question is answered."""
     since_shas = set(_git(root, "rev-list", f"{at}..{head}").split())
     since = [c for c in commits if c.sha in since_shas]
-    members = hier.Membership(units)
+    members = hier.Membership(all_units)
     files_now = repo.tracked_files(root)
-    files_then = [f for f in _git(root, "ls-tree", "-r", "--name-only", at).splitlines() if f]
-    at_date = _git(root, "log", "-1", "--format=%aI", at).strip()
-
+    files_then = {f for f in _git(root, "ls-tree", "-r", "--name-only", at).splitlines() if f}
     rows: dict[str, dict[str, Any]] = {}
-    for u in picked:
+    for u in units:
         paths, split = u.get("paths", []), members.split(u["id"])
         m_since = unit_mass(since, paths, weights, split)
         m_total = unit_mass(commits, paths, weights, split)
+        old, new = change_lines(since, paths, files_then, split)
+        change, edited = classify_change(m_since, old, new)
         rows[u["id"]] = {
             "unit": u["id"],
             "name": u.get("name", ""),
@@ -205,20 +273,30 @@ def run(
             "share_since": round(m_since / m_total, 3) if m_total else 0.0,
             "files_now": sum(1 for f in files_now if _under(f, paths)),
             "files_at_rev": sum(1 for f in files_then if _under(f, paths)),
+            "lines_since_existing": old,
+            "lines_since_new": new,
+            "edited_share": edited,
+            "change": change,
             "questions": [],
         }
+    header = {
+        "at_sha": at,
+        "at_date": _git(root, "log", "-1", "--format=%aI", at).strip(),
+        "commits_since": len(since),
+        "mass_since": round(sum(landed(c, weights, 0.0) for c in since), 3),
+    }
+    return header, rows
 
-    out(f"Synthetic developer frozen at {at[:8]} ({at_date[:10]}), quizzed on HEAD {head[:8]}")
-    out(f"{len(since)} commits since, on {len(picked)} units. 1/3: questions from HEAD...")
-    questions = generate_questions(root, llm, picked, per_unit=1)
-    out("2/3: answers from the snapshot only...")
-    with snapshot(root, at) as snap:
-        answered = answer(snap, llm, questions)
-    out("3/3: grading against HEAD...")
-    results = grade(root, llm, answered)
 
+def _score(r: dict[str, Any]) -> float:
+    return scoring.VERDICT_SCORE.get(r["verdict"], 0.0)
+
+
+def fill(rows: dict[str, dict[str, Any]], results: list[dict[str, Any]]) -> None:
+    """Attach graded answers to their unit rows and score each unit."""
+    for row in rows.values():
+        row["questions"] = []
     for r in results:
-        ev = scoring.evidence(r)
         rows[r["unit_id"]]["questions"].append(
             {
                 "question": r["question"],
@@ -227,51 +305,260 @@ def run(
                 "confidence": r["confidence"],
                 "verdict": r["verdict"],
                 "feedback": r.get("feedback", ""),
-                "evidence": ev,
+                "score": _score(r),
+                "evidence": scoring.evidence(r),
             }
         )
     for row in rows.values():
         qs = row["questions"]
-        if qs:
-            ev = sum(q["evidence"] for q in qs) / len(qs)
-            row["evidence"], row["wrongness"] = round(ev, 3), round(1 - ev, 3)
-            row["verdict"] = "/".join(q["verdict"] for q in qs)
-        else:
-            row["evidence"] = row["wrongness"] = row["verdict"] = None
+        if not qs:
+            row.update(score=None, wrongness=None, evidence=None, verdict=None)
+            row.update(confident_wrong=0, unknown=0)
+            continue
+        sc = sum(q["score"] for q in qs) / len(qs)
+        ev = sum(q["evidence"] for q in qs) / len(qs)
+        row["score"], row["wrongness"] = round(sc, 3), round(1 - sc, 3)
+        row["evidence"] = round(ev, 3)
+        row["verdict"] = "/".join(q["verdict"] for q in qs)
+        row["confident_wrong"] = sum(
+            1 for q in qs if q["verdict"] == "wrong" and q["confidence"] >= 3
+        )
+        row["unknown"] = sum(1 for q in qs if q["verdict"] == "unknown")
 
-    scored = [r for r in rows.values() if r["wrongness"] is not None]
-    xs = [r["mass_since"] for r in scored]
-    shares = [r["share_since"] for r in scored]
-    ys = [r["wrongness"] for r in scored]
+
+def correlation(points: list[tuple[float, float]]) -> dict[str, Any]:
+    xs, ys = [x for x, _ in points], [y for _, y in points]
     rho, p = spearman(xs, ys), permutation_p(xs, ys)
-    rho_s, p_s = spearman(shares, ys), permutation_p(shares, ys)
-    summary = {
-        "units_scored": len(scored),
-        "verdicts": dict(Counter(q["verdict"] for r in scored for q in r["questions"])),
-        "mean_wrongness": round(sum(ys) / len(ys), 3) if ys else None,
-        "spearman_mass_since_vs_wrongness": None if rho is None else round(rho, 3),
+    return {
+        "n": len(points),
+        "rho": None if rho is None else round(rho, 3),
         "p_one_sided": None if p is None else round(p, 4),
-        "spearman_share_since_vs_wrongness": None if rho_s is None else round(rho_s, 3),
-        "p_one_sided_share": None if p_s is None else round(p_s, 4),
         "reading": reading(rho, p),
     }
-    report = {
+
+
+def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """One snapshot's summary: verdicts, mean score, confident wrong answers, the Spearman
+    correlation of mass since with wrongness (1 - mean score), the same with the evidence
+    udebt records (confident wrong counts -0.5), and the split by kind of change."""
+    scored = [r for r in rows if r["wrongness"] is not None]
+    qs = [q for r in scored for q in r["questions"]]
+    by_change: dict[str, dict[str, Any]] = {}
+    for kind in ("unchanged", "mostly-edited", "mostly-new"):
+        group = [r for r in scored if r["change"] == kind]
+        gq = [q for r in group for q in r["questions"]]
+        by_change[kind] = {
+            "units": len(group),
+            "questions": len(gq),
+            "mean_mass_since": round(sum(r["mass_since"] for r in group) / len(group), 3)
+            if group
+            else None,
+            "mean_wrongness": round(sum(r["wrongness"] for r in group) / len(group), 3)
+            if group
+            else None,
+            "confident_wrong": sum(r["confident_wrong"] for r in group),
+            "unknown": sum(r["unknown"] for r in group),
+        }
+    return {
+        "units_scored": len(scored),
+        "questions": len(qs),
+        "verdicts": dict(Counter(q["verdict"] for q in qs)),
+        "mean_score": round(sum(q["score"] for q in qs) / len(qs), 3) if qs else None,
+        "confident_wrong": sum(r["confident_wrong"] for r in scored),
+        "unknown_share": round(sum(r["unknown"] for r in scored) / len(qs), 3) if qs else None,
+        "mass_since_vs_wrongness": correlation([(r["mass_since"], r["wrongness"]) for r in scored]),
+        "mass_since_vs_evidence_wrongness": correlation(
+            [(r["mass_since"], 1 - r["evidence"]) for r in scored]
+        ),
+        "share_since_vs_wrongness": correlation(
+            [(r["share_since"], r["wrongness"]) for r in scored]
+        ),
+        "by_change": by_change,
+    }
+
+
+def paired(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
+    """Within each unit, across snapshots: the same questions, different knowledge. A pair of
+    snapshots is concordant when the one with more mass since scored worse, discordant when
+    it scored better. Pairs with equal mass since are skipped."""
+    done = [s for s in snapshots if s.get("graded")]
+    conc = disc = ties = 0
+    for i, a in enumerate(done):
+        for b in done[i + 1 :]:
+            for uid, ra in a["units"].items():
+                rb = b["units"].get(uid)
+                if rb is None or ra["wrongness"] is None or rb["wrongness"] is None:
+                    continue
+                if abs(ra["mass_since"] - rb["mass_since"]) < UNCHANGED_MASS:
+                    continue
+                lo, hi = (ra, rb) if ra["mass_since"] < rb["mass_since"] else (rb, ra)
+                if hi["wrongness"] > lo["wrongness"]:
+                    conc += 1
+                elif hi["wrongness"] < lo["wrongness"]:
+                    disc += 1
+                else:
+                    ties += 1
+    tau = round((conc - disc) / (conc + disc), 3) if conc + disc else None
+    return {"concordant": conc, "discordant": disc, "tied": ties, "tau": tau}
+
+
+def _rows_list(snap: dict[str, Any]) -> list[dict[str, Any]]:
+    return list(snap["units"].values())
+
+
+def run(
+    root: Path,
+    store: Store,
+    llm: LLM,
+    revs: list[str],
+    *,
+    n_units: int | None = None,
+    per_unit: int = 2,
+    dev: str | None = None,
+    resume: Path | None = None,
+    out=print,
+) -> tuple[dict[str, Any], Path]:
+    m = store.require_map()
+    head = repo.head(root)
+    snaps = resolve_snapshots(root, revs, head)
+    picked = pick_units(m["units"], n_units)
+    commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
+
+    prior: dict[str, Any] | None = None
+    if resume is not None:
+        prior = json.loads(Path(resume).read_text(encoding="utf-8"))
+        if prior.get("head") != head or prior.get("version") != REPORT_VERSION:
+            raise SystemExit(f"{resume} is for another HEAD or report version; start afresh.")
+    date = lisbon_date()
+    name = "_".join(at[:8] for _, at in snaps)
+    path = Path(resume) if resume else store.dir / "experiments" / f"synthetic-{name}-{date}.json"
+    report: dict[str, Any] = {
         "experiment": "synthetic",
-        "version": 1,
+        "version": REPORT_VERSION,
         "repo": root.name,
         "head": head,
-        "at": rev,
-        "at_sha": at,
-        "at_date": at_date,
         "dev": dev,
-        "date": lisbon_date(),
+        "date": date,
         "generated_at": now_iso(),
-        "commits_since": len(since),
-        "llm_calls": 3,
-        "units": list(rows.values()),
-        "summary": summary,
+        "per_unit": per_unit,
+        "unit_ids": [u["id"] for u in picked],
+        "llm_calls": 0,
+        "questions": None,
+        "snapshots": [],
     }
-    path = store.dir / "experiments" / f"synthetic-{at[:8]}-{report['date']}.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    for rev, at in snaps:
+        header, rows = unit_rows(root, at, head, picked, m["units"], commits, weights)
+        report["snapshots"].append({"at": rev, **header, "graded": False, "units": rows})
+
+    def save() -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    def call(what: str) -> None:
+        """Count a model call before making it, and save, so a call that fails still counts."""
+        report["llm_calls"] += 1
+        save()
+        out(f"call {report['llm_calls']}: {what}...")
+
+    if prior is not None:
+        report["llm_calls"] = int(prior.get("llm_calls", 0))
+    out(
+        f"Synthetic developers frozen at {len(snaps)} snapshot(s), quizzed on HEAD {head[:8]}: "
+        f"{len(picked)} units x {per_unit} questions, one question set for every snapshot"
+    )
+    same_units = prior is not None and prior.get("unit_ids") == report["unit_ids"]
+    if same_units and prior.get("questions") and prior.get("per_unit") == per_unit:
+        questions = prior["questions"]
+        out("Questions: reused from the report being resumed")
+    else:
+        call("questions from HEAD, on each unit's decision and current behaviour")
+        questions = generate_questions(
+            root, llm, picked, per_unit, stable=True, max_turns=MAX_TURNS["questions"]
+        )
+    report["questions"] = questions
+    save()
+
+    done = {s["at_sha"]: s for s in (prior or {}).get("snapshots", []) if s.get("graded")}
+    for snap in report["snapshots"]:
+        at = snap["at_sha"]
+        if same_units and at in done:
+            snap.update(graded=True, units=done[at]["units"], summary=done[at].get("summary"))
+            out(f"{at[:8]}: reused from the report being resumed")
+            continue
+        out(
+            f"Snapshot {at[:8]} ({snap['at_date'][:10]}): {snap['commits_since']} commits, "
+            f"mass {snap['mass_since']} since"
+        )
+        call(f"answers from {at[:8]} only")
+        with snapshot(root, at) as wt:
+            answered = answer(wt, llm, questions, MAX_TURNS["answers"])
+        snap["answers"] = [
+            {"index": i, "answer": a["answer"], "confidence": a["confidence"]}
+            for i, a in enumerate(answered)
+        ]
+        save()
+        if any(a["answer"] for a in answered):
+            call(f"grading {at[:8]}'s answers against HEAD")
+        results = grade(root, llm, answered, MAX_TURNS["grades"])
+        fill(snap["units"], results)
+        snap.pop("answers")
+        snap["graded"] = True
+        snap["summary"] = summarize(_rows_list(snap))
+        save()
+
+    graded = [s for s in report["snapshots"] if s["graded"]]
+    report["pooled"] = correlation(
+        [
+            (r["mass_since"], r["wrongness"])
+            for s in graded
+            for r in _rows_list(s)
+            if r["wrongness"] is not None
+        ]
+    )
+    report["paired"] = paired(graded)
+    save()
     return report, path
+
+
+def suggest(
+    root: Path, store: Store, targets: list[float], n_units: int | None = None
+) -> list[dict[str, Any]]:
+    """For each target mass, the first-parent commit from HEAD whose mass since (the landed
+    weight of `rev..HEAD`) first reaches it, with how many of the picked units have not
+    moved since. No model call."""
+    m = store.require_map()
+    head = repo.head(root)
+    picked = pick_units(m["units"], n_units)
+    commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
+    by_sha = {c.sha: c for c in commits}
+    line = _git(root, "rev-list", "--first-parent", head).split()
+
+    def mass_since(at: str) -> float:
+        shas = _git(root, "rev-list", f"{at}..{head}").split()
+        return sum(landed(by_sha[s], weights, 0.0) for s in shas if s in by_sha)
+
+    out = []
+    for target in targets:
+        lo, hi = 1, len(line) - 1  # mass since grows along the first-parent line
+        if hi < lo:
+            break
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if mass_since(line[mid]) >= target:
+                hi = mid
+            else:
+                lo = mid + 1
+        at = line[lo]
+        header, rows = unit_rows(root, at, head, picked, m["units"], commits, weights)
+        out.append(
+            {
+                "target": target,
+                **header,
+                "unchanged": sum(1 for r in rows.values() if r["change"] == "unchanged"),
+                "units": len(rows),
+                "changes": dict(Counter(r["change"] for r in rows.values())),
+            }
+        )
+    return out

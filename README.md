@@ -64,7 +64,7 @@ udebt risk [range|--staged]    # weight a change lands in each unit vs your unde
 udebt hook install             # warn-only pre-push hook that runs `udebt risk`
 udebt scope <unit> blackbox    # "I choose not to understand this", for you (or --for <dev>)
 udebt scope <unit> blackbox --team   # for everyone: stored in the map
-udebt experiment synthetic --at <rev> [--units N]   # validation: a synthetic developer (3 calls)
+udebt experiment synthetic --snapshots <rev>,... [--per-unit 2]   # validation: synthetic developers
 udebt cache [status|rebuild]   # the parsed-commit cache (gitignored)
 ```
 
@@ -338,23 +338,52 @@ signatures are checked first.
 
 ## Experiments
 
-`udebt experiment synthetic --at <rev>` tests the model without human subjects. A synthetic
-developer is the `claude` CLI taking the quiz with its knowledge frozen at `<rev>`:
+`udebt experiment synthetic` tests the model without human subjects. A synthetic developer
+is the `claude` CLI taking the quiz with its knowledge frozen at an older snapshot:
 
-1. questions are written from HEAD, as `udebt quiz` writes them (one call for all units);
-2. the answers come from a temporary `git worktree` at `<rev>` with its `.git` link removed,
-   the answerer's only working directory, and the prompt says the code it sees is the only
-   code it knows (one call);
-3. the answers are graded against HEAD, as the quiz grades them (one call).
+```bash
+udebt experiment synthetic --suggest 10,25,50          # snapshots that much mass before HEAD (no LLM)
+udebt experiment synthetic --snapshots <rev>,<rev>,<rev> [--per-unit 2] [--units N]
+udebt experiment synthetic --at <rev>                  # one snapshot
+udebt experiment synthetic --snapshots ... --resume .udebt/experiments/<report>.json
+```
 
-Its stale knowledge should go wrong where the code moved since `<rev>`. The report, in
-`.udebt/experiments/synthetic-<sha>-<date>.json` (nothing goes to `.udebt/records/`), gives
-per unit the weighted mass landed since `<rev>` (the same attribution as everywhere else),
-its share of the unit's mass, the files at `<rev>` and now, the question, answer, verdict and
-evidence, and the Spearman rank correlation between mass since and wrongness (1 - evidence)
-with a one-sided permutation p-value. A positive, significant correlation is what decay
-predicts. `--units N` takes the N most important top-level units (default all).
+1. one question set is written from HEAD for every snapshot (one call), `--per-unit`
+   questions per unit (default 2): the first on the unit's decision (why X rather than Y,
+   what would have to change), the second on its current behaviour (what happens when X
+   fails, which component decides Z). The prompt shows no commit history and forbids
+   questions about what changed, so a unit that has not moved since a snapshot can be
+   answered correctly from it;
+2. per snapshot, the answers come from a temporary `git worktree` at `<rev>` with its `.git`
+   link removed, the answerer's only working directory, and the prompt says the code it sees
+   is the only code it knows (one call);
+3. per snapshot, the answers are graded against HEAD, as the quiz grades them (one call).
 
+So a run costs 1 + 2 x snapshots calls, and the snapshot is the only variable. Its stale
+knowledge should go wrong where the code moved since. The report, in
+`.udebt/experiments/synthetic-<sha>[_<sha>...]-<date>.json` (nothing goes to
+`.udebt/records/`), gives per snapshot and per unit:
+
+- the weighted mass landed since the snapshot (the same attribution as everywhere else),
+  its share of the unit's mass, and the files at the snapshot and now;
+- where the lines since went: the share in files that existed at the snapshot (`edited`)
+  against files it lacked (`new`), which classes the unit `unchanged`, `mostly-edited` or
+  `mostly-new`; edits to code a developer saw are where misconceptions come from, new code
+  is where known gaps come from;
+- each question, answer, confidence, verdict and feedback; the mean score (correct 1,
+  partial 0.5, wrong and unknown 0), and the confidently wrong answers (confidence 3);
+- the Spearman correlation between mass since and wrongness (1 - mean score), with a
+  one-sided permutation p-value, also against udebt's own evidence (confidently wrong -0.5)
+  and against the share since; and the same split by kind of change.
+
+Across snapshots it adds a pooled correlation (not independent: the same questions) and a
+paired count: for the same unit at two snapshots, how often the one with more mass since
+scored worse. A positive, significant correlation is what decay predicts. `--units N` takes
+the N most important top-level units (default all). The report is written after every call
+and counts each call before making it, so a run that stops part way (a model error, say) can
+be finished with `--resume <report>` without paying again for what it already has.
+
+## Development
 ## Development
 
 ```bash

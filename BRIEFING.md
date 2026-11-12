@@ -157,6 +157,16 @@ acceptable.
   `records/`; the report is `experiments/synthetic-<sha8>-<Lisbon date>.json` and names
   the resolved sha, since `<rev>` may contain `~`. First result on digitalme: rho -0.27, no
   support for decay; recorded as is (ROADMAP Phase 5).
+- **Synthetic experiment, second design** (Phase 1.2): several snapshots in one run share
+  one question set written from HEAD, `--per-unit` (default 2) questions per unit, the
+  first on the decision and the second on current behaviour, from a prompt
+  (`TASK: stable-questions`) that shows no history and forbids "what changed" questions.
+  Score is correct 1, partial 0.5, wrong and unknown 0 (udebt's -0.5 for confident wrong is
+  reported beside it). A unit's change since a snapshot is `unchanged` (mass < 0.005),
+  `mostly-edited` (>= half its changed lines in files the snapshot had) or `mostly-new`.
+  The nearest snapshot should leave at least a third of the units unchanged, as a control;
+  `--suggest` lists candidates. Reports are saved after every call and `--resume` finishes
+  one, because a run has a fixed call budget.
 - **Version bumps** (Phase 1.2): a manifest or version file whose diff changes only version
   strings is a `version` kind for that commit: no +0.3 for dependencies, no directory spread,
   out of line share; a commit of only version bumps (plus docs, lockfiles, generated files)

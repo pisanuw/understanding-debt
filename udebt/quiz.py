@@ -10,7 +10,13 @@ from . import repo, scoring
 from . import units as hier
 from .llm import LLM
 from .mapping import commits_for, weights_for
-from .prompts import GRADE_SCHEMA, QUESTIONS_SCHEMA, grade_prompt, questions_prompt
+from .prompts import (
+    GRADE_SCHEMA,
+    QUESTIONS_SCHEMA,
+    grade_prompt,
+    questions_prompt,
+    stable_questions_prompt,
+)
 from .provenance import Commit, landed, unit_provenance
 from .responsibility import Responsibility, effective_scope
 from .responsibility import load as load_responsibility
@@ -127,13 +133,30 @@ def _parent_name(units: list[dict[str, Any]], uid: str) -> dict[str, str]:
 
 
 def generate_questions(
-    root: Path, llm: LLM, units: list[dict[str, Any]], per_unit: int = 1
+    root: Path,
+    llm: LLM,
+    units: list[dict[str, Any]],
+    per_unit: int = 1,
+    *,
+    stable: bool = False,
+    max_turns: int = 40,
 ) -> list[dict[str, Any]]:
-    res = llm.structured(
-        questions_prompt(units, per_unit), QUESTIONS_SCHEMA, cwd=root, read_tools=True
-    )
+    """`stable` asks for questions on each unit's decision and current behaviour only, never
+    on what changed (the synthetic-developer experiment), and keeps at most `per_unit` per
+    unit, in unit order."""
+    prompt = (stable_questions_prompt if stable else questions_prompt)(units, per_unit)
+    res = llm.structured(prompt, QUESTIONS_SCHEMA, cwd=root, read_tools=True, max_turns=max_turns)
     valid = {u["id"] for u in units}
     qs = [q for q in res.get("questions", []) if q.get("unit_id") in valid]
+    if stable:
+        order = {u["id"]: i for i, u in enumerate(units)}
+        kept: dict[str, int] = {}
+        capped = []
+        for q in qs:
+            if kept.get(q["unit_id"], 0) < per_unit:
+                kept[q["unit_id"]] = kept.get(q["unit_id"], 0) + 1
+                capped.append(q)
+        qs = sorted(capped, key=lambda q: order[q["unit_id"]])
     if not qs:
         raise SystemExit("No questions were generated.")
     return qs
@@ -165,11 +188,16 @@ def ask_interactively(questions: list[dict[str, Any]], inp=None, out=print) -> l
     return answered
 
 
-def grade(root: Path, llm: LLM, answered: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def grade(
+    root: Path, llm: LLM, answered: list[dict[str, Any]], max_turns: int = 40
+) -> list[dict[str, Any]]:
+    """Grade the non-empty answers in one call; an empty answer is a known unknown."""
     to_grade = [a for a in answered if a["answer"]]
     grades: dict[int, dict[str, Any]] = {}
     if to_grade:
-        res = llm.structured(grade_prompt(to_grade), GRADE_SCHEMA, cwd=root, read_tools=True)
+        res = llm.structured(
+            grade_prompt(to_grade), GRADE_SCHEMA, cwd=root, read_tools=True, max_turns=max_turns
+        )
         for g in res.get("grades", []):
             grades[int(g["index"])] = g
     results, gi = [], 0

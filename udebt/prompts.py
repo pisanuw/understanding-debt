@@ -299,6 +299,47 @@ Units:
 """
 
 
+def stable_questions_prompt(units: list[dict[str, Any]], per_unit: int) -> str:
+    """Questions for the synthetic-developer experiment (synthetic.py). The same questions go
+    to answerers who know different snapshots, so they must be answerable from the code as
+    it stands, whatever version a developer learnt: about the unit's decision and current
+    behaviour, never about what changed or when. No commit history is shown, so the writer
+    is not steered towards the latest changes."""
+    unit_lines = []
+    for u in units:
+        parent = f" (a part of {u['parent_name']})" if u.get("parent_name") else ""
+        unit_lines.append(
+            f"- unit_id: {u['id']}\n  name: {u['name']}{parent}\n"
+            f"  summary: {u.get('summary', '')}\n"
+            f"  decision: {u.get('decision', '')}\n  alternatives: {u.get('alternatives', '')}\n"
+            f"  why: {u.get('why', '')}\n  paths: {', '.join(u.get('paths', []))}"
+        )
+    return f"""TASK: stable-questions
+
+You are writing a short quiz on how the repository in the current directory works. Write
+exactly {per_unit} question(s) for each unit below, each answerable from the code as it is now.
+
+Ask about the unit as it stands: the decision it embodies and how the code behaves today.
+Do not ask what changed, when, or why something was changed, and do not ask about commit
+history or about the newest feature in preference to the core of the unit. A developer who
+knows this unit's code well should be able to answer from the code alone. Give each unit's
+questions different shapes, in this order:
+1. decision: "Why does the code do X rather than <alternative>? What constraint forces it?"
+   or "If X were replaced with <alternative>, what else would have to change?"
+2. behaviour: "What happens when X fails / is empty / is called twice?" or "Which component
+   decides Z, and what does it do with it?"
+Further questions, if asked for, alternate between the two shapes on other parts of the unit.
+
+Every question must have an answer the code determines, so it can be graded objectively.
+Avoid trivia (exact names, line counts, versions, file names). Use the read-only tools to
+verify every reference answer against the actual code, and cite the files you relied on in
+`evidence`. Keep each question to two sentences and each reference answer to three.
+
+Units:
+{chr(10).join(unit_lines)}
+"""
+
+
 def grade_prompt(items: list[dict[str, Any]]) -> str:
     blocks = []
     for i, it in enumerate(items):

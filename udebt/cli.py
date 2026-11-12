@@ -11,7 +11,7 @@ udebt status [unit] [--deep]    debt per unit and a 0-100 debt index (--team: bu
 udebt risk [range]              a change's weight per unit against your understanding
 udebt dig [<id>]                guided walkthrough of the worst unit (or a chosen one)
 udebt directed add <session>    count agent commits you directed as your assisted work
-udebt experiment synthetic --at <rev>   quiz a synthetic developer frozen at an old snapshot
+udebt experiment synthetic --snapshots <rev>,...   synthetic developers frozen at old snapshots
 udebt cache [status|rebuild]    the parsed-commit cache under .udebt/ (gitignored)
 """
 
@@ -994,34 +994,97 @@ def cmd_experiment(args) -> int:
 
     root, store = _ctx(args)
     store.require()
-    llm = _llm(store, args)
     email = _email(args, root)
+    if args.suggest:
+        targets = [float(x) for x in args.suggest.split(",") if x.strip()]
+        rows = synthetic.suggest(root, store, targets, args.units)
+        print(
+            f"\n{'target':>6} {'sha':<9} {'date':<10} {'commits':>7} {'mass':>6}  units unchanged"
+        )
+        for r in rows:
+            print(
+                f"{r['target']:>6.1f} {r['at_sha'][:8]:<9} {r['at_date'][:10]:<10} "
+                f"{r['commits_since']:>7} {r['mass_since']:>6.1f}  {r['unchanged']}/{r['units']}"
+                f"  {r['changes']}"
+            )
+        print("\nmass = landed weight of <sha>..HEAD (first-parent commits from HEAD). No LLM.")
+        return 0
+    revs = [args.at] if args.at else [r.strip() for r in (args.snapshots or "").split(",")]
+    revs = [r for r in revs if r]
+    if not revs:
+        raise SystemExit("Name a snapshot: --at REV or --snapshots REV,REV,...")
+    llm = _llm(store, args)
     try:
-        report, path = synthetic.run(root, store, llm, args.at, n_units=args.units, dev=email)
+        report, path = synthetic.run(
+            root,
+            store,
+            llm,
+            revs,
+            n_units=args.units,
+            per_unit=args.per_unit,
+            dev=email,
+            resume=Path(args.resume) if args.resume else None,
+        )
     except LLMError as e:
         raise SystemExit(str(e)) from e
-    rows = report["units"]
-    w = min(44, max([22, *(len(r["unit"]) + 2 for r in rows)]))
-    print(f"\n{'unit':<{w}} {'imp':>5} {'since':>6} {'share':>5} {'files':>9}  verdict")
-    for r in sorted(rows, key=lambda r: -r["mass_since"]):
-        conf = ",".join(str(q["confidence"]) for q in r["questions"] if q["answer"])
-        files = f"{r['files_at_rev']}/{r['files_now']}"
+    for snap in report["snapshots"]:
+        _print_snapshot(snap)
+    if len(report["snapshots"]) > 1:
+        pooled, pair = report["pooled"], report["paired"]
         print(
-            f"{r['unit']:<{w}} {r['importance']:>5.2f} {r['mass_since']:>6.2f} "
-            f"{r['share_since']:>5.2f} {files:>9}  {r['verdict'] or '(no question)'}"
+            f"\nPooled over snapshots (n = {pooled['n']}, not independent: the same "
+            f"questions): {pooled['reading']}"
+        )
+        print(
+            f"Same unit, two snapshots, more mass since: worse {pair['concordant']}, better "
+            f"{pair['discordant']}, same {pair['tied']} (tau {pair['tau']})"
+        )
+    print(
+        "\nsince = weighted mass landed on the unit after the snapshot; score = mean of correct 1,"
+        " partial 0.5, wrong and unknown 0; cw = confidently wrong (confidence 3); change = "
+        "where the lines since went (files the snapshot had: edited; files it lacked: new)."
+    )
+    print(
+        f"Report: {path.relative_to(root)}  ({report['llm_calls']} model calls; nothing "
+        "recorded in .udebt/records/)"
+    )
+    return 0
+
+
+def _print_snapshot(snap: dict[str, Any]) -> None:
+    rows = list(snap["units"].values())
+    w = min(32, max([22, *(len(r["unit"]) + 2 for r in rows)]))
+    print(
+        f"\nSnapshot {snap['at_sha'][:8]} ({snap['at_date'][:10]}, `{snap['at']}`): "
+        f"{snap['commits_since']} commits, mass {snap['mass_since']} since"
+    )
+    print(
+        f"{'unit':<{w}} {'since':>6} {'edited':>6} {'change':<13} {'score':>5} {'cw':>2}  verdicts"
+    )
+    for r in sorted(rows, key=lambda r: -r["mass_since"]):
+        edited = "-" if r["edited_share"] is None else f"{r['edited_share']:.2f}"
+        score = "-" if r["score"] is None else f"{r['score']:.2f}"
+        conf = ",".join(str(q["confidence"]) for q in r["questions"] if q["answer"])
+        print(
+            f"{r['unit']:<{w}} {r['mass_since']:>6.2f} {edited:>6} {r['change']:<13} {score:>5} "
+            f"{r['confident_wrong']:>2}  {r['verdict'] or '(no question)'}"
             f"{f' (conf {conf})' if conf else ''}"
         )
-    sm = report["summary"]
+    sm = snap.get("summary")
+    if not sm:
+        return
     print(
-        f"\nsince = weighted mass landed on the unit after {report['at_sha'][:8]}; share = of "
-        "all its mass; files = at the snapshot / now."
+        f"mean score {sm['mean_score']}; {sm['confident_wrong']} confidently wrong; "
+        f"unknown {sm['unknown_share']} of answers; verdicts {sm['verdicts']}"
     )
-    print(f"Mass since vs wrongness: {sm['reading']}")
-    rho_s = sm["spearman_share_since_vs_wrongness"]
-    if rho_s is not None:
-        print(f"Share since vs wrongness: rho = {rho_s} (p = {sm['p_one_sided_share']})")
-    print(f"Report: {path.relative_to(root)}  (nothing recorded in .udebt/records/)")
-    return 0
+    print(f"mass since vs 1 - score: {sm['mass_since_vs_wrongness']['reading']}")
+    groups = ", ".join(
+        f"{k} {g['units']} (wrongness {g['mean_wrongness']}, cw {g['confident_wrong']}, "
+        f"unknown {g['unknown']})"
+        for k, g in sm["by_change"].items()
+        if g["units"]
+    )
+    print(f"by change: {groups}")
 
 
 def cmd_cache(args) -> int:
@@ -1214,10 +1277,21 @@ def build_parser() -> argparse.ArgumentParser:
     ex = s.add_subparsers(dest="experiment", required=True)
     x = ex.add_parser(
         "synthetic",
-        help="quiz a synthetic developer frozen at an older snapshot (3 claude calls)",
+        help="quiz synthetic developers frozen at older snapshots (1 + 2 per snapshot calls)",
     )
-    x.add_argument("--at", required=True, metavar="REV", help="the snapshot it knows")
+    which = x.add_mutually_exclusive_group(required=True)
+    which.add_argument("--at", metavar="REV", help="one snapshot")
+    which.add_argument(
+        "--snapshots", metavar="REV,REV,...", help="several snapshots, one shared question set"
+    )
+    which.add_argument(
+        "--suggest",
+        metavar="MASS,...",
+        help="list the first-parent commits that many weighted mass units before HEAD (no LLM)",
+    )
     x.add_argument("--units", type=int, help="the N most important units (default all)")
+    x.add_argument("--per-unit", type=int, default=2, help="questions per unit (default 2)")
+    x.add_argument("--resume", metavar="REPORT", help="finish a report that stopped part way")
     x.set_defaults(fn=cmd_experiment)
 
     s = sub.add_parser("cache", help="the parsed-commit cache: status, or rebuild it")

@@ -120,21 +120,28 @@ class FakeLLM:
             ]
             covered = {p for u in canned for p in u["paths"]}
             return {"units": canned + _units_from_clusters(prompt, covered)}
-        if "TASK: questions" in prompt:
+        if "TASK: questions" in prompt or "TASK: stable-questions" in prompt:
             ids = [
                 line.split(":", 1)[1].strip()
                 for line in prompt.splitlines()
                 if line.startswith("- unit_id:")
             ]
+            m = re.search(r"Write\s+(?:exactly\s+)?(\d+)\s+question", prompt)
+            n = int(m.group(1)) if m else 1
+            shapes = [  # a unit's first question is the one a single-question quiz gets
+                "What happens in {u} when the input is empty?",
+                "Why does {u} keep its state that way?",
+            ]
             return {
                 "questions": [
                     {
                         "unit_id": u,
-                        "question": f"What happens in {u} when the input is empty?",
+                        "question": shapes[k % 2].format(u=u) + (f" ({k + 1})" if k > 1 else ""),
                         "reference_answer": f"{u} returns a default.",
                         "evidence": [f"udebt/{u}.py"],
                     }
                     for u in ids
+                    for k in range(n)
                 ]
             }
         if "TASK: weigh" in prompt:
