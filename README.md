@@ -67,7 +67,9 @@ architectural, behavioural, refactor or cosmetic and blends that in. Weights are
 weight times the square root of the share of changed lines that fell in that unit. The
 square root is deliberate: a unit that got a tenth of a large architectural commit carries
 about a third of its debt, because a new dependency or a changed model spills past the lines
-it touched there. A commit confined to one unit lands its full weight.
+it touched there. A commit confined to one unit lands its full weight. Lockfile and generated
+lines do not count towards the share: a 2000-line `package-lock.json` in a backend refactor
+says nothing about where the thinking went.
 
 Everything below that used to be a commit count is now a sum of weights ("mass").
 
@@ -80,6 +82,9 @@ For each architectural unit `u` and developer `d`:
 | understanding | verified x 0.9^(mass landed on `u` since the last answer) |
 | prior (no quiz yet) | 0.5 x your weighted share of `u` x 0.9^(mass others landed since your last commit) |
 | importance | 0.6 x centrality/5 + 0.4 x mass/max mass, centrality rated 1-5 by the mapper |
+| co-change edge (a, b) | sum over commits touching both, with at most 30 files, of weight / (files - 1) |
+| import edge (a, b) | 1 per direction in which a imports b; scaled so imports and co-change carry equal total weight |
+| candidate units | Louvain communities of the merged graph (seeded), sub-clusters for those of 8+ files |
 | risk of a change | per unit touched: mass landed vs your understanding; HIGH if mass >= 0.3 and understanding < 0.3, CAUTION if mass >= 0.1 and understanding < 0.6; the change's verdict is its worst unit |
 | debt(u) | importance x (1 - understanding), architectural units only |
 | debt index | 100 x sum(debt) / sum(importance) |
@@ -99,6 +104,32 @@ choices:
 
 Team view takes the maximum understanding across developers per unit and counts how many
 developers clear the known threshold (default 0.6). That count is the unit's bus factor.
+
+## Structural discovery
+
+Before the model sees the repository, `udebt` proposes candidate units from the code itself:
+
+1. **Import graph.** Python files are parsed with `ast`; JS and TS files by a regex over
+   `import`, `export ... from`, `require` and dynamic `import()`. An import that resolves to a
+   tracked file is an edge; anything else is an external package, kept to describe the
+   cluster. Each language is one function registered with `@language(...)` in
+   `udebt/imports.py`, so C++, Rust and Java are one function each.
+2. **Co-change graph**, for every language: two files are linked by each commit that changed
+   both, by the commit's weight divided by (files in the commit - 1). Commits touching more
+   than `cochange_max_files` (default 30) files are reformats or bulk moves and are ignored.
+3. **Communities.** The two graphs are merged with equal total weight and partitioned by
+   Louvain (implemented in `udebt/graph.py`, stdlib only, seeded so the result is
+   deterministic). Clusters of eight or more files are partitioned again on their own
+   subgraph to give sub-clusters.
+4. Only source files are clustered. Docs, config and data files would glue unrelated code
+   together, so each is attached afterwards to the cluster it changes with most; files that
+   change with nearly everything (journals, changelogs) are listed as hubs and left out.
+
+The map prompt lists each cluster with a name candidate (its main directory and frequent
+file-name words), its heaviest files, the packages it imports and the clusters it imports
+from. The model names the clusters, merges and splits them, and adds the cross-cutting
+decisions no cluster captures (auth model, persistence, error policy). On a 1900-file,
+2500-commit repository the graph work takes about four seconds, most of it parsing Python.
 
 ## Contributors
 

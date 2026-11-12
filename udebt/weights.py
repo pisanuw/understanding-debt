@@ -20,20 +20,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .history import INFRA, KEYWORDS, MANIFESTS, _toplevel
+from .filekinds import kind as _kind
+from .history import KEYWORDS, _toplevel
 from .provenance import Commit
-
-LOCK = re.compile(
-    r"(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock|uv\.lock|Pipfile\.lock|"
-    r"Cargo\.lock|go\.sum|composer\.lock|Gemfile\.lock|flake\.lock|[^/]*\.lock)$"
-)
-GENERATED = re.compile(
-    r"(^|/)(dist|build|out|target|node_modules|__pycache__|\.next|coverage|__snapshots__)/|"
-    r"\.(min\.js|min\.css|map|pyc|snap|ipynb_checkpoints)$|(^|/)[^/]*\.generated\.[^/]+$"
-)
-DOCS = re.compile(r"(^|/)(docs?|doc)/|\.(md|rst|txt|adoc)$|(^|/)(LICENSE|CHANGELOG|README)[^/]*$")
-TESTS = re.compile(r"(^|/)(tests?|__tests__|spec|e2e)/|(^|/)test_[^/]+$|[._](test|spec)\.[a-z]+$")
-MEDIA = re.compile(r"\.(png|jpe?g|gif|svg|ico|webp|mp3|mp4|wav|pdf|woff2?|ttf)$")
 
 # LLM refinement classes and the weight each implies.
 CLASS_WEIGHT = {"architectural": 1.0, "behavioural": 0.6, "refactor": 0.3, "cosmetic": 0.05}
@@ -46,24 +35,6 @@ class CommitWeight:
     reasons: list[str] = field(default_factory=list)
     effective_lines: int = 0  # whitespace-ignored insertions + deletions
     refined: str | None = None  # LLM class, if refined
-
-
-def _kind(path: str) -> str:
-    if LOCK.search(path):
-        return "lock"
-    if GENERATED.search(path):
-        return "generated"
-    if MEDIA.search(path):
-        return "media"
-    if MANIFESTS.search(path):
-        return "manifest"
-    if INFRA.search(path):
-        return "infra"
-    if TESTS.search(path):
-        return "test"
-    if DOCS.search(path):
-        return "docs"
-    return "code"
 
 
 def effective_lines(root: Path) -> dict[str, int]:

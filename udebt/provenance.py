@@ -18,8 +18,11 @@ import math
 import re
 import subprocess
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from typing import Any
+
+from .filekinds import mechanical
 
 BUILTIN_SIGNATURES: list[dict[str, Any]] = [
     {
@@ -107,23 +110,35 @@ class Commit:
     def touches(self, paths: list[str]) -> bool:
         return any(_under(f, paths) for f in self.files)
 
-    def share(self, paths: list[str]) -> float:
-        """Fraction of this commit's changed lines that fall under `paths` (0..1). Falls back
-        to the fraction of files when line counts are unavailable (binary files)."""
+    @cached_property
+    def counted_lines(self) -> dict[str, int]:
+        """Changed lines per file, without lockfiles and generated files: a 2000-line
+        package-lock.json says nothing about where a refactor's thinking went."""
+        return {f: n for f, n in self.file_lines.items() if not mechanical(f)}
+
+    def share(self, paths: list[str], exclude: list[str] | None = None) -> float:
+        """Fraction of this commit's changed lines that fall under `paths` (0..1), and not
+        under `exclude`, not counting lockfiles and generated files. Falls back to the
+        fraction of files when line counts are unavailable (binary or purely mechanical)."""
         if not self.files:
             return 0.0
-        total = sum(self.file_lines.values())
-        if total > 0:
-            return min(1.0, sum(n for f, n in self.file_lines.items() if _under(f, paths)) / total)
-        return sum(1 for f in self.files if _under(f, paths)) / len(self.files)
 
-    def attribution(self, paths: list[str]) -> float:
+        def inside(f: str) -> bool:
+            return _under(f, paths) and not (exclude and _under(f, exclude))
+
+        lines = self.counted_lines
+        total = sum(lines.values())
+        if total > 0:
+            return min(1.0, sum(n for f, n in lines.items() if inside(f)) / total)
+        return sum(1 for f in self.files if inside(f)) / len(self.files)
+
+    def attribution(self, paths: list[str], exclude: list[str] | None = None) -> float:
         """How much of this commit's weight lands on `paths`: the square root of the line
         share. Concave on purpose: a unit that received a tenth of a large architectural
         commit carries about a third of its debt, because the commit's nature (a new
         dependency, a changed model) spills past the lines it touched there. A commit
         confined to one unit lands its full weight."""
-        return math.sqrt(self.share(paths))
+        return math.sqrt(self.share(paths, exclude))
 
 
 def _under(f: str, paths: list[str]) -> bool:

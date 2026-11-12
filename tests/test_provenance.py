@@ -121,3 +121,17 @@ def test_share_splits_a_commit_across_units(mixed_repo):
     assert (
         abs(persist.attribution(["pyproject.toml"]) ** 2 - persist.share(["pyproject.toml"])) < 1e-9
     )
+
+
+def test_line_share_ignores_lockfiles_and_generated_files():
+    c = mk(
+        files=["frontend/package-lock.json", "backend/main.py", "frontend/src/App.jsx"],
+        file_lines={
+            "frontend/package-lock.json": 2000,
+            "backend/main.py": 300,
+            "frontend/src/App.jsx": 100,
+        },
+    )
+    assert c.share(["backend"]) == 0.75 and c.share(["frontend"]) == 0.25
+    only_lock = mk(files=["yarn.lock"], file_lines={"yarn.lock": 50})
+    assert only_lock.share(["yarn.lock"]) == 1.0  # falls back to the file count

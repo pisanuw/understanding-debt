@@ -17,19 +17,9 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from .filekinds import INFRA, MANIFESTS
 from .provenance import Commit
 
-MANIFESTS = re.compile(
-    r"(^|/)(pyproject\.toml|setup\.py|setup\.cfg|requirements[^/]*\.txt|Pipfile|environment\.ya?ml|"
-    r"package\.json|go\.mod|Cargo\.toml|Gemfile|pom\.xml|build\.gradle(\.kts)?|composer\.json|"
-    r"mix\.exs|deno\.json|pubspec\.yaml)$"
-)
-INFRA = re.compile(
-    r"(^|/)(Dockerfile[^/]*|docker-compose[^/]*\.ya?ml|Makefile|Procfile|fly\.toml|vercel\.json|"
-    r"netlify\.toml|render\.yaml|app\.yaml|serverless\.ya?ml|[^/]*\.plist|nginx[^/]*\.conf|"
-    r"run\.sh|deploy[^/]*\.sh)$|^\.github/workflows/|^\.gitlab-ci\.yml$|^terraform/|^infra/|"
-    r"^deploy/|^k8s/|^helm/"
-)
 KEYWORDS = re.compile(
     r"\b(migrat\w*|switch\w*|replac\w*|adopt\w*|introduc\w*|rewrit\w*|refactor\w*|restructur\w*|"
     r"move[sd]? to|drop\w*|remov\w*|split\w*|persist\w*|database|db|auth\w*|cach\w*|deploy\w*|"
