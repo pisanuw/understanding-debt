@@ -124,6 +124,7 @@ class FakeLLM:
                         "why": "Zero dependencies and diff-friendly for git.",
                         "paths": ["udebt/store.py"],
                         "centrality": 4,
+                        "shaped_by": _fake_shas(prompt),
                     },
                     {
                         "id": "scoring",
@@ -135,6 +136,7 @@ class FakeLLM:
                         "why": "Provenance says nothing about architectural understanding.",
                         "paths": ["udebt/scoring.py"],
                         "centrality": 5,
+                        "shaped_by": [],
                     },
                 ]
             }
@@ -169,6 +171,15 @@ class FakeLLM:
     def text(self, prompt, *, cwd, read_tools=True, max_turns=40):
         self.calls.append(prompt)
         return "# Walkthrough\n\nThis is a fake walkthrough.\n\nCHECK QUESTION: What is 1+1?\n"
+
+
+def _fake_shas(prompt: str) -> list[str]:
+    """Short shas from the history block of a map prompt, in order."""
+    return [
+        ln.split()[1]
+        for ln in prompt.splitlines()
+        if ln.startswith("- ") and len(ln.split()) > 2 and len(ln.split()[1]) == 7
+    ]
 
 
 def get_llm(model: str | None = None, verbose: bool = False) -> LLM:

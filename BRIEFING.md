@@ -3,9 +3,11 @@
 ## Scope
 
 A standalone CLI (`udebt`) that measures and helps reduce *understanding debt*: the gap
-between a developer's mental model and the code an AI wrote under their direction. Target
-user is a **team** sharing one repository. Product, not a research instrument. Numeric
-scores are acceptable.
+between a developer's mental model and the code an AI wrote under their direction. The
+primary use is pointing it at an **existing repository with mixed human and AI history**
+and making sure the developer understands the decisions that shaped it. Target user is a
+**team** sharing one repository. Product, not a research instrument. Numeric scores are
+acceptable.
 
 ## Decisions
 
@@ -19,6 +21,19 @@ scores are acceptable.
   Blank answers are recorded as known unknowns with no penalty.
 - **Decay per commit.** Understanding verified at commit X decays by 0.9 per later commit
   touching the unit's paths. This is what makes debt grow while the AI builds.
+- **Decisions come from history as much as from code.** Cheap git heuristics pick
+  decision-bearing commits (founding, dependencies, infra, new dirs, renames, big
+  restructurings); the LLM reads code plus that list and links each unit to the commits that
+  shaped it (`history` on each unit).
+- **Three commit classes**: `ai` (agent-authored), `assisted` (human author, AI co-author
+  trailer), `human`. Signatures are data in config; Claude Code is the only one that matters
+  today, others are stubs for later.
+- **Weak prior from own commits**, capped at 0.5, AI-assisted commits at half weight,
+  decayed by every commit someone else landed since. Replaced by any quiz evidence.
+- **Identity aliases** in config (`identities`) so a developer's several emails count as one.
+- **Testbeds**: `pisanuw/digitalme` (190 commits, 126 human / 62 assisted / 2 ai) is the
+  primary; `pisanuw/dsa-instructor` (2510 commits, mostly ai) is the stress test; the small
+  all-human repos are controls.
 - **LLM via the `claude` CLI**, subscription-billed, read-only tools (Read, Glob, Grep),
   structured output via `--json-schema`. No API key. `UDEBT_LLM=fake` for offline tests.
 - **Storage is JSON under `.udebt/`**, all of it committed to the repo by default:

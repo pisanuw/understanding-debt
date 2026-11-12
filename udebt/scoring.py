@@ -7,6 +7,7 @@ For each architectural unit u and developer d:
     evidence(record)   = 1.0 correct | 0.5 partial | 0.0 wrong | -0.5 confidently wrong
     verified(u, d)     = clamp(mean(evidence of last K records), 0, 1)
     understanding(u,d) = verified * decay ** commits_touching_u_since_last_record
+    prior(u, d)        = 0.5 * dev_share * decay ** others_since_dev   [when no quiz records]
     debt(u, d)         = importance(u) * (1 - understanding(u, d))   [architectural units only]
     debt_index(d)      = 100 * sum(debt) / sum(importance)            [0 = none, 100 = total]
 
@@ -53,6 +54,15 @@ def importance(centrality: int, churn: int, max_churn: int) -> float:
     return round(0.6 * c + 0.4 * ch, 3)
 
 
+PRIOR_CAP = 0.5
+
+
+def prior_understanding(dev_share: float, others_since_dev: int, decay: float = 0.9) -> float:
+    """Weak prior from the developer's own commits to a unit, capped at PRIOR_CAP and
+    decayed by every commit someone else (human or AI) landed on it since."""
+    return PRIOR_CAP * max(0.0, min(1.0, dev_share)) * (decay ** max(0, others_since_dev))
+
+
 @dataclass
 class UnitScore:
     unit_id: str
@@ -61,10 +71,12 @@ class UnitScore:
     commits_since: int
     understanding: float
     scope: str
+    source: str = "none"  # quiz | prior | none
+    prior: float = 0.0
 
     @property
     def measured(self) -> bool:
-        return self.verified is not None
+        return self.source == "quiz"
 
     @property
     def debt(self) -> float:
@@ -80,15 +92,24 @@ def score_unit(
     *,
     window: int = 5,
     decay: float = 0.9,
+    prior: float = 0.0,
 ) -> UnitScore:
     v = verified_understanding(records, window)
+    if v is not None:
+        understanding, source = decayed(v, commits_since, decay), "quiz"
+    elif prior > 0:
+        understanding, source = prior, "prior"
+    else:
+        understanding, source = 0.0, "none"
     return UnitScore(
         unit_id=unit["id"],
         importance=float(unit.get("importance", 0.5)),
         verified=v,
         commits_since=commits_since,
-        understanding=decayed(v, commits_since, decay),
+        understanding=understanding,
         scope=unit.get("scope", "architectural"),
+        source=source,
+        prior=prior,
     )
 
 

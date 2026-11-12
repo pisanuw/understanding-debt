@@ -7,7 +7,9 @@ from typing import Any
 
 from . import repo, scoring
 from .llm import LLM
+from .mapping import commits_for
 from .prompts import GRADE_SCHEMA, QUESTIONS_SCHEMA, grade_prompt, questions_prompt
+from .provenance import Commit, unit_provenance
 from .store import Store
 
 
@@ -17,17 +19,31 @@ def compute_scores(
     units: list[dict[str, Any]],
     email: str,
     records: list[dict[str, Any]] | None = None,
+    commits: list[Commit] | None = None,
 ) -> list[scoring.UnitScore]:
+    """Score every unit for one developer. `commits` lets callers share one git log parse."""
     cfg = store.config
     recs = store.load_records(email) if records is None else records
+    if commits is None:
+        commits = commits_for(root, store)
+    mine = cfg.emails_for(email)
     out = []
     for u in units:
         unit_recs = [r for r in recs if r.get("unit") == u["id"]]
         since = scoring.last_record_head(unit_recs)
-        commits = repo.commit_count(root, u.get("paths", []), since) if since else 0
+        n_since = repo.commit_count(root, u.get("paths", []), since) if since else 0
+        prov = unit_provenance(commits, u.get("paths", []), mine)
+        prior = scoring.prior_understanding(
+            prov.dev_share, prov.others_since_dev, cfg.decay_per_commit
+        )
         out.append(
             scoring.score_unit(
-                u, unit_recs, commits, window=cfg.evidence_window, decay=cfg.decay_per_commit
+                u,
+                unit_recs,
+                n_since,
+                window=cfg.evidence_window,
+                decay=cfg.decay_per_commit,
+                prior=prior,
             )
         )
     return out

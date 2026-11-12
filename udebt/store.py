@@ -28,7 +28,17 @@ class Config:
     decay_per_commit: float = 0.9
     evidence_window: int = 5
     known_threshold: float = 0.6
+    identities: dict[str, list[str]] = field(default_factory=dict)  # primary email -> aliases
     extra: dict[str, Any] = field(default_factory=dict)
+
+    def emails_for(self, email: str) -> set[str]:
+        """All addresses that belong to the developer identified by `email`."""
+        e = email.lower()
+        for primary, aliases in self.identities.items():
+            group = {primary.lower(), *(a.lower() for a in aliases)}
+            if e in group:
+                return group
+        return {e}
 
     @classmethod
     def load(cls, path: Path) -> Config:
@@ -44,6 +54,7 @@ class Config:
             "decay_per_commit": self.decay_per_commit,
             "evidence_window": self.evidence_window,
             "known_threshold": self.known_threshold,
+            "identities": self.identities,
         }
         d.update(self.extra)
         return d
@@ -77,6 +88,9 @@ class Store:
         return Config.load(self.config_path)
 
     # -- map -----------------------------------------------------------------
+    def save_config(self, cfg: Config) -> None:
+        self.config_path.write_text(json.dumps(cfg.dump(), indent=2) + "\n", encoding="utf-8")
+
     def load_map(self) -> dict[str, Any] | None:
         if not self.map_path.exists():
             return None

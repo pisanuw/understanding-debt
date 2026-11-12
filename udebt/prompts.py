@@ -22,8 +22,23 @@ MAP_SCHEMA: dict[str, Any] = {
                     "why": {"type": "string"},
                     "paths": {"type": "array", "items": {"type": "string"}},
                     "centrality": {"type": "integer", "minimum": 1, "maximum": 5},
+                    "shaped_by": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "short shas from the history list that made or changed "
+                        "this decision, oldest first",
+                    },
                 },
-                "required": ["id", "name", "kind", "summary", "decision", "paths", "centrality"],
+                "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "summary",
+                    "decision",
+                    "paths",
+                    "centrality",
+                    "shaped_by",
+                ],
             },
         }
     },
@@ -73,18 +88,30 @@ GRADE_SCHEMA: dict[str, Any] = {
 }
 
 
-def map_prompt(file_list: list[str], max_units: int) -> str:
-    files = "\n".join(file_list[:400])
-    more = "" if len(file_list) <= 400 else f"\n... and {len(file_list) - 400} more files"
+def map_prompt(
+    file_list: list[str], max_units: int, history: list[dict[str, Any]], tree: str | None = None
+) -> str:
+    if tree is not None:
+        files_block = f"Directory layout ({len(file_list)} tracked files):\n{tree}"
+    else:
+        files_block = "Tracked files:\n" + "\n".join(file_list)
+    hist_lines = [
+        f"- {h['sha']} {h['date']} [{h['klass']}{'/' + h['agent'] if h.get('agent') else ''}] "
+        f"{h['subject']}  (files: {h['files']}; e.g. {', '.join(h['sample_files'][:4])})"
+        for h in history
+    ]
+    hist_block = "\n".join(hist_lines) if hist_lines else "(no history available)"
     return f"""TASK: map
 
 You are mapping the ARCHITECTURE of the repository in the current directory so a developer who
-did not write the code can decide what they must understand. You have read-only tools; use them
-to look at the code before answering. Do not guess from file names alone.
+did not write all of the code can decide what they must understand. The repository was built by a
+mix of humans and AI coding agents. You have read-only tools; use them to look at the code before
+answering. Do not guess from file names alone.
 
 Identify at most {max_units} architectural units. A unit is one of:
 - decision: a design choice embedded in the code (persistence strategy, auth model, error handling
-  policy, concurrency model, configuration approach, dependency on an external service)
+  policy, concurrency model, configuration approach, dependency on an external service, deployment
+  target)
 - module: a cohesive area of code with a clear responsibility that other code depends on
 - boundary: an interface between parts (API surface, CLI contract, plugin boundary, data schema)
 - flow: an end-to-end path that crosses several modules (request lifecycle, build pipeline)
@@ -94,36 +121,51 @@ code, boilerplate, formatting config, one-off scripts.
 
 For each unit give: a short kebab-case id; a name; the kind; a one-sentence summary; the decision
 it embodies (what was chosen); plausible alternatives that were NOT chosen; why this choice was
-likely made (say "unclear" if the code does not reveal it); the repository paths (files or
-directories, relative to the root) where it lives; and centrality 1-5, where 5 means most other
-code depends on it or breaks if it changes.
+likely made (say "unclear" if neither code nor history reveals it); the repository paths (files
+or directories, relative to the root) where it lives; centrality 1-5, where 5 means most other
+code depends on it or breaks if it changes; and `shaped_by`: the short shas from the history list
+below that introduced or materially changed this decision, oldest first (empty if none apply).
 
-Tracked files:
-{files}{more}
+Commits in the history list are marked [human], [assisted] (a human committed with an AI
+co-author) or [ai] (an AI agent authored the commit). Prefer decisions that an [ai] or [assisted]
+commit introduced: those are the ones the human developer is least likely to understand.
+
+History (commits most likely to carry decisions, oldest first):
+{hist_block}
+
+{files_block}
 """
 
 
 def questions_prompt(units: list[dict[str, Any]], per_unit: int) -> str:
     unit_lines = []
     for u in units:
+        hist = u.get("history") or []
+        shaped = "; ".join(
+            f"{h['sha']} {h['date']} [{h['klass']}] {h['subject'][:70]}" for h in hist[:5]
+        )
         unit_lines.append(
             f"- unit_id: {u['id']}\n  name: {u['name']}\n  summary: {u.get('summary', '')}\n"
-            f"  paths: {', '.join(u.get('paths', []))}"
+            f"  decision: {u.get('decision', '')}\n  alternatives: {u.get('alternatives', '')}\n"
+            f"  why: {u.get('why', '')}\n  paths: {', '.join(u.get('paths', []))}\n"
+            f"  shaped_by: {shaped or '(unknown)'}"
         )
     return f"""TASK: questions
 
-You are testing whether a developer understands the architecture of the repository in the current
-directory. Write {per_unit} PREDICTION question(s) for each unit below. A prediction question has
-an answer that the code determines, so it can be graded objectively. Good shapes:
-- "What happens when X fails / is empty / is called twice?"
-- "If you change/rename/remove X, what else breaks?"
-- "Which component owns Y? Where does Z get decided?"
-- "What is the order of events when ...?"
+You are testing whether a developer understands the DECISIONS that shaped the repository in the
+current directory. Write {per_unit} question(s) for each unit below. Mix these shapes, favouring
+the first two:
+- consequence: "If you reverted/replaced X with <alternative>, what else would have to change?"
+- rationale: "Why does the code do X rather than Y? What constraint forces it?" Only ask this when
+  the code or commit history actually reveals the reason; otherwise ask a consequence question.
+- prediction: "What happens when X fails / is empty / is called twice?"
+- ownership: "Which component decides Z? Where does it get configured?"
 
-Avoid trivia (exact variable names, line counts, package versions). Target the decisions and
-boundaries a developer must know to change the code safely. Use the read-only tools to verify
-every reference answer against the actual code and cite the files you relied on in `evidence`.
-Keep each question to two sentences and each reference answer to three.
+Every question must have an answer the code (or the cited commits) determines, so it can be graded
+objectively. Avoid trivia (exact names, line counts, versions). Use the read-only tools to verify
+every reference answer against the actual code; `git show <sha>` is not available, so rely on the
+code and the commit subjects given. Cite the files you relied on in `evidence`. Keep each
+question to two sentences and each reference answer to three.
 
 Units:
 {chr(10).join(unit_lines)}
@@ -160,6 +202,9 @@ def dig_prompt(unit: dict[str, Any]) -> str:
 unit well enough to change it safely. Use the read-only tools to look at the actual code first.
 
 Unit: {json.dumps(unit, indent=2)}
+
+The unit's `history` lists the commits that shaped it, each marked human, assisted (human with an
+AI co-author) or ai (AI-authored). Mention who made the decision and when if that is known.
 
 Write a walkthrough in Markdown, at most 400 words, with these sections:
 1. **The decision** — what was chosen, in one paragraph, and the alternative that was rejected.

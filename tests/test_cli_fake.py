@@ -32,8 +32,14 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
     storage = next(u for u in m["units"] if u["id"] == "storage")
     assert storage["churn"] == 4 and storage["importance"] == 0.88  # 0.6*0.8 + 0.4*1.0
 
+    # dev1 authored every commit, so the own-commit prior gives 0.5 understanding everywhere
     rc, out = run(root, "status", capsys=capsys)
-    assert rc == 0 and "Debt index: 100.0" in out and "unmeasured" in out
+    assert rc == 0 and "Debt index: 50.0" in out and "prior from your commits" in out
+    assert "4 commits: 0 ai, 0 assisted, 4 human" in out
+
+    # a developer with no commits sees the unmeasured view
+    rc, out = run(root, "--as-user", "new@example.com", "status", capsys=capsys)
+    assert "Debt index: 100.0" in out and "unmeasured" in out
 
     # quiz order is by importance: storage (0.88) then scoring (0.70, one commit of churn).
     # first answer correct (contains "default"), second blank (known unknown)
@@ -44,7 +50,8 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
     assert "[CORRECT ]" in out and "[UNKNOWN ]" in out
     recs = Store(root).load_records("dev1@example.com")
     assert len(recs) == 2 and recs[0]["head"] == repo.head(root)
-    # storage (0.88) is now understood; scoring (0.70) is a known unknown
+    # storage (0.88) is now understood; scoring (0.70) is a known unknown. The quiz answer
+    # replaces the own-commit prior, so admitting ignorance costs the 0.5 prior.
     assert "Debt index: 44.3" in out  # 0.70 / 1.58
 
     # a commit touching store.py decays the understanding we just verified
@@ -110,3 +117,17 @@ def test_dig_without_check_line_warns(fixture_repo, monkeypatch, capsys):
     rc, out = run(fixture_repo, "dig", "scoring", capsys=capsys)
     assert rc == 0 and "nothing was recorded" in out
     assert Store(fixture_repo).load_records("dev1@example.com") == []
+
+
+def test_alias_and_history(mixed_repo, capsys):
+    root = mixed_repo
+    run(root, "init", capsys=capsys)
+    run(root, "map", capsys=capsys)
+    rc, out = run(root, "history", capsys=capsys)
+    assert rc == 0 and "persist to json" in out and "you+ai" in out
+    rc, out = run(root, "alias", "dev2@example.com", "Dev2@Example.com", capsys=capsys)
+    assert rc == 0 and "dev2@example.com" in out
+    cfg = json.loads((root / ".udebt" / "config.json").read_text())
+    assert cfg["identities"] == {"dev1@example.com": ["dev2@example.com"]}
+    rc, out = run(root, "status", capsys=capsys)
+    assert "yours: 6" in out
