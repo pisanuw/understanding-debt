@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "seeded_at": "2026-11-12T12:52:45+00:00",
+  "developers": {
+    "pisan@uw.edu": {
+      "units": {
+        "arch-map": "footprint",
+        "cli-contract": "footprint",
+        "commit-weights": "footprint",
+        "llm-backend": "footprint",
+        "prediction-scoring": "footprint",
+        "project-governance": "footprint",
+        "provenance-history": "footprint",
+        "quiz-flow": "footprint",
+        "responsibility-contributors": "footprint",
+        "risk-gating": "footprint",
+        "store-persistence": "footprint",
+        "structural-discovery": "footprint"
+      }
+    }
+  },
+  "pending": {}
+}

@@ -2,5 +2,24 @@
   "model": null,
   "decay_per_commit": 0.9,
   "evidence_window": 5,
-  "known_threshold": 0.6
+  "known_threshold": 0.6,
+  "refine_top": 40,
+  "bus_target": 2,
+  "footprint_threshold": 0.1,
+  "cochange_max_files": 30,
+  "identities": {
+    "pisan@uw.edu": [
+      "yusuf@pisan.me"
+    ]
+  },
+  "handles": {},
+  "directed": {
+    "pisan@uw.edu": {
+      "sessions": [
+        "session_01JyJzMWGmtjvQpor63FZ43U",
+        "session_01JyJzMYGFTUG3wn6vdqEMb9"
+      ],
+      "agents": []
+    }
+  }
 }

@@ -31,3 +31,4 @@
 2026-11-12 [note] Grouping cuts total mass: digitalme 83.9 -> 69.7, dsa-instructor 991.9 -> 541.2, go-git 1388 -> 898; squash-merging repos (prefect) unchanged.
 2026-11-12 [code] `udebt experiment synthetic --at <rev>`: claude quizzed from an old worktree snapshot (3 calls), graded on HEAD; report in .udebt/experiments/, nothing in records/.
 2026-11-12 [note] First synthetic run, digitalme at 44f520b, 12 units: 0 correct, Spearman(mass since, wrongness) -0.27 (p 0.81). No support for decay; floor effect and confidence term.
+2026-11-12 [note] Dogfood .udebt regenerated: commits.json v2, map rescored, both sessions directed by pisan@uw.edu, whose seeded set is now all 12 units (index 74.9).
