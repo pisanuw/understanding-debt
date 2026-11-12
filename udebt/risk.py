@@ -20,9 +20,10 @@ from pathlib import Path
 from typing import Any
 
 from . import units as hier
+from .filekinds import VERSION_PATHSPECS, version_candidate
 from .provenance import Commit, _under, landed
 from .scoring import UnitScore
-from .weights import CommitWeight, heuristic_weight
+from .weights import CommitWeight, heuristic_weight, parse_version_diff
 
 HIGH_MASS, HIGH_UND = 0.3, 0.3
 CAUTION_MASS = 0.1
@@ -99,6 +100,17 @@ def staged_commit(root: Path) -> tuple[Commit, CommitWeight]:
         capture_output=True,
         text=True,
     ).stdout.split()
+    diff = subprocess.run(
+        ["git", "diff", "--cached", "-p", "-U0", "--no-renames", "--no-ext-diff", "--no-color"]
+        + ["--", *VERSION_PATHSPECS],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    ).stdout
+    bumped = {f for f, ok in parse_version_diff(diff).items() if ok and version_candidate(f)}
     c = Commit(
         sha="staged",
         date="",
@@ -109,8 +121,10 @@ def staged_commit(root: Path) -> tuple[Commit, CommitWeight]:
         files=files,
         insertions=ins,
         deletions=dels,
+        file_lines=per_file,
+        version_files=bumped,
     )
-    return c, heuristic_weight(c, eins + edels, set(added), set(), set())
+    return c, heuristic_weight(c, eins + edels, set(added), set(), set(), bumped)
 
 
 def assess(

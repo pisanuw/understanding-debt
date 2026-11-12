@@ -295,3 +295,14 @@ def test_version_bumps_weigh_like_lockfile_bumps(tmp_path):
     mono_c = by["release: 1.1.0"]
     mono_c.version_files = bumps[mono_c.sha]
     assert set(mono_c.counted_lines) == {"CHANGELOG.md"}
+
+
+def test_staged_version_bump(tmp_path):
+    from udebt.risk import staged_commit
+
+    root, pkg = _release_repo(tmp_path)
+    (root / "packages" / "core" / "package.json").write_text(pkg("@x/core", "2.0.0"))
+    git(root, "add", ".")
+    c, w = staged_commit(root)
+    assert c.version_files == {"packages/core/package.json"}
+    assert w.weight == VERSION_BUMP_WEIGHT
