@@ -227,3 +227,45 @@ def test_dashboard_is_one_self_contained_file(mixed_repo, capsys):
     from udebt.dashboard import blob as make_blob
 
     assert "</script>" not in make_blob({"subject": "</script><script>alert(1)"})
+
+
+def test_depth_in_the_series_timeline_export_and_dashboard(fixture_repo, capsys):
+    root = fixture_repo
+    store = _mapped(root, capsys)
+    head = git(root, "rev-parse", "HEAD").strip()
+    dev = "dev1@example.com"
+    recs = understood("storage", "2099-01-01T00:00:00+00:00", head)
+    recs += [{"unit": "scoring", "level": 1, "verdict": "correct", "confidence": 2,
+              "ts": "2099-01-01T00:00:00+00:00", "head": head}]  # fmt: skip
+    recs += [{"unit": "scoring", "verdict": "wrong", "confidence": 1, "head": head,
+              "ts": "2099-01-01T00:00:00+00:00"}]  # fmt: skip  # before the ladder: level 5
+    for r in recs:
+        store.append_record(dev, {"type": "quiz", "dev": dev, **r})
+    rc, out = run(root, capsys, "snapshot")
+    data = json.loads((root / ".udebt" / "snapshots.json").read_text())
+    last = data["points"][-1]["devs"][dev]
+    assert last["depth"] == {"scoring": 1, "storage": 3}
+    assert last["und"]["storage"] == 1.0 and abs(last["und"]["scoring"] - 0.333) < 1e-3
+    assert data["fingerprint"]["evidence"] == "ladder" and data["fingerprint"]["rules"] == 3
+    # timeline: per developer, depth now under the table; per unit, a depth column each
+    rc, out = run(root, capsys, "timeline", "--dev", dev)
+    assert "Depth now (highest level passed" in out and "storage 3" in out
+    rc, out = run(root, capsys, "timeline", "--unit", "storage", "--format", "csv")
+    cols = out.splitlines()[0].split(",")
+    assert f"{dev} depth" in cols
+    assert out.splitlines()[-1].split(",")[cols.index(f"{dev} depth")] == "3"
+    rc, out = run(root, capsys, "timeline", "--unit", "storage")
+    assert "depth = highest level passed" in out
+    # export: each answer's level as recorded (None before the ladder), depth per unit
+    rc, out = run(root, capsys, "export", "--out", "-")
+    exp = json.loads(out[: out.rindex("}") + 1])
+    assert [e["level"] for e in exp["evidence"]] == [1, 2, 3, 1, None]
+    units = {u["id"]: u for u in exp["units"]}
+    assert units["storage"]["depth"] == {dev: 3} and units["scoring"]["depth"] == {dev: 1}
+    assert exp["settings"]["ladder"]["1"] == "purpose and placement"
+    run(root, capsys, "export", "--format", "csv")
+    snaps = (root / ".udebt" / "export" / "snapshots.csv").read_text().splitlines()
+    assert snaps[0] == "t,sha,dev,unit,understanding,depth,debt,index"
+    rc, out = run(root, capsys, "dashboard")
+    page = (root / ".udebt" / "dashboard" / "index.html").read_text()
+    assert '{ t: "depth", num: true }' in page and '"depth":{"dev1@example.com":3}' in page

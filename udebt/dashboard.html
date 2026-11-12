@@ -597,11 +597,12 @@ footer p { margin: 4px 0; }
       barBox.appendChild(bar); rk.appendChild(barBox);
       var val = el("div", { "class": "val" });
       val.appendChild(el("strong", null, inIndex ? fmt(row.debt[u]) : "-"));
-      val.appendChild(document.createTextNode("  und " + fmt(row.und[u], 2)));
+      val.appendChild(document.createTextNode("  und " + fmt(row.und[u], 2) +
+        (row.depth && row.depth[u] != null ? ", depth " + row.depth[u] + "/5" : "")));
       rk.appendChild(val);
     });
     document.getElementById("bd-note").textContent = (outside ? outside + " unit(s) outside " + short(dev) + "'s responsibility set count no debt (bar faded, -). " : "") +
-      "und = understanding then (0-1)" + ((row.quizzed || []).length ? "; quizzed: " + row.quizzed.join(", ") : "; no quiz yet, so it is the own-commit prior") + ".";
+      "und = understanding then (0-1)" + ((row.quizzed || []).length ? "; quizzed: " + row.quizzed.join(", ") + "; depth = highest level passed on the question ladder (1-3 the architecture, 4-5 depth)" : "; no quiz yet, so it is the own-commit prior") + ".";
   }
 
   // -- tables ---------------------------------------------------------------------
@@ -632,7 +633,7 @@ footer p { margin: 4px 0; }
   }
   function renderUnits() {
     var dev = state.dev, target = D.settings.bus_target;
-    document.getElementById("units-sub").textContent = "Top-level units now; you% and und for " + (dev || "nobody") +
+    document.getElementById("units-sub").textContent = "Top-level units now; you%, und and depth (highest question-ladder level passed, of 5) for " + (dev || "nobody") +
       "; holders understand the unit at >= " + D.settings.known_threshold + " (bus target " + target + ").";
     var rows = top.slice().sort(function (a, b) { return (b.importance || 0) - (a.importance || 0); }).map(function (u) {
       var ok = u.holders.length >= target;
@@ -643,10 +644,11 @@ footer p { margin: 4px 0; }
       var name = u.name || u.id; if (u.scope !== "architectural") name += " (blackbox)";
       return { cells: [name, fmt(u.importance, 2), Math.round(100 * u.ai_share) + "%",
         dev && u.you[dev] != null ? Math.round(100 * u.you[dev]) + "%" : "-",
-        dev && u.understanding[dev] != null ? fmt(u.understanding[dev], 2) : "-", bus,
+        dev && u.understanding[dev] != null ? fmt(u.understanding[dev], 2) : "-",
+        dev && u.depth && u.depth[dev] != null ? u.depth[dev] + "/5" : "-", bus,
         (u.responsible || []).join(", ") || "nobody"] };
     });
-    table("units", [{ t: "Unit", wrap: true }, { t: "imp", num: true }, { t: "ai%", num: true }, { t: "you%", num: true }, { t: "und", num: true }, { t: "Holders" }, { t: "Responsible", wrap: true }], rows);
+    table("units", [{ t: "Unit", wrap: true }, { t: "imp", num: true }, { t: "ai%", num: true }, { t: "you%", num: true }, { t: "und", num: true }, { t: "depth", num: true }, { t: "Holders" }, { t: "Responsible", wrap: true }], rows);
   }
   function renderRisk() {
     var ev = strongEvents().slice().sort(function (a, b) { return a.landed < b.landed ? 1 : a.landed > b.landed ? -1 : 0; });

@@ -1102,17 +1102,19 @@ def cmd_timeline(args) -> int:
             {uid for p in pts for uid in p["devs"].get(dev, {}).get("debt", {})},
             key=lambda uid: -(pts[-1]["devs"].get(dev, {}).get("debt", {}).get(uid, 0.0)),
         )
-        cols = ["t", "sha", "index", *top_ids]
+        cols = ["t", "sha", "index", *top_ids, *(f"{uid} depth" for uid in top_ids)]
         rows = [
             [p["t"], p["sha"], p["devs"].get(dev, {}).get("index")]
             + [p["devs"].get(dev, {}).get("debt", {}).get(uid, 0.0) for uid in top_ids]
+            + [p["devs"].get(dev, {}).get("depth", {}).get(uid) for uid in top_ids]
             for p in pts
         ]
     elif unit:
-        cols = ["t", "sha", "importance", "size", *h.devs]
+        cols = ["t", "sha", "importance", "size", *h.devs, *(f"{d} depth" for d in h.devs)]
         rows = [
             [p["t"], p["sha"], *(p["units"].get(unit) or [None, None])]
             + [p["devs"].get(d, {}).get("und", {}).get(unit) for d in h.devs]
+            + [p["devs"].get(d, {}).get("depth", {}).get(unit) for d in h.devs]
             for p in pts
         ]
     else:
@@ -1138,12 +1140,13 @@ def cmd_timeline(args) -> int:
     what = (
         f"debt per unit for {dev} (its share of the index)"
         if args.dev
-        else f"understanding of {unit}"
+        else f"understanding of {unit}, and depth on the question ladder"
         if unit
         else "debt index per developer"
     )
     print(f"\nTimeline for {root.name}: {what}, {len(pts)} points")
-    shown = cols[2:] if not args.dev else cols[2:11]
+    n_debt = 1 + len(top_ids) if args.dev else 0
+    shown = cols[2:] if not args.dev else cols[2 : 2 + min(9, n_debt)]
     heads = [_label_dev(c, 12 if args.dev else 18) for c in shown]
     print(f"{'date':<10} {'sha':<8} " + " ".join(f"{c:>{max(7, len(c))}}" for c in heads))
     for r in rows:
@@ -1153,8 +1156,16 @@ def cmd_timeline(args) -> int:
             width = max(7, len(c))
             cells.append(f"{'-' if v is None else v:>{width}}")
         print(f"{r[0][:10]:<10} {r[1][:8]:<8} " + " ".join(cells))
-    if args.dev and len(cols) > 11:
-        print(f"(+ {len(cols) - 11} more units: `--format csv` has them all)")
+    if args.dev and n_debt > 9:
+        print(f"(+ {n_debt - 9} more units: `--format csv` has them all)")
+    if args.dev and pts:
+        now = pts[-1]["devs"].get(dev, {}).get("depth", {})
+        print(
+            "Depth now (highest level passed on the question ladder, of 5; - no answer): "
+            + ", ".join(f"{uid} {now.get(uid, '-')}" for uid in top_ids)
+        )
+    if unit:
+        print("depth = highest level passed on the question ladder (of 5); - = no answer yet.")
     _print_events(events, 8, args.all)
     print(
         "\nUnits are the current map's, replayed against the past; a point counts the commits "
@@ -1239,7 +1250,16 @@ def cmd_export(args) -> int:
 def _export_tables(data: dict[str, Any]) -> dict[str, tuple[list[str], list[list[Any]]]]:
     """The export as flat tables, one CSV each."""
     snaps = [
-        [p["t"], p["sha"], dev, uid, row["und"].get(uid), row["debt"].get(uid), row["index"]]
+        [
+            p["t"],
+            p["sha"],
+            dev,
+            uid,
+            row["und"].get(uid),
+            row.get("depth", {}).get(uid),
+            row["debt"].get(uid),
+            row["index"],
+        ]
         for p in data["snapshots"]
         for dev, row in p["devs"].items()
         for uid in sorted(set(row["und"]) | set(row["debt"]))
@@ -1258,7 +1278,10 @@ def _export_tables(data: dict[str, Any]) -> dict[str, tuple[list[str], list[list
         for p in data["snapshots"]
         for uid, (imp, size) in p["units"].items()
     ]
-    ev_cols = ["ts", "dev", "unit", "type", "verdict", "confidence", "evidence", "head", "question"]
+    ev_cols = [
+        "ts", "dev", "unit", "type", "level", "forced", "verdict", "confidence", "evidence",
+        "head", "question",
+    ]  # fmt: skip
     if data["evidence"] and "answer" in data["evidence"][0]:
         ev_cols += ["answer", "feedback", "reference"]
     risk_cols = [
@@ -1279,8 +1302,15 @@ def _export_tables(data: dict[str, Any]) -> dict[str, tuple[list[str], list[list
         "last",
     ]
     unit_cols = ["id", "name", "kind", "parent", "scope", "importance", "ai_share"]
+    depth_of = {
+        u["id"]: ";".join(f"{d}={n}" for d, n in sorted(u.get("depth", {}).items()))
+        for u in data["units"]
+    }
     return {
-        "snapshots": (["t", "sha", "dev", "unit", "understanding", "debt", "index"], snaps),
+        "snapshots": (
+            ["t", "sha", "dev", "unit", "understanding", "depth", "debt", "index"],
+            snaps,
+        ),
         "provenance": (["t", "sha", "commits", "ai", "assisted", "human", "bot"], prov),
         "unit_points": (["t", "sha", "unit", "importance", "size"], units_t),
         "evidence": (ev_cols, [[e.get(k) for k in ev_cols] for e in data["evidence"]]),
@@ -1298,9 +1328,10 @@ def _export_tables(data: dict[str, Any]) -> dict[str, tuple[list[str], list[list
             [[c.get(k) for k in con_cols] + [";".join(c["emails"])] for c in data["contributors"]],
         ),
         "units": (
-            [*unit_cols, "holders", "responsible"],
+            [*unit_cols, "holders", "responsible", "depth"],
             [
-                [u.get(k) for k in unit_cols] + [";".join(u["holders"]), ";".join(u["responsible"])]
+                [u.get(k) for k in unit_cols]
+                + [";".join(u["holders"]), ";".join(u["responsible"]), depth_of[u["id"]]]
                 for u in data["units"]
             ],
         ),

@@ -39,7 +39,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from . import repo, scoring
+from . import ladder, repo, scoring
 from . import units as hier
 from .contributors import as_dict, contributors
 from .ledger import Cutoff, Ledger, parse_ts
@@ -57,8 +57,8 @@ NAME = "snapshots.json"
 VERSION = 1
 # the scoring rules a stored series was made with, beyond the settings the fingerprint names:
 # 2 = Phase 3.1 (each commit's changed lines capped at its unit's size; no CAUTION event when
-# the understanding is only the own-commit prior)
-RULES = 2
+# the understanding is only the own-commit prior); 3 = Phase 3.2 (the question ladder's score)
+RULES = 3
 EVERY = "week"
 HEAVY = 0.5  # a commit this heavy by someone else is marked on that developer's line
 LEVELS = ("OUTSIDE", "HIGH", "CAUTION")
@@ -311,6 +311,9 @@ def snapshot_at(h: History, t: datetime, step: int) -> dict[str, Any]:
         quizzed = sorted(uid for uid, s in top.items() if s.source in ("quiz", "children"))
         if quizzed:
             row["quizzed"] = quizzed
+        depth = {uid: s.depth for uid, s in sorted(top.items()) if s.depth is not None}
+        if depth:
+            row["depth"] = depth  # highest ladder level passed, for units with evidence
         devs[dev] = row
     return {
         "t": _iso(t),
@@ -407,6 +410,7 @@ def fingerprint(h: History, every: str) -> dict[str, Any]:
         "units": hashlib.sha1(units.encode()).hexdigest()[:12],
         "decay": [d.model, d.rate, d.per_mass, d.floor],
         "window": h.cfg.evidence_window,
+        "evidence": h.cfg.evidence_model,
         "rules": RULES,
     }
 
@@ -520,6 +524,9 @@ def evidence(h: History, with_answers: bool = False) -> list[dict[str, Any]]:
                 "dev": dev,
                 "unit": r.get("unit"),
                 "type": kind or "quiz",
+                # the ladder level as recorded: None before the ladder (scored as 5)
+                "level": r.get("level"),
+                "forced": bool(r.get("forced")),
                 "verdict": r.get("verdict"),
                 "confidence": r.get("confidence"),
                 "evidence": scoring.evidence(r),
@@ -591,6 +598,9 @@ def unit_table(h: History, last: dict[str, Any] | None) -> list[dict[str, Any]]:
             if p.dev_share > 0:
                 you[dev] = round(p.dev_share, 3)
         und = {d: row["und"][u["id"]] for d, row in devs.items() if u["id"] in row.get("und", {})}
+        depth = {
+            d: row["depth"][u["id"]] for d, row in devs.items() if u["id"] in row.get("depth", {})
+        }
         rows.append(
             {
                 "id": u["id"],
@@ -602,6 +612,7 @@ def unit_table(h: History, last: dict[str, Any] | None) -> list[dict[str, Any]]:
                 "ai_share": round(prov.ai_share, 3),
                 "you": you,
                 "understanding": und,
+                "depth": depth,
                 "holders": sorted(d for d, x in und.items() if x >= cfg.known_threshold),
                 "responsible": h.resp.holders_of(u["id"], h.units),
             }
@@ -633,6 +644,8 @@ def export_data(
             "bus_target": cfg.bus_target,
             "heavy": HEAVY,
             "units_replayed_as_defined_now": True,
+            "evidence_model": cfg.evidence_model,
+            "ladder": {str(n): lv.name for n, lv in ladder.LEVELS.items()},
         },
         "devs": h.devs,
         "units": unit_table(h, points[-1] if points else None),

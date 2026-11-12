@@ -293,7 +293,10 @@ unit by unit:
   a quiz run asks for every missing one in one call before the questions call, and the
   question writer sees it, so the level 1 question asks what follows from it rather than what
   it says. `udebt dig` opens with the same orientation.
-- **`udebt status` shows depth** next to understanding (`1/5`, `-` with no answer).
+- **`udebt status` shows depth** next to understanding (`1/5`, `-` with no answer), and so do
+  `udebt timeline --dev` (under the table) and `--unit` (a column per developer), the
+  dashboard's unit table and breakdown, and the export (`depth` per unit and point; each
+  answer's `level`, null for one recorded before the ladder).
 - **`udebt quiz --level N`** asks every question at level N, the old flat behaviour at 5, for
   experiments. `evidence_model: "flat"` in config scores the old way, the mean of the last 5 answers.
 
@@ -520,9 +523,9 @@ the understanding of each unit, its part of the debt index (the parts sum to the
 and the index over their set (over every existing unit for a developer without one). The
 series is kept in `.udebt/snapshots.json`, committed, one point per line; a run appends only
 the points newer than the last, so it is idempotent and its diff is an append. A series made
-with another map, decay model, evidence window or interval, or whose last point a rewrite
-took off the first-parent line, is kept as it is with a note until `udebt snapshot
---rebuild`.
+with another map, decay model, evidence window, evidence model, interval or scoring rules
+(the ladder made them version 3), or whose last point a rewrite took off the first-parent
+line, is kept as it is with a note until `udebt snapshot --rebuild`.
 
 **Risk events** are the "high-debt member landed a heavy change" moments: every commit a
 developer authored (or directed, for an agent commit) weighing at least 0.1 is assessed by
