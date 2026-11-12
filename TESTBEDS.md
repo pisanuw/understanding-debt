@@ -308,6 +308,42 @@ tracing SDK, model flavors, the web UI, the AI Gateway (26% AI) and others. mlfl
 decisions are 21 human and 5 assisted, and none is among its 1,563 commits authored by the
 Copilot agent. That may be right (small fixes) or a bias, and has not been checked.
 
+**Synthetic replication** (e2485d4, 13 more owner-approved calls, 14 min). Each repo's snapshot
+is the `--suggest mshare:0.35` commit; huggingface_hub also ran three snapshots sharing one
+question set. 12 units x 2 questions per snapshot.
+
+| repo, snapshot | share vs wrongness | mass vs wrongness | observed | predicted (rmse) | 0.9^mass (rmse) |
+|---|---|---|--:|--:|--:|
+| huggingface_hub `bb3d3b55` 2026-01-29 (first run) | **0.82, p 0.002** | 0.24, p 0.23 | 0.75 | 0.53 | – |
+| sentry-javascript `b52283ee` 2026-06-19 | **0.62, p 0.017** | 0.27, p 0.19 | 0.56 | 0.35 (0.34) | 0.09 (0.60) |
+| mlflow `89843ef8` 2026-01-28 | **0.74, p 0.004** | **0.53, p 0.039** | 0.63 | 0.50 (0.24) | 0.02 (0.67) |
+| huggingface_hub `24473944` 2026-06-26 | **0.59, p 0.021** | 0.37, p 0.12 | 0.71 | 0.78 (0.21) | 0.51 (0.41) |
+| huggingface_hub `bb3d3b55` 2026-01-29 | **0.57, p 0.029** | 0.09, p 0.39 | 0.58 | 0.53 (0.25) | 0.36 (0.41) |
+| huggingface_hub `1ebdbf95` 2025-05-23 | **0.71, p 0.007** | -0.08, p 0.60 | 0.56 | 0.37 (0.31) | 0.23 (0.49) |
+
+Correlations are Spearman rho with a one-sided permutation p, over 12 units.
+
+- **The share of a unit changed since the snapshot predicts wrongness in all six runs** (rho
+  0.57–0.82, every p < 0.03). Raw weighted mass does so in one run of six.
+- **Older snapshots score worse.** On huggingface_hub the three snapshots score 0.71, 0.58
+  and 0.56. On the same unit, the snapshot with more mass since did worse 14 times, better 4
+  times and the same 15 times (tau 0.56). The tool's pooled correlation (n = 36, not
+  independent) uses mass and is not significant (0.19, p 0.13); a pooled figure on share
+  would match the per-snapshot result.
+- **`0.9^mass` decay is far too steep.** It predicts 0.02–0.51 where 0.56–0.71 is observed
+  (rmse 0.41–0.67). The share-based prediction is much closer (rmse 0.21–0.34) but still
+  pessimistic for old snapshots (0.37 vs 0.56) and slightly optimistic for the newest (0.78
+  vs 0.71).
+- **Gaps, not misconceptions.** Mostly-new units scored worse than mostly-edited ones in 5
+  of 6 runs (mlflow tied), often through `unknown` answers. 1 of 144 answers was confidently
+  wrong, so the synthetic setup barely tests the misconception penalty.
+- **Question sets vary.** The same snapshot (`bb3d3b55`) scored 0.75 with rho 0.82 on one
+  question set and 0.58 with rho 0.57 on another. One question set per repo is not enough to
+  fix the curve's level.
+- The answerer and the grader are the same model family, and the answerer can infer from
+  names and general knowledge. These runs support the ranking (share changed orders the
+  units), not an absolute calibration.
+
 ## Caveats
 
 - **Disclosure-only.** Every AI share is a lower bound. Zed (2%), Ruff (2%) and openai/codex
