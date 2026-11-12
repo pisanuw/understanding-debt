@@ -347,6 +347,47 @@ June refactor) every touched unit is CAUTION for the sole author, heaviest first
 **Exit** when the dashboard for digitalme shows the June 2026 refactor as a visible debt
 step and a quiz as a visible drop.
 
+**Status 2026-11-12: done; the exit check is partial** (no quiz has been taken on
+digitalme, so there is no drop to show).
+
+| item | status |
+|---|---|
+| replay | done: every developer (footprint >= 0.1, evidence or a set) on every top-level unit at each point, with `status`'s scoring code at an explicit cut-off (`ledger.Cutoff`): commits on the first-parent line by then (branches with their merge), evidence by then, sizes from that tree, the current map's units replayed against the past (absent until touched, importance from churn up to the point); per point also mass by class and each developer's index over their set |
+| snapshots | done: `.udebt/snapshots.json`, one committed file rather than `snapshots/*.json`, one point per line; weekly (Mondays UTC), `day` or `mass:N` (config `snapshot_every`); `udebt snapshot` appends only newer points; a fingerprint marks a stale series, `--rebuild` |
+| `udebt timeline` | done: `--dev`, `--unit`, `--format table\|csv\|json`, with the strongest risk events |
+| `udebt export` | done: `udebt-export` v1 JSON or eight CSV tables (snapshots, provenance, unit points, evidence, risk events, heavy commits, contributors, units), no answer text unless `--with-answers`, gitignored `.udebt/export/` |
+| `udebt dashboard` | done: one self-contained HTML file (inline CSS, hand-written JS, inline SVG, no request), a line per developer, crosshair tooltip, click or arrow keys for the per-unit breakdown (segmented bar and ranked list), quiz and dig markers, rugs for the developer's risk events and others' heavy commits (weight >= 0.5), contributors, units (ai%, you%, holders, bus target), risk events, the series as a table; light and dark; checked with Playwright at 1280 and 390 px |
+| signals | done: risk events recomputed from history (each developer commit with weight >= 0.1 against their understanding at the step before it landed), stored with the series; `udebt risk --history [--since] [--all]` |
+
+| | digitalme | dsa-instructor | this repository |
+|---|--:|--:|--:|
+| commits | 190 | 2,510 | 38 |
+| points (interval) | 12 (week) | 19 (week) | 11 (mass:2) |
+| risk events: OUTSIDE / HIGH / CAUTION | 0 / 4 / 308 | 0 / 143 / 97 | 0 / 40 / 75 |
+| `udebt snapshot --rebuild`, cold | 0.6 s | 5.1 s | 0.2 s |
+| `udebt dashboard`, series current | 0.2 s | 1.2 s | 0.1 s |
+| `snapshots.json` | 117 KB | 106 KB | 52 KB |
+| dashboard file | 184 KB | 306 KB | 101 KB |
+| render in Chromium (load event) | ~50 ms | ~65 ms | ~40 ms |
+
+The strongest risk events (all HIGH; the one developer's set covers every unit he touched,
+so OUTSIDE never fires): on digitalme `557eb8c` (2026-05-25, faq-cache-tts, understanding
+then 0.25, weight 0.80, mass 0.70), `97ef5fe` (2026-05-15, frontend-spa, 0.00, weight 1.00,
+the unit's first big change), `4f6903d` (2026-05-30, safety-guardrails, 0.25, weight 0.68);
+on dsa-instructor `9e603f9` (2026-10-27, deploy-ops, 0.06, weight 1.00: the off-site backup
+catch-up in a unit the agents had rebuilt), `f900b16` (2026-06-11, agent-turn-pipeline,
+0.26, weight 1.00: the single supervised turn pipeline), `0a293ad` (2026-10-22,
+offline-pipeline, 0.22, weight 0.87). The June refactor on digitalme (`e45fe82`, landed
+2026-06-02) is a CAUTION event on eight units (understanding 0.47-0.50) and the largest
+weekly step after the first, 51.8 to 56.3: visible but small, because a sole author's own
+assisted commit only halves his share. dsa-instructor's index climbs from 72 to 96 between
+September and November as agent commits overtake his.
+
+Screenshots at 1280 and 390 px in light and dark showed and fixed: a clipped rug label, a
+cramped two-column table layout, unit names breaking mid-word at phone width, tooltip
+values wrapping, colliding time labels on a one-day history, and an x-axis with no labels
+under two days. No horizontal page scroll at 390 px, no console error, no request.
+
 ## Phase 4: hosted (Netlify, Render, Supabase) with the CLI as the local twin
 
 **Adds**
@@ -369,6 +410,25 @@ step and a quiz as a visible drop.
 
 **Assumes** metadata-only storage, advisory checks by default, and an org-supplied API key
 for the hosted model calls.
+
+**What Phase 3 leaves for it to reuse** (2026-11-12):
+
+- **The import contract**: `udebt export` (`udebt-export` v1) is the payload `udebt push`
+  sends; its tables (snapshots per developer and unit, unit points, provenance, evidence
+  without answers, risk events, heavy commits, contributors, units) map one to one onto
+  Supabase tables, and the CSV form is their bulk load.
+- **The worker's scoring**: `compute_scores` with a `Cutoff` and a `Ledger` is the whole
+  replay; the worker runs `replay.ensure` on a fetched clone and writes the new points and
+  events. Points are append-only and fingerprinted, so a re-run after a push inserts rows
+  and a map change is an explicit rebuild.
+- **The live dashboard**: `udebt/dashboard.html` reads one JSON object in the export's
+  shape; the SPA can start as that page with the blob replaced by an API fetch, scoped by
+  the permission model (a member's view drops other developers' rows).
+- **The PR check**: a risk event is exactly the advisory verdict a check run posts, and
+  `risk --history` is its backfill.
+- Still missing: identity mapping to GitHub users (the export keys developers by primary
+  email), the per-repository decay rate the Phase 1.4 runs ask for, and a cap on the
+  developers a large team's series carries.
 
 **Exit** when one team uses the hosted dashboard for a month and the CLI and server agree
 on every number.

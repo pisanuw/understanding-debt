@@ -251,6 +251,42 @@ acceptable.
     throwaway attributes file). `commits.json` v5, parsed cache `ver` v3. Changes no commit
     on the five testbeds (none uses the table form).
 
+- **Phase 3, time series and the local dashboard (2026-11-12)**:
+  - **Snapshots committed, one file**: `.udebt/snapshots.json` (not a `snapshots/`
+    directory), compact JSON, one point and one risk event per line, so a commit of it is
+    an append. `udebt snapshot` appends only points newer than the last (idempotent); a
+    fingerprint (map `generated_at`, a hash of unit ids, paths and centrality, decay model
+    and rates, evidence window, interval) or a last point off the first-parent line makes
+    the stored series stale, kept with a note until `--rebuild`.
+  - **Units replayed as defined now** (owner): the current map's units against the past;
+    a unit no commit had touched yet is absent at a point; importance from the churn up to
+    the point (the same `set_importance` as `map --rescore`), centrality from today; sets
+    and scope as today. Weights are today's too.
+  - **The repository at a point** is the first-parent line up to a commit: a branch lands
+    with its merge, a point's time is the first-parent commit's author time, kept
+    monotone; evidence counts up to that time. Weekly points fall on Mondays 00:00 UTC
+    (idle weeks skipped); `day` and `mass:N` are the alternatives; a last point at the
+    latest commit or evidence.
+  - **Same scoring code**: `compute_scores` takes a `Cutoff`; `status` is the case without
+    one. A per-map `Ledger` holds each commit's attribution and lines per unit, so a replay
+    costs a filter per score, not a pass over history.
+  - **Developers in the series**: human-led footprint of at least 0.1 mass (directed agent
+    work at half), or evidence, or a responsibility set; agents and bots are not
+    developers.
+  - **Risk events from history**: each commit a developer authored or directed, weight
+    >= 0.1, assessed by `risk.assess` against their understanding at the step before it
+    landed, evidence before its author time; one event per unit at OUTSIDE, HIGH or
+    CAUTION. Listings show OUTSIDE and HIGH by default.
+  - **Export** (`udebt-export` v1, JSON or CSV tables, gitignored `.udebt/export/`) carries
+    no answer text unless `--with-answers` (answer, feedback, reference dropped; question,
+    verdict, confidence kept), matching Phase 4's metadata-only storage.
+  - **Dashboard**: one self-contained HTML file from the package template
+    `udebt/dashboard.html`, data as one JSON blob; the reference categorical palette from
+    the dataviz guidance, validated in both modes (three light slots under 3:1 contrast,
+    hence direct end labels and the series table). This repository's dashboard is
+    committed as the dogfood example, with `snapshot_every: "mass:2"`.
+  - Dig records carry `source: "dig"` (older ones are recognised by their reference).
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.
@@ -294,6 +330,18 @@ acceptable.
   digitalme, 0.14 on dsa-instructor; the Phase 1.4 run under-predicts dsa-instructor's
   scores by 0.3-0.45). Calibrate the rate per repository from its own quizzes once there
   are some, keeping ln 4 as the default?
+- Replayed risk events flood with CAUTION for a sole developer: the own-commit prior stops
+  at 0.5, under the 0.6 threshold, so every commit of theirs with mass >= 0.1 is CAUTION
+  (308 of 312 events on digitalme). Should the replay (and `risk`) leave out CAUTION
+  where the understanding is only the prior, or should the threshold apply to quizzed
+  understanding only?
+- Phase 3's exit check needs a quiz on digitalme to show "a quiz as a visible drop"; there
+  are no quiz records on any testbed yet. The June refactor shows as the largest weekly
+  step after the first (51.8 to 56.3), small because the sole author's own assisted
+  commit only halves his share.
+- Replay keeps every developer with 0.1 of footprint; a large external team (prefect,
+  go-git) would give hundreds of lines. Cap the dashboard at the N largest footprints, or
+  group the rest?
 - The dogfood `.udebt/map.json` here was mapped from the old miner, which found 3
   candidates in this repository; the new one finds 18, those 3 among them, so a
   re-map would link more history. Not re-run, to save the call.

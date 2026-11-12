@@ -28,7 +28,10 @@ human commits, AI-assisted commits and AI-authored commits, and uses the `claude
    view is useful before the first quiz;
 7. **flag** changes that land weight in units the author does not understand, most strongly
    outside their responsibility set;
-8. **dig** into the worst unit with a short guided walkthrough that ends in a check question.
+8. **dig** into the worst unit with a short guided walkthrough that ends in a check question;
+9. **replay** all of it over the history: debt per developer and unit at every week (or N
+   units of mass), the risk events of the past, an export for the hosted version and a
+   static dashboard.
 
 ## Install
 
@@ -69,10 +72,16 @@ udebt scope <unit> blackbox    # "I choose not to understand this", for you (or 
 udebt scope <unit> blackbox --team   # for everyone: stored in the map
 udebt experiment synthetic --snapshots <rev>,... [--per-unit 2]   # validation: synthetic developers
 udebt cache [status|rebuild]   # the parsed-commit cache (gitignored)
+udebt snapshot [--every week|day|mass:N] [--rebuild]   # replay debt at past points -> .udebt/snapshots.json
+udebt timeline [--dev X] [--unit U] [--format table|csv|json]   # the series and its risk events
+udebt risk --history [--since DATE] [--all]   # every past change a developer landed, against their understanding then
+udebt export [--format csv|json] [--out PATH] [--with-answers]   # full history for the hosted import
+udebt dashboard [--out .udebt/dashboard/index.html] [--open]    # one static, self-contained HTML page
 ```
 
-Commit everything under `.udebt/` except the parsed-commit cache and the line counts
-(`sizes.json`), which `.udebt/.gitignore` keeps out. The map and `responsibility.json` are shared, each `records/<developer>.jsonl`
+Commit everything under `.udebt/` except the parsed-commit cache, the line counts
+(`sizes.json`), the export and dashboard screenshots, which `.udebt/.gitignore` keeps out;
+`snapshots.json` (the replayed series) is committed like the map. The map and `responsibility.json` are shared, each `records/<developer>.jsonl`
 file holds one developer's quiz history, so the team view and bus factor work for everyone,
 and `commits.json` holds the commit weights with their LLM refinements, paid for once.
 
@@ -405,6 +414,77 @@ A commit matching `author_emails` or `author_names` (or `authored_patterns` in t
 one of the `names` recognises, is `assisted`. An identity that a broad bot rule catches but
 that an agent really drives can be claimed back with an `ai_signatures` entry, since agent
 signatures are checked first.
+
+## Time series and the dashboard
+
+`udebt snapshot` replays the history. At each point along the first-parent line (weekly by
+default: Mondays 00:00 UTC from the first commit's week, skipping a week in which neither a
+commit nor evidence arrived; `--every day`, or `--every mass:N` for a point each time N
+more units of weighted mass have landed; config `snapshot_every`) it scores every developer
+with a footprint (0.1 of human-led mass), a responsibility set or evidence, on every
+top-level unit, with the same code `status` uses, at an explicit cut-off:
+
+- only the commits on the first-parent line by then; a branch lands when its merge does,
+  and a point's time is its first-parent commit's author time (never going back);
+- only the evidence recorded by then;
+- unit sizes from that point's tree, for the share decay;
+- **the units of the current map, replayed against the past.** Units are defined now and
+  history is replayed against them: a unit no commit had touched yet does not exist at a
+  point and stays out of the indexes; importance comes from the churn up to the point,
+  centrality from today's map; responsibility sets and scope are today's.
+
+Each point records the commits and mass so far by class (ai, assisted, human, and bot
+commits' weight beside them), each existing unit's importance and size, and per developer
+the understanding of each unit, its part of the debt index (the parts sum to the index)
+and the index over their set (over every existing unit for a developer without one). The
+series is kept in `.udebt/snapshots.json`, committed, one point per line; a run appends only
+the points newer than the last, so it is idempotent and its diff is an append. A series made
+with another map, decay model, evidence window or interval, or whose last point a rewrite
+took off the first-parent line, is kept as it is with a note until `udebt snapshot
+--rebuild`.
+
+**Risk events** are the "high-debt member landed a heavy change" moments: every commit a
+developer authored (or directed, for an agent commit) weighing at least 0.1 is assessed by
+`udebt risk`'s rule against their understanding at the step before it landed, with the
+evidence recorded before its author time, and each unit at OUTSIDE, HIGH or CAUTION is an
+event. They are stored with the series and extended the same way. `udebt risk --history`
+lists OUTSIDE and HIGH, strongest first (`--all` adds CAUTION, `--since` cuts the start);
+`udebt timeline` and the dashboard list them too.
+
+`udebt timeline` prints the series: every developer's index per point; with `--dev`, that
+developer's debt per unit; with `--unit`, every developer's understanding of one unit;
+`--format csv` or `json` for scripts. `udebt export` writes the whole history in one JSON
+file (`udebt-export` version 1) or a directory of CSV tables, by default under the
+gitignored `.udebt/export/`: settings, units (importance, ai share, each developer's share
+and understanding, holders, who is responsible), responsibility sets, contributors with
+their labels, the snapshots, the evidence, the risk events and the commits weighing 0.5 or
+more. Evidence goes without answer text (the answer, the grader's feedback and the
+reference answer) unless `--with-answers`: the question text, verdict and confidence are
+metadata, the answers are not. This is the file the hosted version imports (ROADMAP Phase 4).
+
+`udebt dashboard` writes `.udebt/dashboard/index.html`: one file with its CSS and its
+hand-written JavaScript inline, charts drawn as inline SVG, no CDN, no web font and no
+request of any kind, so it opens offline and from `file://`. The data is the export (no
+answers) in one `<script type="application/json" id="udebt-data">` tag; regenerate the file
+or swap the blob. It shows:
+
+- a line per developer of the debt index over time, with a crosshair tooltip; click a point
+  (or use the arrow keys) to see that developer's debt per unit at that point, as a
+  segmented bar of the five units with most debt and the rest, and as a ranked list;
+- markers for quiz and dig evidence on the developer's line, and two rugs under the time
+  axis: the developer's risk events, and commits weighing 0.5 or more by anyone else;
+- summary tiles, a contributors table with the labels from `udebt contributors`, a units
+  table with ai%, you%, understanding, holders against the bus target and who is
+  responsible, the risk events, and the whole series as a table;
+- light and dark from `prefers-color-scheme`, one hue per contributor from a validated
+  categorical palette in fixed order, status colours only for risk levels and the bus
+  target and always with a label; it keeps to phone width (tables scroll in their cards).
+
+On digitalme (190 commits) the weekly series has 12 points and 312 risk events (4 HIGH),
+rebuilt cold in 0.6 s; the dashboard is 184 KB and renders in about 50 ms. On dsa-instructor
+(2,510 commits) 19 points and 240 events (143 HIGH), 5.1 s cold and 1.2 s warm, 306 KB,
+about 65 ms. This repository's own dashboard, `.udebt/dashboard/index.html`, is committed as
+the example (every 2 units of mass, since its history spans two days).
 
 ## Experiments
 

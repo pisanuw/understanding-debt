@@ -54,3 +54,9 @@
 2026-11-12 [code] TOML dependency tables ([dependencies.x] version = ...) are pins: git labels -U0 hunks with the table. commits.json v5, ver v3. No testbed commit changes.
 2026-11-12 [note] Fit: exp RMSE 0.229, (1-s)^k 0.226, 0.9^mass 0.265, mass share 0.165. Per repo k 2.39 (digitalme) vs 0.14 (dsa): the line share does not unify the two repos.
 2026-11-12 [note] dsa-instructor at mass share 0.30/0.70 (5 calls): observed 0.85/0.40, share model 0.40/0.11, 0.9^mass 0.57/0.33; 12 of 12 pairs worse. Model over-decays here; not retuned.
+2026-11-12 [code] compute_scores takes an explicit Cutoff (commits landed on the first-parent line, evidence by then, that tree's sizes); a per-map Ledger holds each commit's landing per unit.
+2026-11-12 [decision] Replay: current map's units against the past (absent until touched, importance from churn so far), weekly points on the first-parent line, branches land with their merge.
+2026-11-12 [decision] Snapshots in one committed .udebt/snapshots.json, one point per line, append-only and fingerprinted (map, decay, interval); --rebuild recomputes. Config snapshot_every.
+2026-11-12 [code] udebt snapshot, timeline (table/csv/json), export (udebt-export v1, CSV tables, no answers unless --with-answers), risk --history, dashboard (self-contained HTML).
+2026-11-12 [decision] Risk events from history: each developer commit with weight >= 0.1, assessed against their understanding at the step before it landed; stored with the series.
+2026-11-12 [note] digitalme 12 points, 312 events (4 HIGH), 184 KB; dsa-instructor 19 points, 240 events (143 HIGH), 5.1 s cold, 306 KB. June refactor: index 51.8 -> 56.3. No quiz drop yet.

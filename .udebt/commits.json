@@ -154,6 +154,15 @@
    "sha": "482d1d494b36caf5de4fe109af0464605a808781",
    "weight": 0.473
   },
+  "4adc2d1047720ed49655ed7e58f24a12a7b7b60f": {
+   "effective_lines": 48,
+   "reasons": [
+    "48 effective lines"
+   ],
+   "refined": null,
+   "sha": "4adc2d1047720ed49655ed7e58f24a12a7b7b60f",
+   "weight": 0.476
+  },
   "4ff6ad09e4bd95b167760ba738aa3dd3a2e50494": {
    "effective_lines": 603,
    "reasons": [
@@ -332,6 +341,16 @@
    "refined": null,
    "sha": "f1d259c7bdca1d0c03fcce76c46c5db32b52b48f",
    "weight": 0.7
+  },
+  "f2633f843c4f6a30491356e4236700e18b7435f9": {
+   "effective_lines": 964,
+   "reasons": [
+    "964 effective lines",
+    "2 new code files"
+   ],
+   "refined": null,
+   "sha": "f2633f843c4f6a30491356e4236700e18b7435f9",
+   "weight": 0.8
   },
   "f4d9f244f4ee44f34bbbf421267fa17ab1ac6f9e": {
    "effective_lines": 1071,
