@@ -388,6 +388,32 @@ cramped two-column table layout, unit names breaking mid-word at phone width, to
 values wrapping, colliding time labels on a one-day history, and an x-axis with no labels
 under two days. No horizontal page scroll at 390 px, no console error, no request.
 
+### Phase 3.1: map paths, decay caps and refit, risk and dashboard polish
+
+**Status 2026-11-12: done.** From the e2485d4 testbed runs (TESTBEDS.md) and the Phase 3
+open questions. One `claude` CLI call (the huggingface_hub map; no retry was needed).
+
+| item | status |
+|---|---|
+| map path resolution | done: each unit and sub-unit path is kept if it names a tracked file or directory, else replaced by the one tracked path it is the tail of, else dropped into `unresolved`; counts in `map.json` `paths` |
+| coverage check and retry | done: under 50% of the clustered non-test source files, or a unit with no path left, warns and retries once with the unresolved paths and two root-relative examples (`--no-retry`); a map still short gets `warnings`, printed first by `status` |
+| map prompt | done: says paths are relative to the root, with two examples taken from the files |
+| huggingface_hub validation | done: 87 of 87 paths exact, coverage 78%, no retry (40 s); offline, the same map with the package prefix stripped resolves 84 by suffix, 6 exact, drops 3 ambiguous, leaves no unit empty |
+| per-commit cap | done: a commit's changed lines in a unit are capped at the unit's size just after it (running sum of growth); a deletion counts its size once; `chroma-integration` 43.9 to 1.32 at `42530b1` |
+| k refit | done: pooled k = 1.0 (config `decay_k`), on 108 unit-snapshots and 4 huggingface_hub aggregates; a floor was fitted and not adopted (`decay_floor`, default 0); Phase 5 |
+| synthetic report | done: predictions use the configured k; the pooled section also correlates share changed and mass share; rows carry `lines_uncapped` |
+| risk CAUTION on the prior | done: muted in the replay and in `udebt risk` (one line instead of a row); HIGH and OUTSIDE kept; digitalme 312 to 12 events, dsa-instructor 240 to 144 |
+| dashboard line cap | done: eight developers by current debt plus a dashed "others" mean, a selector that swaps a developer in; Playwright at 1280 and 390 px, light and dark |
+
+| replayed risk events | digitalme | dsa-instructor |
+|---|--:|--:|
+| Phase 3 | 312 (4 HIGH, 308 CAUTION) | 240 (143 HIGH, 97 CAUTION) |
+| caps and k = 1, prior CAUTION kept | 312 | 240 |
+| Phase 3.1 | 12 (4 HIGH, 8 CAUTION) | 144 (143 HIGH, 1 CAUTION) |
+
+The caps and the new k change no event count on digitalme or dsa-instructor (the events are
+the prior's, which neither touches enough to cross a threshold); the muting does it all.
+
 ## Phase 4: hosted (Netlify, Render, Supabase) with the CLI as the local twin
 
 **Adds**
@@ -709,6 +735,87 @@ What it suggests, untested: rank by share works better than rank by absolute mas
 0.63 to 0.77 against 0.35), but one rate does not fit both repositories under either share;
 the decay rate may need to be per repository (calibrated from its own quizzes) rather than
 global. Do not retune on synthetic runs alone (BRIEFING open questions).
+
+**The Phase 3.1 refit, 2026-11-12** (no model call: a re-analysis of the recorded reports).
+Every unit-snapshot of the four local reports, scored correct 1, partial 0.5, wrong and
+unknown 0: digitalme `44f520b` (12 units, one question each) and `7f463b1`, `f557893`,
+`7b1895d` (36); dsa-instructor `4f56755`, `a2245bd`, `b5436cb` (36) and `42530b1`,
+`f13a9cf` (24), 108 in all, the share recomputed with and without the per-commit cap (the
+uncapped recomputation reproduces each report's own share and the Phase 1.4 fit, k 1.370,
+RMSE 0.229 on its 72 points). huggingface_hub's runs exist only as summaries (the other
+session's reports are not here), so each is one aggregate observation: the mean observed
+score over its 12 units against the mean prediction over the 12 units of today's map at the
+same snapshot, weighted 12. The proxy predicts what the runs predicted (ln 4: 0.55, 0.79,
+0.41 against the runs' 0.53, 0.78, 0.37). The four: `bb3d3b5` on two question sets (0.75,
+0.58), `2447394` (0.71) and `1ebdbf9` (0.56). sentry-javascript's and mlflow's runs (one
+snapshot each, share vs wrongness significant) came with no mean observed score and their
+checkouts are not here, so they are not in the fit.
+
+| set | n | exp, uncapped: k / RMSE | exp, capped: k / RMSE | floor + (1 - floor) exp, capped: k / floor / RMSE | mass share: k / RMSE |
+|---|--:|---|---|---|---|
+| digitalme | 48 | 2.72 / 0.232 | 2.72 / 0.232 | 6.0 (grid edge) / 0.18 / 0.222 | 3.01 / 0.220 |
+| dsa-instructor | 60 | 0.43 / 0.191 | 0.42 / 0.165 | 0.62 / 0.25 / 0.161 | 1.03 / 0.152 |
+| huggingface_hub (4 aggregates) | 4 x 12 | 0.93 / 0.091 | 0.93 / 0.091 | 6.0 (grid edge) / 0.55 / 0.075 | 1.49 / 0.074 |
+| pooled, unit points | 108 | 1.10 / 0.300 | 1.06 / 0.294 | 2.46 / 0.33 / 0.283 | 1.87 / 0.224 |
+| **pooled, with huggingface_hub** | 156 | 1.04 / 0.255 | **1.02 / 0.251** | 2.39 / 0.35 / 0.241 | 1.75 / 0.193 |
+
+RMSE of the capped share at a fixed k (digitalme, dsa-instructor, huggingface_hub, pooled
+with it): ln 4 0.286, 0.312, 0.135, 0.261; **k = 1.0** 0.342, 0.251, 0.093, 0.251; the
+floor fit 0.325, 0.245, 0.091, 0.241. The cap's residual: it changes only dsa-instructor,
+whose RMSE at its own k goes 0.191 to 0.165 and at k = 1.0 0.262 to 0.251; no digitalme or
+huggingface_hub commit reaches its unit's size. Pooled rank correlation with wrongness:
+capped share 0.66 (uncapped 0.66), mass share 0.79, mass 0.60.
+
+| snapshot | mean capped share | observed | ln 4 | k = 1.0 | floor fit |
+|---|--:|--:|--:|--:|--:|
+| digitalme `44f520b` | 0.61 | 0.17 | 0.46 | 0.57 | 0.54 |
+| digitalme `7f463b1` | 0.003 | 1.00 | 1.00 | 1.00 | 1.00 |
+| digitalme `f557893` | 0.32 | 0.46 | 0.66 | 0.74 | 0.68 |
+| digitalme `7b1895d` | 0.78 | 0.21 | 0.37 | 0.48 | 0.49 |
+| dsa-instructor `4f56755` | 0.001 | 0.98 | 1.00 | 1.00 | 1.00 |
+| dsa-instructor `a2245bd` | 0.09 | 0.94 | 0.90 | 0.92 | 0.90 |
+| dsa-instructor `b5436cb` | 0.28 | 0.96 | 0.70 | 0.77 | 0.72 |
+| dsa-instructor `42530b1` | 0.72 (4.28 uncapped) | 0.85 | 0.42 | 0.52 | 0.51 |
+| dsa-instructor `f13a9cf` | 2.27 (5.83 uncapped) | 0.40 | 0.11 | 0.20 | 0.37 |
+| huggingface_hub `2447394` | 0.22 | 0.71 | 0.79 | 0.83 | 0.80 |
+| huggingface_hub `bb3d3b5`, two question sets | 0.53 | 0.75, 0.58 | 0.55 | 0.63 | 0.61 |
+| huggingface_hub `1ebdbf9` | 0.75 | 0.56 | 0.41 | 0.51 | 0.51 |
+
+Chosen: **exp(-k x capped share), k = 1.0**, config `decay_k`. The pooled fit is 1.02 (1.06
+without huggingface_hub, 1.00 with its first summary alone), so 1.0 costs nothing in RMSE
+and reads plainly: 37% is left once a unit's worth of change has landed. The floor improves
+the pooled RMSE by 0.010 and is not adopted: per repository it runs to the grid edge, a step
+down to a plateau, on digitalme and huggingface_hub, so what it fits is the level an LLM
+answerer keeps when it reads its snapshot in full, and that level moves with the question
+set as much as with the snapshot (below). As a product default a floor of 0.35 would keep a
+unit rewritten many times over a third understood. `decay_floor` (default 0) is there for a
+team that wants it. Reading it honestly:
+
+- **One k still does not fit all three repositories**: 2.72, 0.42 and 0.93. The pooled k is
+  optimistic on digitalme (0.57 predicted against 0.17 observed at `44f520b`) and
+  pessimistic on dsa-instructor's older snapshots (0.52 against 0.85, 0.20 against 0.40) and
+  huggingface_hub's oldest (0.51 against 0.56). Per-repository calibration from real quizzes
+  stays the open question.
+- **The cap fixes the artifact it was aimed at, not every large share.** `chroma-integration`
+  at `42530b1` goes from 43.9 to 1.32; at `f13a9cf` from 52.3 to 9.7, because while the unit
+  held 77,000 lines of raw JSON several re-ingests each changed thousands of them, all
+  counted against the 1,731 lines left. A per-commit fraction (each commit's lines over the
+  unit's size after it, summed) would read 1.6 there and fits a little better pooled (RMSE
+  0.275 at k 0.79 against 0.282 for the capped share, on the first fit's points); it is a
+  change of definition, left as an open question.
+- **The mass share still fits best** (pooled RMSE 0.193, rho 0.79), as in Phase 1.4.
+- **Question-set variance is as large as the decay effect.** The same huggingface_hub
+  snapshot `bb3d3b5` scored 0.75 (rho 0.82) on one question set and 0.58 (rho 0.57) on
+  another; between huggingface_hub's newest and oldest snapshots the mean score moves 0.71 to
+  0.56. The ranking (share against wrongness) held in all six external runs (rho 0.57 to
+  0.82, every p < 0.03), but the level of the curve, which is what k and a floor fit, is
+  not pinned by one question set: fitting it needs several question sets per snapshot or
+  more questions per unit, and that is the next experiment's design, before any further
+  refit.
+- From the other session's runs (summaries only): mostly-new units were worse in 5 of 6,
+  mostly through "unknown" answers; 1 of 144 answers was confidently wrong; 0.9^mass
+  predicted 0.02-0.51 against 0.56-0.71 observed. Raw mass correlated with wrongness
+  significantly once (mlflow, rho 0.53, p 0.039); the share did in all six.
 
 ## Decisions assumed in this roadmap
 

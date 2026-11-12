@@ -216,6 +216,55 @@ The major-version rule (Phase 1.3, ROADMAP) changes 4 of huggingface_hub's 2,849
 commits (ruff and mypy upgrades within 0.x, each now +0.3; mass 1314.1 to 1315.2) and no
 candidate.
 
+### Phase 3.1 re-check (2026-11-12)
+
+Path resolution (ROADMAP Phase 3.1) on the same clone, `2c61ae8`, one `udebt map` call
+(40 s, owner-approved budget of two):
+
+| | |
+|---|--:|
+| paths the model gave (units and sub-units) | 87 |
+| resolved exactly | 87 |
+| resolved by a unique suffix | 0 |
+| dropped | 0 |
+| units or sub-units left without a path | 0 |
+| coverage (clustered non-test source files; 287 source files) | 78% |
+| retry | no (not needed) |
+
+This time the model answered with root-relative paths, so the new code had nothing to
+repair; the prompt now asks for them explicitly with two examples from the files
+(`src/huggingface_hub/community.py` and `src/huggingface_hub/inference`). The failure the
+e2485d4 run hit was replayed offline on the previous map (93 paths) with
+`src/huggingface_hub/` stripped from every path: 84 resolve by suffix, 6 exactly (the
+paths outside the package), 3 are dropped as ambiguous (`__init__.py`, `lfs.py` in the
+package and in `cli/`, `constants.py` in the package and in `inference/_mcp/`), and no unit
+is left empty, so the map would have scored nearly as the repaired one did.
+
+The new map: 12 units, 7 sub-units (`cli` 4, `inference-client` 3).
+
+| unit | churn (mass) | importance | paths | commits | ai share |
+|---|--:|--:|--:|--:|--:|
+| hf-api | 242.05 | 1.00 | 7 | 735 | 0.07 |
+| download-cache | 91.99 | 0.75 | 8 | 289 | 0.05 |
+| cli | 129.84 | 0.69 | 26 | 313 | 0.25 |
+| http-errors | 31.21 | 0.65 | 5 | 124 | 0.08 |
+| inference-client | 103.75 | 0.65 | 6 | 245 | 0.02 |
+| upload-commit | 27.25 | 0.53 | 6 | 102 | 0.05 |
+| auth-config | 29.74 | 0.53 | 7 | 136 | 0.05 |
+| integrations | 57.42 | 0.46 | 6 | 203 | 0.02 |
+| hffs-buckets | 34.66 | 0.42 | 5 | 103 | 0.08 |
+| mcp-agents | 13.57 | 0.26 | 1 | 36 | 0.03 |
+| sandbox | 8.86 | 0.26 | 3 | 21 | 0.41 |
+| webhooks | 4.52 | 0.25 | 2 | 19 | 0.00 |
+
+No commit on huggingface_hub reaches its unit's size, so the per-commit cap changes no share
+there (at `bb3d3b5` the units' mean share is 0.53 capped or not). Its four summarised
+synthetic runs enter the decay refit as aggregate points (ROADMAP Phase 5): per repository k
+0.93. The replay with today's map, every 25 units of mass: 53 points, 378 developers with a
+footprint, 1,383 risk events (1,180 HIGH, 0 OUTSIDE: there is no responsibility set), 94 s,
+8.3 MB; the dashboard draws the eight developers with the most debt now, all near 100 (they
+touched little), the main developer swapped in at 90.4, and the mean of the other 370.
+
 ## Runs on e2485d4 (2026-11-12, owner-approved `claude` CLI calls)
 
 **Unit paths are not validated.** A second `udebt map` on huggingface_hub (one call, 49 s)

@@ -68,3 +68,5 @@
 2026-11-12 [decision] CAUTION raised only by the own-commit prior is muted: replay drops it, live `risk` names it in a line; HIGH, OUTSIDE stay. Events: digitalme 312 -> 12, dsa-instructor 240 -> 144.
 2026-11-12 [code] Synthetic report's pooled section also correlates share changed and mass share; optional config decay_floor (floor + (1 - floor) x exp(-k s)), default 0.
 2026-11-12 [code] Dashboard draws at most eight developers (most debt now) plus a dashed "others" mean; the selector swaps a developer in. Checked at 1280/390 px, light and dark, 378-dev hf.
+2026-11-12 [note] hf map 2c61ae8: 87/87 paths exact, coverage 78%, no retry; offline, prefix-stripped paths resolve 84 by suffix, 6 exact, 3 dropped. Refit: pooled k 1.02, floor fit 0.35 not adopted.
+2026-11-12 [doc] README, BRIEFING (path rules, caps, k = 1.0, muted CAUTION, line cap), ROADMAP Phase 3.1 and the Phase 5 refit with question-set variance, TESTBEDS Phase 3.1 re-check.

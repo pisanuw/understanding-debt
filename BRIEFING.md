@@ -287,6 +287,61 @@ acceptable.
     committed as the dogfood example, with `snapshot_every: "mass:2"`.
   - Dig records carry `source: "dig"` (older ones are recognised by their reference).
 
+- **Phase 3.1, map paths, decay caps and refit, risk and dashboard polish (2026-11-12)**:
+  - **Map paths are resolved, not trusted**: every unit and sub-unit path the model gives is
+    kept if it is a tracked file or a directory holding tracked files (after stripping `./`
+    and slashes); else replaced by the one tracked file or directory whose path ends in it
+    (`hf_api.py` -> `src/huggingface_hub/hf_api.py`); else dropped into the unit's
+    `unresolved`. Exact wins over suffix, so a package-relative `utils` resolves to a
+    top-level `utils/` when one exists; an ambiguous tail (`__init__.py`, `lfs.py` in two
+    places) is dropped rather than guessed. A parent's paths are resolved before its
+    sub-units' are merged in. `map.json` records the counts (`paths`).
+  - **Retry once, then flag**: under 50% coverage of the clustered non-test source files, or
+    a unit left with no path, `udebt map` warns and asks once more with the unresolved paths
+    and two real root-relative examples appended (`--no-retry` skips it); the better answer
+    (coverage, then fewer empty units, then fewer drops) is kept. A map still short is
+    written with `warnings`, which `status` prints before anything else. The prompt now says
+    paths are relative to the root and shows two examples taken from the files (the deepest
+    directory holding half the source files, a file in it and its largest subdirectory).
+  - **A commit changes at most all of a unit**: its changed lines in a unit are capped at
+    the unit's size just after it (at least one line). A rewrite counts the unit once, not
+    old plus new lines; deleting most of a unit counts what is left. A whole-file deletion
+    counts its size once (numstat's deletions). "Just after" rather than "before" because
+    the artifact was a deletion: capped at the size before, the 74,700 raw JSON lines
+    `eb5a9a3d` removed from dsa-instructor's `chroma-integration` would still count against
+    the 1,731 lines left (share 43.9); capped after, the share is 1.32. The size after each
+    commit is the running sum of insertions minus deletions under the unit in history order
+    (no tree reads); at HEAD it matches the blob count to within 54 lines on every unit of
+    the four repositories checked. On a branch it also counts what the main line added
+    meanwhile, which the cap tolerates. The parsed-commit cache keeps per-file deletions
+    (format 2, one rebuild).
+  - **k refitted, pooled: 1.0** (config `decay_k`, which replaces `share_decay_rate`; a
+    non-default old value carries over, the old default ln 4 does not). Fitted on all 108
+    recorded unit-snapshots (digitalme's two runs, dsa-instructor's two) plus
+    huggingface_hub's four summarised runs as aggregate points (mean of 12 units, weight 12,
+    shares from today's map at the same snapshot): pooled 1.02 (1.06 without huggingface_hub),
+    rounded to 1.0; per repository 2.72, 0.42 and 0.93. The cap moves dsa-instructor's fit
+    (RMSE 0.191 to 0.165) and nothing else. A floor, floor + (1 - floor) x exp(-k s), fits
+    pooled at floor 0.35, k 2.39, RMSE 0.241 against 0.251: not adopted, because per
+    repository it runs to a step (k at the grid edge, 6) onto a plateau whose level is within
+    question-set variance (0.75 and 0.58 on one snapshot), the answerer is an LLM that reads
+    its snapshot in full, and a floor of a third would keep a unit rewritten many times a
+    third understood. It is there as config `decay_floor` (default 0). The mass share still
+    fits better (pooled RMSE 0.193 at k 1.75; rho with wrongness 0.79 against 0.66).
+  - **CAUTION on the prior alone is muted**: a CAUTION whose understanding is only the
+    own-commit prior is reported OK and `muted`; the replay leaves it out of the risk events
+    and `udebt risk` names it in one line ("Not flagged: ... only the own-commit prior").
+    HIGH and OUTSIDE still fire on a prior; a unit with no understanding at all can still be
+    CAUTION. Events: digitalme 312 to 12, dsa-instructor 240 to 144. The replay fingerprint
+    carries a rules version (2), so series made before go stale.
+  - **Dashboard lines capped at eight**: the developers with the highest debt index at the
+    latest point (ties to more commits), plus one dashed line for the mean of the rest; the
+    Developer selector groups "On the chart" and "Swap onto the chart", and picking one of the
+    rest swaps them into the eighth slot (later picks reuse that slot). The page opens on the
+    developer with most commits, swapped in if needed. The series table follows the lines.
+    Unit colours in the breakdown reuse the palette from the start when eight developer
+    lines leave fewer than three free slots.
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.
@@ -317,7 +372,9 @@ acceptable.
 - (Answered 2026-11-12, Phase 1.4: 10 slots per period, proportional to mass; decay by the
   share of a unit changed; the next dsa-instructor run picks snapshots by share. See
   Decisions.)
-- The line share the owner specified (weighted changed lines over size in lines) fits the
+- (Partly answered in Phase 3.1: lines kept, each commit capped at its unit's size, k refit
+  to 1.0. See Decisions. The rest of this question stands.) The line share the owner
+  specified (weighted changed lines over size in lines) fits the
   two synthetic runs worse than the mass share does (RMSE 0.229 against 0.165): bulk
   content (curriculum JSON and rendered figures in dsa-instructor's `offline-pipeline`,
   23,800 weighted lines in 9 days, mostly two course additions) and one large commit in a
@@ -330,7 +387,8 @@ acceptable.
   digitalme, 0.14 on dsa-instructor; the Phase 1.4 run under-predicts dsa-instructor's
   scores by 0.3-0.45). Calibrate the rate per repository from its own quizzes once there
   are some, keeping ln 4 as the default?
-- Replayed risk events flood with CAUTION for a sole developer: the own-commit prior stops
+- (Answered in Phase 3.1: CAUTION from the prior alone is muted, HIGH and OUTSIDE kept.)
+  Replayed risk events flood with CAUTION for a sole developer: the own-commit prior stops
   at 0.5, under the 0.6 threshold, so every commit of theirs with mass >= 0.1 is CAUTION
   (308 of 312 events on digitalme). Should the replay (and `risk`) leave out CAUTION
   where the understanding is only the prior, or should the threshold apply to quizzed
@@ -339,9 +397,23 @@ acceptable.
   are no quiz records on any testbed yet. The June refactor shows as the largest weekly
   step after the first (51.8 to 56.3), small because the sole author's own assisted
   commit only halves his share.
-- Replay keeps every developer with 0.1 of footprint; a large external team (prefect,
-  go-git) would give hundreds of lines. Cap the dashboard at the N largest footprints, or
-  group the rest?
+- (Answered in Phase 3.1 for the chart: eight lines by current debt plus "others", with a
+  swap selector.) Replay keeps every developer with 0.1 of footprint; a large external team
+  (prefect, go-git) would give hundreds of lines. The replay itself still scores all of them:
+  huggingface_hub has 378 such developers, 1.7 s per point.
 - The dogfood `.udebt/map.json` here was mapped from the old miner, which found 3
   candidates in this repository; the new one finds 18, those 3 among them, so a
   re-map would link more history. Not re-run, to save the call.
+- The cap leaves one large share: at dsa-instructor's `f13a9cf`, `chroma-integration` reads
+  9.7, because while the unit held 77,000 lines of raw JSON several re-ingests changed tens
+  of thousands of them, each under the cap, and all count against the 1,731 lines left.
+  Summing each commit's lines over the unit's size at that commit (a per-commit fraction,
+  min 1) instead of over the size at the cut-off would read 1.6 there and fits a little
+  better pooled (RMSE 0.275 at k 0.79 against 0.282); it changes the share's definition, so
+  it is left for the owner.
+- On a large team, the eight developers with the most debt are the least involved ones
+  (huggingface_hub: those who touched little, at index ~100). Rank the chart by footprint,
+  or by debt within each developer's set, instead?
+- k differs by repository more than between forms (2.72 digitalme, 0.42 dsa-instructor,
+  0.93 huggingface_hub): calibrate it per repository from its own quizzes once there are
+  some, with 1.0 as the default?

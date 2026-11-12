@@ -53,7 +53,7 @@ udebt directed add <session>   # agent sessions (or a whole agent) whose commits
 udebt contributors             # everyone who committed: AI, joint human-AI, human, bot, "most likely"
 udebt weigh [--refine]         # how much debt each commit can create; --refine asks claude about the heaviest
 udebt clusters                 # candidate units from imports and co-change, no LLM
-udebt map                      # clusters + history -> claude names units and sub-units -> .udebt/map.json
+udebt map [--no-retry]         # clusters + history -> claude names units and sub-units -> .udebt/map.json
 udebt map --rescore            # redo churn/importance/provenance with current weights, no LLM
 udebt units                    # the hierarchy, with scope and importance
 udebt responsibility seed      # propose each developer's set from CODEOWNERS, else footprint
@@ -204,7 +204,7 @@ For each architectural unit `u` and developer `d`:
 | responsibility set | CODEOWNERS: units where an owner owns >= 30% of the files; for a developer CODEOWNERS does not name: units where their share of the human-led mass is >= 10% (and >= 0.1), AI-authored commits left out; then curated |
 | your debt index | the debt index over your responsibility set plus the units you are touching now (uncommitted or unpushed changes); over every unit when you have no set |
 | bus target | every architectural unit should have >= `bus_target` (default 2) developers at understanding >= 0.6; the team view lists those below |
-| risk of a change | per unit touched: mass landed vs your understanding; **OUTSIDE** if the unit is outside your set, mass >= 0.1 and understanding < 0.6; HIGH if mass >= 0.3 and understanding < 0.3; CAUTION if mass >= 0.1 and understanding < 0.6; the change's verdict is its worst unit |
+| risk of a change | per unit touched: mass landed vs your understanding; **OUTSIDE** if the unit is outside your set, mass >= 0.1 and understanding < 0.6; HIGH if mass >= 0.3 and understanding < 0.3; CAUTION if mass >= 0.1 and understanding < 0.6, unless that understanding is only the own-commit prior (which stops at 0.5): then the unit is named in one line, not flagged; the change's verdict is its worst unit |
 
 Your share of a unit's commits counts AI-assisted commits at half weight, and so do agent
 commits you directed (config `directed`, see Contributors): such a commit stays `ai` for
@@ -225,7 +225,9 @@ it does not erode your prior. Four deliberate choices:
   change costs more in a small unit than in a large one. One commit counts at most the
   unit's size just after it: rewriting a unit counts it once (not its old plus its new
   lines), and deleting most of one (data files moved out of git) counts what is left, not
-  the deleted lines against a size that no longer has them. The Phase 1 rule (10 percent off
+  the deleted lines against a size that no longer has them. `decay_floor` (default 0) keeps
+  a part of the understanding however much changes, floor + (1 - floor) x exp(-k x share);
+  the refit tried it and kept the plain curve (ROADMAP Phase 5). The Phase 1 rule (10 percent off
   per unit of weighted mass, whatever the unit's size) decayed a large repository's units
   far too fast and a small one's too slowly in the synthetic runs (ROADMAP Phase 5); it is
   still there as `decay_model: "mass"`.
@@ -247,6 +249,20 @@ on a parent is evidence about the parent's decision, so its sub-units only inher
 it; quizzes on sub-units roll up to the parent. In `risk --deep`, files under a parent that
 no sub-unit covers appear as `<parent> (rest)`. Version 1 and 2 maps (flat) keep working,
 and `map --rescore` leaves their version alone.
+
+**Paths are checked before anything is scored.** The prompt says every path is relative to
+the repository root and shows two taken from the files (a source file and a directory, with
+their leading `src/` or package directory). Each path the model returns, for a unit or a
+sub-unit, is kept when it names a tracked file or a directory that holds tracked files;
+otherwise it is replaced by the one tracked file or directory whose path ends in it (a
+package-relative `hf_api.py` becomes `src/huggingface_hub/hf_api.py`); otherwise, when
+nothing or several things end in it (`__init__.py`), it is dropped and listed under the
+unit's `unresolved`. `map.json` records how many resolved each way (`paths`). If the units
+then cover under half of the clustered non-test source files, or a unit has no path left,
+`udebt map` says so and asks once more, with the paths that did not resolve and the two
+examples appended (`--no-retry` skips this); a map still short of that is written with
+`warnings`, and `udebt status` prints them before anything else. The fix for a bad map is to
+re-run `udebt map`, or to edit the paths in `map.json` and run `udebt map --rescore`.
 
 ## Responsibility sets
 
@@ -451,7 +467,9 @@ took off the first-parent line, is kept as it is with a note until `udebt snapsh
 developer authored (or directed, for an agent commit) weighing at least 0.1 is assessed by
 `udebt risk`'s rule against their understanding at the step before it landed, with the
 evidence recorded before its author time, and each unit at OUTSIDE, HIGH or CAUTION is an
-event. They are stored with the series and extended the same way. `udebt risk --history`
+event, except a CAUTION whose understanding is only the own-commit prior (a sole developer
+would otherwise get one for nearly every commit: 308 of digitalme's 312 events). They are
+stored with the series and extended the same way. `udebt risk --history`
 lists OUTSIDE and HIGH, strongest first (`--all` adds CAUTION, `--since` cuts the start);
 `udebt timeline` and the dashboard list them too.
 
@@ -472,7 +490,10 @@ request of any kind, so it opens offline and from `file://`. The data is the exp
 answers) in one `<script type="application/json" id="udebt-data">` tag; regenerate the file
 or swap the blob. It shows:
 
-- a line per developer of the debt index over time, with a crosshair tooltip; click a point
+- a line per developer of the debt index over time, at most eight (the eight with the most
+  debt now, ties to more commits) plus one dashed line for the mean of the others; the
+  Developer selector swaps any other developer onto the chart, in the eighth slot, and the
+  page opens on the developer with most commits; a crosshair tooltip; click a point
   (or use the arrow keys) to see that developer's debt per unit at that point, as a
   segmented bar of the five units with most debt and the rest, and as a ranked list;
 - markers for quiz and dig evidence on the developer's line, and two rugs under the time
@@ -484,10 +505,12 @@ or swap the blob. It shows:
   categorical palette in fixed order, status colours only for risk levels and the bus
   target and always with a label; it keeps to phone width (tables scroll in their cards).
 
-On digitalme (190 commits) the weekly series has 12 points and 312 risk events (4 HIGH),
-rebuilt cold in 0.6 s; the dashboard is 184 KB and renders in about 50 ms. On dsa-instructor
-(2,510 commits) 19 points and 240 events (143 HIGH), 5.1 s cold and 1.2 s warm, 306 KB,
-about 65 ms. This repository's own dashboard, `.udebt/dashboard/index.html`, is committed as
+On digitalme (190 commits) the weekly series has 12 points and 12 risk events (4 HIGH),
+rebuilt cold in 0.6 s; the dashboard is 89 KB. On dsa-instructor (2,510 commits) 19 points
+and 144 events (143 HIGH), 6.0 s cold, 276 KB. On huggingface_hub (2,920 commits, 378
+developers with a footprint) every 25 units of mass gives 53 points and 1,383 events in
+94 s; the series is 8.3 MB and the dashboard 9 MB, and the page renders without errors in
+Chromium. This repository's own dashboard, `.udebt/dashboard/index.html`, is committed as
 the example (every 2 units of mass, since its history spans two days).
 
 ## Experiments
