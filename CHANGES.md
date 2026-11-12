@@ -19,3 +19,6 @@
 2026-11-12 [decision] Footprint ignores AI-authored commits and counts assisted ones in full: responsibility is human. A unit only agents touched is in nobody's set until a lead assigns it.
 2026-11-12 [decision] Team view checks a bus target per unit (config bus_target, default 2) and lists units below it with who is responsible. Parents roll up sub-unit quizzes only, not their priors.
 2026-11-12 [note] Real runs: digitalme 12 units/3 sub-units in 37s; dsa-instructor 12/9 in 62s (graph 4s). risk on dsa b194175 flags teachback OUTSIDE. Agent-only units are in nobody's set.
+2026-11-12 [decision] Testbeds: count every agent, not only Claude. Starter set huggingface_hub, sentry-javascript, mlflow + servo control; no team contacts, so validate via reverts; Py/TS first.
+2026-11-12 [doc] TESTBEDS.md + testbeds.json: 34 public repos screened from metadata, pinned shas; built-in signatures miss Assisted-by, Devin, claude[bot], OpenCode, Generated-by.
+2026-11-12 [decision] Owner: merge testbeds branch; Phase 1.1 (missing agent signatures, case-insensitive emails, bot class out of human share/decay, PR grouping for squash bias); synthetic developers + reverts as validation, first experiment after 1.1.

@@ -26,14 +26,18 @@ acceptable.
   restructurings); the LLM reads code plus that list and links each unit to the commits that
   shaped it (`history` on each unit).
 - **Three commit classes**: `ai` (agent-authored), `assisted` (human author, AI co-author
-  trailer), `human`. Signatures are data in config; Claude Code is the only one that matters
-  today, others are stubs for later.
+  trailer), `human`. Signatures are data in config. **Every agent counts** (owner,
+  2026-11-12): Claude was the starting point, but Copilot's coding agent, Cursor, Codex,
+  Devin, OpenCode and `Assisted-by:` trailers carry large shares in real repos (TESTBEDS.md).
 - **Weak prior from own commits**, capped at 0.5, AI-assisted commits at half weight,
   decayed by every commit someone else landed since. Replaced by any quiz evidence.
 - **Identity aliases** in config (`identities`) so a developer's several emails count as one.
 - **Testbeds**: `pisanuw/digitalme` (190 commits, 126 human / 62 assisted / 2 ai) is the
   primary; `pisanuw/dsa-instructor` (2510 commits, mostly ai) is the stress test; the small
-  all-human repos are controls.
+  all-human repos are controls. **External testbeds** in TESTBEDS.md and `testbeds.json`
+  (pinned shas): start with huggingface_hub, sentry-javascript and mlflow, with servo as an
+  AI-banned control. No contacts on those teams, so validation there uses outcome proxies
+  (reverts) on the large-team tier.
 - **LLM via the `claude` CLI**, subscription-billed, read-only tools (Read, Glob, Grep),
   structured output via `--json-schema`. No API key. `UDEBT_LLM=fake` for offline tests.
 - **Storage is JSON under `.udebt/`**, all of it committed to the repo by default:
@@ -86,6 +90,13 @@ acceptable.
   architectural unit with fewer holders above the known threshold, and who is responsible.
 - **Line share ignores lockfile and generated lines**, so a lockfile bump inside a refactor
   does not steer the refactor's weight to the frontend.
+
+- **Owner answers 2026-11-12 (second round)**: merge the testbeds research; Phase 1.1 fixes
+  the classifier gaps (Assisted-by, Devin, claude[bot], OpenCode, Jules, Codex connector,
+  Amazon Q, Generated-by, Made-with; case-insensitive emails; a bot class excluded from human
+  share and decay) and the squash bias (group branch commits by PR, size once); validation by
+  synthetic developers (the `claude` CLI quizzed from an older snapshot) and reverts on the
+  large-team testbeds, first experiment right after 1.1. Times are reported in Lisbon time.
 
 ## Non-goals (for now)
 
