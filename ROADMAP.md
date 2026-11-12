@@ -219,6 +219,66 @@ huggingface_hub 4 of 2,849 (ruff and mypy 0.x upgrades, +0.3 each; mass 1314.1 t
 no candidate changed). No other testbed is cloned here; prefect and go-git, where Phase 1.2
 saw most version-only pins, would move most.
 
+### Phase 1.4: model fixes the owner approved
+
+**Status 2026-11-12: done.** From the Phase 1.3 open questions: the history quota, decay by
+share, a dsa-instructor run at larger shares, and Cargo's table form.
+
+| item | status |
+|---|---|
+| history quota | done: 10 of the 40 slots per period, so with 4 periods slots are proportional to mass; `history_periods` and `history_quota` stay settings |
+| decay by share changed | done: understanding x exp(-k x share), share = weighted changed lines landed on the unit since the evidence / the unit's size in lines at the cut-off; k = ln 4 (fitted 1.37); the prior erodes the same way; `decay_model: "mass"` keeps the 0.9-per-mass rule; status notes "decayed from X by share Y (mass Z)" |
+| unit sizes | done: lines of the tracked files under the unit (line share's kinds, no binaries, shared files split), `git ls-tree` + `git cat-file --batch`, cached per blob in gitignored `.udebt/sizes.json` |
+| synthetic rerun on dsa-instructor at larger shares | done: 5 calls, snapshots at mean mass share 0.30 and 0.70 (picked with `--suggest mshare:`): observed 0.85 and 0.40, the share model predicted 0.40 and 0.11 (too much decay; 0.9^mass 0.57 and 0.33); 12 of 12 pairs worse at the older snapshot; Phase 5, fourth result |
+| TOML dependency tables | done: `[dependencies.x]` (and dev, build, target, workspace, Poetry) with `version = "..."` is a pin, through hunk headers git labels with the table; `commits.json` v5, parsed cache `ver` v3; no testbed commit changes (none uses the form) |
+
+**The fit.** The share was recomputed under the new definition for each of the 72
+unit-snapshots of the two recorded runs (digitalme `7f463b1`, `f557893`, `7b1895d`;
+dsa-instructor `4f56755`, `a2245bd`, `b5436cb`; 12 units each, the score of two answers),
+with understanding 1 at the snapshot, and each form fitted by least squares on a grid:
+
+| rule | parameter | RMSE |
+|---|---|--:|
+| exp(-k x share) | k = 1.37 (used: ln 4 = 1.386) | 0.229 |
+| (1 - share)^k | k = 0.87 | 0.226 |
+| d^mass | d = 0.838 | 0.244 |
+| 0.9^mass (Phase 1) | | 0.265 |
+| exp(-k x mass share), mass since / unit mass, for comparison | k = 2.15 | 0.165 |
+
+| run | snapshot | mean share | observed | exp(-1.37 s) | 0.9^mass |
+|---|---|--:|--:|--:|--:|
+| digitalme | `7f463b1` | 0.003 | 1.00 | 1.00 | 0.98 |
+| digitalme | `f557893` | 0.323 | 0.46 | 0.66 | 0.78 |
+| digitalme | `7b1895d` | 0.782 | 0.21 | 0.38 | 0.57 |
+| dsa-instructor | `4f56755` | 0.001 | 0.98 | 1.00 | 0.98 |
+| dsa-instructor | `a2245bd` | 0.090 | 0.94 | 0.90 | 0.90 |
+| dsa-instructor | `b5436cb` | 0.281 | 0.96 | 0.71 | 0.81 |
+
+The two forms fit equally well; the exponential is kept because it composes (fading over
+two stretches of change is fading over their sum, which a replay over time needs) and
+never reaches zero on a rewrite, and k = ln 4 reads plainly: understanding halves for every
+half of a unit that changes. The fit is a compromise: per repository k is 2.39 on digitalme
+(RMSE 0.191) and 0.14 on dsa-instructor (0.114), so the line share does not make the two
+repositories' rates agree. dsa-instructor's units take large line shares the answers did
+not show: bulk curriculum JSON and rendered figures in `offline-pipeline` (23,800 weighted
+lines in 9 days, mostly two course additions) and one large commit in the small
+`chroma-integration` (share 0.27 at mass 0.20). The mass share would fit better (0.165), and
+a pooled rank correlation with wrongness is 0.67 for the line share, 0.67 for mass, 0.77 for
+the mass share. BRIEFING records the choice as an open question; nothing else was tuned.
+
+huggingface_hub at `2c61ae8`, `udebt history --candidates`, quota 5 against 10 (no LLM):
+
+| | quota 5 | quota 10 |
+|---|--:|--:|
+| candidates per period (oldest first) | 8 / 5 / 5 / 22 | 10 / 10 / 10 / 10 |
+| by year: 2020, 2022, 2023, 2024, 2025, 2026 | 2, 6, 3, 3, 1, 25 | 2, 10, 5, 4, 3, 16 |
+| from the last 12 months | 25 | 16 |
+| AI-involved | 18 | 11 |
+| mean survival | 0.98 | 0.98 |
+
+28 of the 40 stay; 12 recent commits give way to 12 from the middle periods. On digitalme
+and dsa-instructor, whose histories fit in one year, the periods go to 10 each as well.
+
 ## Phase 2: conceptual units and responsibility
 
 **Adds**
@@ -522,6 +582,73 @@ too slowly; this would also make the decay rate comparable between repositories.
 retune on two synthetic runs. Next: on dsa-instructor, snapshots chosen by share since
 (mean 0.3 and 0.7, roughly mass 150-400, weeks to months back) to meet digitalme's range;
 `--suggest` could take shares as well as masses.
+
+**Fourth result, 2026-11-12** (Phase 1.4: dsa-instructor at larger shares, the first run
+under the share decay model; HEAD `a005a03`, the same map and units, 12 units, two questions
+each, one question set, developer `pisan@uw.edu`, 5 model calls). Snapshots picked before
+any answer with `--suggest mshare:0.3,0.7`, on the units' mean mass share since (mass since
+over the unit's mass), the measure digitalme's 0.30 and 0.70 were stated in: picking by the
+new line share would have taken `a6d279e` (10-31, line share 0.31), next to the `b5436cb`
+already run, and the mean line share jumps from 0.31 to 4.2 in one step (below). The model's
+predictions were in the suggestion before the run: mean 0.40 and 0.11. Report:
+`dsa-instructor/.udebt/experiments/synthetic-42530b11_f13a9cf4-2026-11-12.json` (not committed
+there).
+
+| snapshot | commits since | mass since | mean mass share | mean / median line share | predicted (share) | 0.9^mass | observed | wrong / partial / correct / unknown |
+|---|--:|--:|--:|---|--:|--:|--:|---|
+| `42530b1` (2026-10-28) | 761 | 116.8 | 0.30 | 4.28 / 0.64 | 0.40 | 0.57 | 0.85 | 1 / 5 / 18 / 0 |
+| `f13a9cf` (2026-10-06) | 2150 | 339.4 | 0.70 | 5.83 / 1.63 | 0.11 | 0.33 | 0.40 | 8 / 13 / 3 / 0 |
+
+Per unit, mass since / line share / mass share, then predicted / observed score:
+
+| unit | `42530b1` | | `f13a9cf` | |
+|---|---|---|---|---|
+| web-layer | 16.40 / 0.38 / 0.15 | 0.59 / 1.00 | 61.72 / 1.80 / 0.58 | 0.08 / 0.25 |
+| agent-turn-pipeline | 8.64 / 0.27 / 0.11 | 0.69 / 0.75 | 30.27 / 1.69 / 0.40 | 0.10 / 0.50 |
+| persistence-migrations | 4.62 / 0.83 / 0.21 | 0.32 / 1.00 | 13.87 / 1.65 / 0.62 | 0.10 / 0.50 |
+| deploy-ops | 12.60 / 0.85 / 0.27 | 0.31 / 0.75 | 31.27 / 1.54 / 0.66 | 0.12 / 0.50 |
+| offline-pipeline | 7.47 / 0.54 / 0.19 | 0.47 / 1.00 | 13.55 / 0.87 / 0.35 | 0.30 / 0.50 |
+| config-env-manifest | 5.14 / 1.69 / 0.40 | 0.10 / 0.50 | 9.92 / 2.34 / 0.78 | 0.04 / 0.25 |
+| student-data-rights | 1.62 / 0.20 / 0.22 | 0.75 / 1.00 | 5.39 / 1.40 / 0.73 | 0.14 / 0.25 |
+| spend-and-keys | 2.30 / 0.69 / 0.41 | 0.39 / 0.50 | 4.61 / 1.42 / 0.82 | 0.14 / 0.25 |
+| chroma-integration | 2.53 / 43.92 / 0.38 | 0.00 / 0.75 | 4.00 / 52.30 / 0.61 | 0.00 / 0.50 |
+| reporting-admin | 9.76 / 0.55 / 0.38 | 0.46 / 1.00 | 22.23 / 1.49 / 0.86 | 0.13 / 0.25 |
+| classes-pairing | 3.19 / 0.87 / 0.56 | 0.30 / 1.00 | 5.75 / 1.61 / 1.00 | 0.11 / 0.50 |
+| teachback | 1.48 / 0.59 / 0.32 | 0.44 / 1.00 | 4.58 / 1.89 / 1.00 | 0.07 / 0.50 |
+
+Same unit at the two snapshots: worse with more mass since in 12 pairs, better in 0. Pooled
+over the 24 unit-snapshots, rho with wrongness is 0.35 for mass since (p = 0.04), 0.63 for
+the line share and 0.77 for the mass share (not independent). Within a snapshot, line share
+0.43 (p = 0.08) and -0.17; mass share 0.34 and 0.22; mass 0.00 and 0.07. No unknowns, no
+confidently wrong answers; mostly-new units were again a little worse than mostly-edited
+ones (wrongness 0.19 against 0.13, then 0.64 against 0.50). Reading it honestly:
+
+- **Decay with age reproduces on dsa-instructor at these shares.** The Phase 1.3 run's
+  ceiling (0.98, 0.94, 0.96) is gone: 0.85 at mass share 0.30 and 0.40 at 0.70, every unit
+  worse at the older snapshot. digitalme gave 0.46 and 0.21 at the same mass shares, so this
+  repository still decays more slowly by every measure; its maintained architecture notes
+  (CLAUDE.md) may carry the answerer across code it has not seen.
+- **The share model does not land near the observed scores: it predicts too much decay.**
+  Mean predicted 0.40 against 0.85 observed (RMSE 0.50 per unit), and 0.11 against 0.40
+  (RMSE 0.32). The old 0.9^mass rule was closer here (0.57 and 0.33; RMSE 0.42 and 0.28),
+  as the fit's per-repository rates (2.39 digitalme, 0.14 dsa-instructor) foretold. For the
+  record, not as a tuning: exp(-2.15 x mass share), the fit's better-scoring alternative,
+  would have predicted 0.54 and 0.24 (RMSE 0.37 and 0.20), also too low.
+- **Two artifacts of the line share showed up.** `chroma-integration` reads 43.9 and 52.3:
+  its numerator holds the removed lines of raw knowledge-base JSON (8,400 lines for one PDF
+  extract) deleted since the snapshot, which its size at HEAD no longer holds; the answers
+  (0.75, 0.50) show nothing of the kind. And bulk content and data files dominate the line
+  share in units that hold them. Both point at the same fix candidates (cap a commit's lines
+  in a unit at the unit's size, or count deletions of whole files once, or use mass over the
+  unit's mass); none was applied.
+- Caveats as before: an LLM as the developer, graded by the same family, one run, snapshots
+  in one repository's busiest two months, and the rate was fitted on runs that included
+  this repository's earlier snapshots.
+
+What it suggests, untested: rank by share works better than rank by absolute mass (pooled
+0.63 to 0.77 against 0.35), but one rate does not fit both repositories under either share;
+the decay rate may need to be per repository (calibrated from its own quizzes) rather than
+global. Do not retune on synthetic runs alone (BRIEFING open questions).
 
 ## Decisions assumed in this roadmap
 

@@ -48,3 +48,9 @@
 2026-11-12 [note] Major-upgrade rule changes 0 commits on digitalme and dsa-instructor, 4 on huggingface_hub. Dogfood map not re-run: the old miner saw 3 candidates here, the new one 18.
 2026-11-12 [note] Synthetic rerun, dsa-instructor, snapshots at mass 4.5/25.2/50.6: score 0.98/0.94/0.96, paired 4 worse 4 better; ceiling. Mean share since 0.10 at mass 50 vs 0.70 on digitalme.
 2026-11-12 [decision] No model change from it; across both repos the score tracks a unit's share changed, not absolute mass. Decay by share is an open question (BRIEFING, ROADMAP Phase 5).
+2026-11-12 [decision] History quota 10 of 40 per period (4 periods): slots proportional to mass. huggingface_hub periods 8/5/5/22 -> 10/10/10/10, last 12 months 25 -> 16.
+2026-11-12 [decision] Decay by share changed: exp(-k x weighted changed lines since / unit size in lines), k = ln 4 (fit 1.37 on both synthetic runs). decay_model "mass" keeps 0.9/mass.
+2026-11-12 [code] Unit sizes from git ls-tree + cat-file --batch, cached per blob in gitignored .udebt/sizes.json. A merged branch's lines carry the branch's weight. Prior erodes by share too.
+2026-11-12 [code] TOML dependency tables ([dependencies.x] version = ...) are pins: git labels -U0 hunks with the table. commits.json v5, ver v3. No testbed commit changes.
+2026-11-12 [note] Fit: exp RMSE 0.229, (1-s)^k 0.226, 0.9^mass 0.265, mass share 0.165. Per repo k 2.39 (digitalme) vs 0.14 (dsa): the line share does not unify the two repos.
+2026-11-12 [note] dsa-instructor at mass share 0.30/0.70 (5 calls): observed 0.85/0.40, share model 0.40/0.11, 0.9^mass 0.57/0.33; 12 of 12 pairs worse. Model over-decays here; not retuned.

@@ -19,8 +19,10 @@ acceptable.
   `blackbox` to declare deliberate ignorance; only accidental ignorance counts as debt.
 - **Misconceptions cost more than gaps.** Confident wrong answers score negative evidence.
   Blank answers are recorded as known unknowns with no penalty.
-- **Decay per commit.** Understanding verified at commit X decays by 0.9 per later commit
-  touching the unit's paths. This is what makes debt grow while the AI builds.
+- **Decay per commit.** Understanding verified at commit X decays with the later commits
+  touching the unit's paths. This is what makes debt grow while the AI builds. (First 0.9
+  per commit, then per unit of weighted mass; since Phase 1.4 by the share of the unit
+  that changed, below.)
 - **Decisions come from history as much as from code.** Cheap git heuristics pick
   decision-bearing commits (founding, dependencies, infra, new dirs, renames, big
   restructurings); the LLM reads code plus that list and links each unit to the commits that
@@ -202,7 +204,7 @@ acceptable.
   Four periods of equal weighted mass (`history_periods`) each get 5 of the 40 slots
   (`history_quota`), the rest go to the best scores, ties to the more recent commit. Equal
   mass rather than calendar years, so busy eras get more periods; half the slots spread,
-  half competed for. The output keeps its fields and adds `survival`, `weight`, `period`;
+  half competed for. (Phase 1.4 raised the quota to 10: slots proportional to mass.) The output keeps its fields and adds `survival`, `weight`, `period`;
   `udebt history --candidates` prints it without a map or a model call. On
   huggingface_hub the last 12 months go from 1 slot to 25 and the map's history links from
   9 (7 to one release) to 31 on 30 commits, 22 of them recent (TESTBEDS.md).
@@ -214,6 +216,40 @@ acceptable.
   1.2 behaviour. `commits.json` v4; the parsed cache versions its `ver` input, so only
   that input is recomputed. Changes 0 commits on digitalme and dsa-instructor, 4 on
   huggingface_hub (ruff and mypy 0.x upgrades).
+- **Phase 1.4 (owner-approved model fixes, 2026-11-12)**:
+  - **History quota 10 per period** (owner): with 4 periods all 40 slots are guaranteed by
+    period, so slots are proportional to mass; `history_periods` and `history_quota` stay
+    settings. huggingface_hub: periods 8/5/5/22 -> 10/10/10/10, last 12 months 25 -> 16.
+  - **Decay by share changed** (owner): understanding and the prior's erosion fade by
+    exp(-k x share), share = weighted changed lines landed under the unit since the evidence
+    over the unit's size in lines at the cut-off. "Weighted" is each commit's changed lines
+    in the unit (line share's rules: no lockfile, generated or version-bump lines, shared
+    files split) times its weight; a commit a merged branch brought in carries the whole
+    branch's weight per line (capped at 1), since with its own small part a ten-commit branch
+    would count a tenth of the lines its squashed twin counts. Size = lines of the tracked
+    files under the unit's paths, the same kinds (no binaries), split the same way; counted
+    per blob (`git cat-file --batch`), cached in gitignored `.udebt/sizes.json`, so it is
+    "cached per map head" and per any other tree. A unit with no lines left divides by one.
+  - **Form and rate fitted** on the 72 unit-snapshots of the two Phase 5 runs, the share
+    recomputed under this definition: exp(-k s) k 1.37 (RMSE 0.229), (1 - s)^k k 0.87
+    (0.226), 0.9^mass 0.265, best per-mass rate 0.84 (0.244). The two forms fit alike; the
+    exponential is kept because it composes (fading over two stretches is fading over their
+    sum, which replay needs) and never reaches zero. k = ln 4 = 1.386: understanding halves
+    for every half of a unit that changes. Fitted per repository, k is 2.39 on digitalme and
+    0.14 on dsa-instructor: the line share does not unify the two as the mass share (mass
+    since over the unit's mass) would (RMSE 0.165 at k 2.15); see open questions.
+  - The per-mass rule stays as `decay_model: "mass"` (`decay_per_commit` 0.9);
+    `share_decay_rate` sets k. Status notes say "decayed from X by share Y (mass Z)".
+  - **Synthetic run at larger shares** (owner; dsa-instructor, 5 calls): snapshots at mean
+    mass share 0.30 and 0.70 (`--suggest mshare:`, the measure digitalme's range was
+    stated in; by line share 0.3 is the 10-31 snapshot already run). Observed 0.85 and
+    0.40, the share model predicted 0.40 and 0.11, 0.9^mass 0.57 and 0.33; 12 of 12 units
+    worse at the older snapshot. Recorded as is, nothing retuned (ROADMAP Phase 5).
+  - **TOML dependency tables** (owner): `[dependencies.serde]` then `version = "2.0"` is a
+    pin (Cargo dev/build/target/workspace tables, Poetry's `[tool.poetry.dependencies.x]`),
+    read through hunk headers git labels with the enclosing table (an xfuncname in a
+    throwaway attributes file). `commits.json` v5, parsed cache `ver` v3. Changes no commit
+    on the five testbeds (none uses the table form).
 
 ## Non-goals (for now)
 
@@ -234,24 +270,30 @@ acceptable.
   `pipeline` name heuristic stay?
 - vscode's `on behalf of @user` footer names the directing developer; it could fill
   `directed` automatically from `handles`.
-- The synthetic rerun suggests decay faster than 0.9 per unit of mass and mass reaching
-  small units from outside their paths (contacts-db wrong at 0.12). Change the model now,
-  or wait for human quizzes on digitalme? (The dsa-instructor run, below, points the other
-  way on the rate.)
-- The dsa-instructor synthetic run (Phase 1.3) hit a ceiling: 0.98, 0.94, 0.96 at mass
-  4.5, 25.2, 50.6, paired 4 worse / 4 better, because the same mass is a tenth as much of
-  a big repository's units (mean share since 0.10 at mass 50, against 0.70 on digitalme).
-  Across both repositories the score follows the share of a unit that changed, not the
-  absolute mass. Should decay be by share (mass since over the unit's mass) rather than
-  0.9 per unit of mass? And should the next dsa-instructor run pick snapshots by share
-  (0.3, 0.7: weeks to months back, about 8 more calls)?
+- The synthetic rerun suggests mass reaching small units from outside their paths
+  (contacts-db wrong at 0.12): attribute some mass beyond a unit's own paths? (The decay
+  rate part was answered in Phase 1.4: decay by share.)
+- (Answered 2026-11-12, Phase 1.4: decay by the share of a unit changed, and the next
+  dsa-instructor run at mass shares 0.3 and 0.7, 5 calls. See Decisions and ROADMAP
+  Phase 5.)
 - (Answered 2026-11-12, Phase 1.3: a major-version upgrade keeps the dependency weight;
   patch and minor upgrades stay version bumps. See Decisions.)
-- History mining now leans to the recent era: on huggingface_hub 22 of 40 candidates come
-  from the last quarter of the mass, 25 from the last 12 months, because AI-era commits are
-  larger and all their files survive. The quota (5 per period) protects the middle periods,
-  not the recent one. Should the floor be larger (10 per period would make slots
-  proportional to mass), or is the recent lean right for a tool about AI-built code?
+- (Answered 2026-11-12, Phase 1.4: 10 slots per period, proportional to mass; decay by the
+  share of a unit changed; the next dsa-instructor run picks snapshots by share. See
+  Decisions.)
+- The line share the owner specified (weighted changed lines over size in lines) fits the
+  two synthetic runs worse than the mass share does (RMSE 0.229 against 0.165): bulk
+  content (curriculum JSON and rendered figures in dsa-instructor's `offline-pipeline`,
+  23,800 weighted lines in 9 days, mostly two course additions) and one large commit in a
+  small unit (`chroma-integration`, share 0.27 on mass 0.20) read as large shares the
+  answers did not show. Keep lines, switch to mass over the unit's mass, or cap a commit's
+  lines in a unit at the unit's size? The Phase 1.4 run added a third artifact: deleting
+  whole files (raw knowledge-base JSON moved out of git) counts their removed lines against
+  a size that no longer has them (`chroma-integration` share 43.9, answers still 0.75).
+- One rate does not fit both repositories under either share (per-repository k 2.39 on
+  digitalme, 0.14 on dsa-instructor; the Phase 1.4 run under-predicts dsa-instructor's
+  scores by 0.3-0.45). Calibrate the rate per repository from its own quizzes once there
+  are some, keeping ln 4 as the default?
 - The dogfood `.udebt/map.json` here was mapped from the old miner, which found 3
   candidates in this repository; the new one finds 18, those 3 among them, so a
   re-map would link more history. Not re-run, to save the call.

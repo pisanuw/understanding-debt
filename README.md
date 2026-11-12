@@ -71,8 +71,8 @@ udebt experiment synthetic --snapshots <rev>,... [--per-unit 2]   # validation: 
 udebt cache [status|rebuild]   # the parsed-commit cache (gitignored)
 ```
 
-Commit everything under `.udebt/` except the parsed-commit cache, which `.udebt/.gitignore`
-keeps out. The map and `responsibility.json` are shared, each `records/<developer>.jsonl`
+Commit everything under `.udebt/` except the parsed-commit cache and the line counts
+(`sizes.json`), which `.udebt/.gitignore` keeps out. The map and `responsibility.json` are shared, each `records/<developer>.jsonl`
 file holds one developer's quiz history, so the team view and bus factor work for everyone,
 and `commits.json` holds the commit weights with their LLM refinements, paid for once.
 
@@ -131,9 +131,14 @@ upgrades (`1.4.2` to `1.5.0`) stay version bumps, and so do the project's own ve
 and pins moved to the version the same diff gives the project (a monorepo's major release
 pinning its own packages). Calendar versions (a year first, `certifi==2023.7.22` to
 `2024.2.2`) and versions that are not numbers (`latest`, a git sha, `1.x`) keep the
-behaviour above. In a Cargo dependency table (`[dependencies.serde]` then `version =
-"1.0"`) the version line reads as a version line, so a major upgrade written that way is
-missed.
+behaviour above. A dependency with a TOML table of its own (`[dependencies.serde]` then
+`version = "1.0"`, in Cargo also `[dev-dependencies.x]`, `[target.'cfg(unix)'.dependencies.x]`
+and `[workspace.dependencies.x]`, in Poetry `[tool.poetry.dependencies.x]`) is a pin like any
+other: the diff pass asks git to name the enclosing table in each hunk header (a throwaway
+attributes file giving Cargo.toml and pyproject.toml a diff driver whose function lines are
+TOML tables), and a `version =` line inside a dependency's table is read as that
+dependency's version, so `1.0` to `2.0` there is a major upgrade. A repository whose own
+.gitattributes gives those files a diff driver overrides this, and the table form is missed.
 
 **A merged branch is weighed as one commit.** A repository that squashes every pull request
 lands it as one commit; one that merges keeps the branch's commits, and weighed one by one
@@ -169,10 +174,14 @@ For each architectural unit `u` and developer `d`:
 |---|---|
 | evidence of one answer | correct 1.0, partial 0.5, wrong 0.0, unknown 0.0, **confidently wrong -0.5** |
 | verified understanding | mean evidence over the last 5 answers on `u`, clamped to [0, 1] |
-| understanding | verified x 0.9^(mass landed on `u` since the last answer) |
+| understanding | verified x exp(-1.386 x share of `u` changed since the last answer): it halves for every half of the unit that changes (config `share_decay_rate`, ln 4) |
+| share of `u` changed since t | weighted changed lines landed under `u` after t / size of `u` in lines; can pass 1 when code is rewritten more than once |
+| weighted changed lines of a commit in `u` | its changed lines under `u`, counted as for line share (lockfile, generated and version-bump lines left out, a shared file split), times its line weight: the commit's weight, or for a commit a merged branch brought in, the whole branch's weight (at most 1); 0 for a bot |
+| size of `u` | lines of the tracked files under `u` at the cut-off (HEAD for `status`), without lockfiles, generated, media or binary files, a shared file split as above; counted once per blob, cached in `.udebt/sizes.json` (gitignored) |
+| understanding, mass model | verified x 0.9^(mass landed on `u` since the last answer): config `decay_model: "mass"` (`decay_per_commit`), the Phase 1 rule, kept to compare |
 | line share of a commit in `u` | changed lines under `u` / all changed lines, lockfile, generated and version-bump lines left out; a file listed by k top-level units counts 1/k of its lines in each, and a parent's part is split again among the sub-units listing it |
 | attribution of a commit to `u` | weight x sqrt(line share); 0 for a bot commit |
-| prior (no quiz yet) | 0.5 x your weighted share of `u` x 0.9^(mass others landed since your last commit) |
+| prior (no quiz yet) | 0.5 x your weighted share of `u` x exp(-1.386 x share of `u` others changed since your last commit) (mass model: 0.9^(mass others landed since)) |
 | importance | 0.6 x centrality/5 + 0.4 x mass/max mass, centrality rated 1-5 by the mapper |
 | co-change edge (a, b) | sum over commits touching both, with at most 30 files, of weight / (files - 1) |
 | import edge (a, b) | 1 per direction in which a imports b; scaled so imports and co-change carry equal total weight |
@@ -199,8 +208,14 @@ it does not erode your prior. Four deliberate choices:
   repo starts at 100 and earns it down.
 - **Saying "I don't know" is free; being confidently wrong costs.** A known unknown is cheap to
   fix. A misconception causes bugs.
-- **Understanding decays when the code moves without you.** Each commit that touches a unit
-  after you last verified it knocks 10 percent off, so debt grows as the AI keeps building.
+- **Understanding decays when the code moves without you, by how much of the unit moved.**
+  Every changed line landed on a unit after you last verified it counts, at its commit's
+  weight, against the unit's size: once a tenth of the unit has changed you keep 87% of what
+  you knew, a half 50%, all of it 25%. So debt grows as the AI keeps building, and the same
+  change costs more in a small unit than in a large one. The Phase 1 rule (10 percent off
+  per unit of weighted mass, whatever the unit's size) decayed a large repository's units
+  far too fast and a small one's too slowly in the synthetic runs (ROADMAP Phase 5); it is
+  still there as `decay_model: "mass"`.
 
 Team view takes the maximum understanding across developers per unit and counts how many
 developers clear the known threshold (default 0.6). That count is the unit's bus factor, and
@@ -296,18 +311,20 @@ lists them, `--json` for the full records):
    units of today. A commit none of whose files survive is dropped, except a founding
    commit (the first three), which adds +0.5 after the multiplication.
 3. **Spread.** History is cut into `history_periods` (default 4) periods of equal weighted
-   mass, oldest first, and each is guaranteed `history_quota` (default 5) of the slots,
-   filled by its best scores. The other slots go to the best scores anywhere. Equal mass
-   rather than equal time: a busy recent year gets more periods than a quiet early one, and
-   a long pre-AI past cannot crowd out the era the agents built. With 4 x 5 of 40 slots,
-   half the list is spread evenly and half goes to the strongest commits.
+   mass, oldest first, and each is guaranteed `history_quota` (default 10) of the slots,
+   filled by its best scores; slots a period cannot fill, and any a smaller quota leaves
+   open, go to the best scores anywhere. Equal mass rather than equal time: a busy recent
+   year gets more periods than a quiet early one, and a long pre-AI past cannot crowd out
+   the era the agents built. With 4 x 10 of 40 slots, slots are proportional to mass: the
+   larger, fully surviving commits of the AI era cannot crowd out the middle periods either
+   (with 5 per period they took 22 of 40 slots on huggingface_hub).
 4. **Ties** go to the more recent commit.
 
 Each candidate carries its sha, date, class, agent, author, subject, file count, score,
 reasons, up to eight sample files (those still alive first), its `survival`, its `weight`
 and its `period`. On huggingface_hub, where the old count-based miner gave 34 of 40 slots
-to 2021-2022 and 22 to commits with no surviving file, the last 12 months now get 25 slots
-and no candidate is gone from HEAD (TESTBEDS.md).
+to 2021-2022 and 22 to commits with no surviving file, the periods now get 10 each, the last
+12 months 16 slots (25 with 5 per period) and no candidate is gone from HEAD (TESTBEDS.md).
 
 ## Contributors
 
@@ -396,6 +413,8 @@ is the `claude` CLI taking the quiz with its knowledge frozen at an older snapsh
 
 ```bash
 udebt experiment synthetic --suggest 10,25,50          # snapshots that much mass before HEAD (no LLM)
+udebt experiment synthetic --suggest mshare:0.3,0.7    # ... where the units' mean mass share since is that
+udebt experiment synthetic --suggest share:0.3,0.7     # ... where their mean share changed is that
 udebt experiment synthetic --snapshots <rev>,<rev>,<rev> [--per-unit 2] [--units N]
 udebt experiment synthetic --at <rev>                  # one snapshot
 udebt experiment synthetic --snapshots ... --resume .udebt/experiments/<report>.json
@@ -419,6 +438,10 @@ knowledge should go wrong where the code moved since. The report, in
 
 - the weighted mass landed since the snapshot (the same attribution as everywhere else),
   its share of the unit's mass, and the files at the snapshot and now;
+- the share of the unit changed since (weighted changed lines over its size at HEAD, the
+  decay model's input) and the score the model predicts for a developer who knew the unit
+  at the snapshot (`predicted`, with the mass model's `predicted_mass` beside it); the
+  summary compares their means and errors with the observed score;
 - where the lines since went: the share in files that existed at the snapshot (`edited`)
   against files it lacked (`new`), which classes the unit `unchanged`, `mostly-edited` or
   `mostly-new`; edits to code a developer saw are where misconceptions come from, new code
@@ -436,7 +459,6 @@ the N most important top-level units (default all). The report is written after 
 and counts each call before making it, so a run that stops part way (a model error, say) can
 be finished with `--resume <report>` without paying again for what it already has.
 
-## Development
 ## Development
 
 ```bash

@@ -198,6 +198,11 @@ the last 12 months' slots, against 25 with it; the quota is what keeps the two m
 periods at 5 each. The founding commits stay (`Initial commit`, `Initial import (#1)`, 74%
 alive), as do the 2022 cache-layout and commit-API decisions.
 
+**Phase 1.4, quota 10 per period** (slots proportional to mass): the periods get 10 / 10 /
+10 / 10; by year 2 / 0 / 10 / 5 / 4 / 3 / 16; the last 12 months 16 (25 before), AI-involved
+11 (18 before), mean survival 0.98. 28 of the 40 stay; 12 recent commits give way to 12 from
+the two middle periods. The map was not re-run on them.
+
 **`udebt map` on the new candidates** (one `claude` CLI call, 39 s; 12 units, 7 sub-units,
 84% coverage): **31 history links to 30 distinct commits**, on 9 of the 12 units, against 9
 links (7 to "V1.0 release (#3464)") before. **22 links (21 commits) point at the last 12
