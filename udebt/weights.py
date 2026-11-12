@@ -22,19 +22,21 @@ from __future__ import annotations
 import json
 import math
 import re
-import subprocess
+from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .filekinds import VERSION_PATHSPECS, mechanical, version_candidate
 from .filekinds import kind as _kind
-from .filekinds import mechanical
 from .history import KEYWORDS, _toplevel
-from .provenance import Commit
+from .provenance import Commit, git_log
 
 # LLM refinement classes and the weight each implies.
 CLASS_WEIGHT = {"architectural": 1.0, "behavioural": 0.6, "refactor": 0.3, "cosmetic": 0.05}
-CACHE_VERSION = 2  # 2: branch commits grouped under their merge
+CACHE_VERSION = 3  # 2: branch commits grouped under their merge; 3: version bumps
+VERSION_BUMP_WEIGHT = 0.03  # a release that only moves version numbers, like a lockfile bump
+NEAR_ZERO = {"docs", "lock", "generated", "media"}  # kinds that leave a version bump a bump
 GROUP_MAX_COMMITS = 50  # a longer branch is a long-lived line of work, not a pull request
 
 
@@ -54,17 +56,12 @@ def effective_lines(root: Path) -> dict[str, int]:
     return {sha: total for sha, (total, _) in _effective(root).items()}
 
 
-def _effective(root: Path) -> dict[str, tuple[int, int]]:
-    """sha -> (effective lines, effective lines outside lockfiles and generated files)."""
-    out = subprocess.run(
-        ["git", "log", "--format=%x1e%H", "--numstat", "-w", "--ignore-blank-lines"],
-        cwd=root,
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    ).stdout
+def _effective(root: Path, shas: list[str] | None = None) -> dict[str, tuple[int, int]]:
+    """sha -> (effective lines, effective lines outside lockfiles and generated files), over
+    history from HEAD or over exactly `shas`."""
+    if shas is not None and not shas:
+        return {}
+    out = git_log(root, ["--format=%x1e%H", "--numstat", "-w", "--ignore-blank-lines"], shas)
     result: dict[str, tuple[int, int]] = {}
     for rec in out.split("\x1e"):
         lines = rec.strip().splitlines()
@@ -84,17 +81,13 @@ def _effective(root: Path) -> dict[str, tuple[int, int]]:
     return result
 
 
-def added_files(root: Path) -> dict[str, set[str]]:
-    """sha -> files first added in that commit."""
-    out = subprocess.run(
-        ["git", "log", "--format=%x1e%H", "--name-status", "--diff-filter=A", "--no-renames"],
-        cwd=root,
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    ).stdout
+def added_files(root: Path, shas: list[str] | None = None) -> dict[str, set[str]]:
+    """sha -> files first added in that commit, over history from HEAD or exactly `shas`."""
+    if shas is not None and not shas:
+        return {}
+    out = git_log(
+        root, ["--format=%x1e%H", "--name-status", "--diff-filter=A", "--no-renames"], shas
+    )
     result: dict[str, set[str]] = {}
     for rec in out.split("\x1e"):
         lines = rec.strip().splitlines()
@@ -105,18 +98,135 @@ def added_files(root: Path) -> dict[str, set[str]]:
     return result
 
 
+# -- version bumps ----------------------------------------------------------------------
+
+# A line that sets a version: `"version": "1.2.3",` (package.json, lerna.json), `version =
+# "1.2.3"` (pyproject.toml, Cargo.toml, setup.cfg), `version: 1.2.3` (pubspec, Chart.yaml),
+# `__version__ = "1.2.3"`, `version="1.2.3",` (setup.py), `<version>1.2.3</version>` (Maven),
+# `version '1.2.3'` (Gradle), or a bare version (a VERSION file).
+_VERSION_LINE = re.compile(
+    r"""^["']?(__version__|version)["']?\s*[:=]|^version\s+["']|^<version>[^<]*</version>$|"""
+    r"""^["']?v?\d+(\.\d+)+([-+][0-9a-z.-]+)?["']?,?$""",
+    re.I,
+)
+# A version string: at least major.minor, so `"port": 3000` is not one.
+_VERSION_TOKEN = re.compile(r"v?\d+(\.\d+)+([-+][0-9A-Za-z.-]+)?")
+_HUNK = re.compile(r"^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@")
+
+
+def version_only(removed: list[str], added: list[str]) -> bool:
+    """Whether a file's diff (its removed and added lines) changes nothing but versions.
+    Every changed line either sets a version, or is a pin whose removed and added forms are
+    the same line apart from version strings (`"@sentry/core": "8.1.0"` to `"8.2.0"`, which
+    a monorepo release rewrites in every package). Blank lines are ignored."""
+    rem = [ln.strip() for ln in removed if ln.strip()]
+    add = [ln.strip() for ln in added if ln.strip()]
+    if not rem and not add:
+        return False
+    pins = [ln for ln in rem + add if not _VERSION_LINE.search(ln)]
+    if any(not _VERSION_TOKEN.search(ln) for ln in pins):
+        return False
+
+    def shape(lines: list[str]) -> Counter:
+        return Counter(_VERSION_TOKEN.sub("#", ln) for ln in lines if not _VERSION_LINE.search(ln))
+
+    return shape(rem) == shape(add)
+
+
+def parse_version_diff(out: str) -> dict[str, bool]:
+    """path -> version-only, from one commit's `-p -U0` diff of manifest and version files.
+    Hunk headers give the line counts, so a removed line that itself starts with `--` is
+    read as content."""
+    changes: dict[str, tuple[list[str], list[str]]] = {}
+    cur: tuple[list[str], list[str]] | None = None
+    old_path = ""
+    minus = plus = 0
+    for ln in out.split("\n"):
+        if minus or plus:
+            if ln.startswith("-") and minus and cur is not None:
+                cur[0].append(ln[1:])
+                minus -= 1
+            elif ln.startswith("+") and plus and cur is not None:
+                cur[1].append(ln[1:])
+                plus -= 1
+            elif not ln.startswith("\\"):  # "\ No newline at end of file"
+                minus = plus = 0
+            continue
+        if ln.startswith("diff --git "):
+            cur, old_path = None, ""
+        elif ln.startswith("--- ") and cur is None:
+            old_path = ln[4:]
+        elif ln.startswith("+++ ") and cur is None:
+            path = ln[4:] if ln[4:] != "/dev/null" else old_path
+            if path.startswith('"'):  # quoted like numstat quotes it, without the a/ b/
+                path = '"' + path[3:]
+            elif path[:2] in ("a/", "b/"):
+                path = path[2:]
+            cur = changes.setdefault(path, ([], []))
+        elif cur is not None and (m := _HUNK.match(ln)):
+            minus = 1 if m.group(1) is None else int(m.group(1))
+            plus = 1 if m.group(2) is None else int(m.group(2))
+    return {p: version_only(r, a) for p, (r, a) in changes.items()}
+
+
+def version_bumps(
+    root: Path, shas: list[str] | None = None, commits: list[Commit] | None = None
+) -> dict[str, set[str]]:
+    """sha -> the manifest and version files whose diff in that commit changes only version
+    strings. One `git log -p -U0` pass restricted to those paths: over history from HEAD, or
+    over exactly `shas`. With `commits`, only the ones that touched such a file are read."""
+    if commits is not None:
+        want = set(shas) if shas is not None else None
+        shas = [
+            c.sha
+            for c in commits
+            if (want is None or c.sha in want)
+            and not c.is_merge
+            and any(version_candidate(f) for f in c.files)
+        ]
+    if shas is not None and not shas:
+        return {}
+    args = ["-p", "-U0", "--no-renames", "--no-ext-diff", "--no-color", "--format=%x1e%H"]
+    if shas is None:
+        args.append("--full-history")
+    out = git_log(root, [*args, "--", *VERSION_PATHSPECS], shas)
+    result: dict[str, set[str]] = {}
+    for rec in out.split("\x1e"):
+        sha, _, diff = rec.partition("\n")
+        sha = sha.strip()
+        if not sha:
+            continue
+        bumped = {p for p, ok in parse_version_diff(diff).items() if ok and version_candidate(p)}
+        if bumped:
+            result[sha] = bumped
+    return result
+
+
 def heuristic_weight(
-    c: Commit, eff_lines: int, added: set[str], renames: set[str], new_dirs: set[str]
+    c: Commit,
+    eff_lines: int,
+    added: set[str],
+    renames: set[str],
+    new_dirs: set[str],
+    version: set[str] | None = None,
 ) -> CommitWeight:
+    """`version` is the files whose diff here is a version bump (version_bumps): they count
+    as their own kind, not as a dependency change, and a commit that only bumps versions
+    (with docs such as a changelog alongside) weighs like a lockfile bump."""
     if not c.files:  # merge commits and empty commits land nothing themselves
         return CommitWeight(c.sha, 0.0, ["no diff (merge or empty)"], 0)
-    kinds = [_kind(f) for f in c.files]
+    version = version or set()
+    kinds = ["version" if f in version else _kind(f) for f in c.files]
     kindset = set(kinds)
     reasons: list[str] = []
     raw_lines = c.insertions + c.deletions
 
     if kindset <= {"lock", "generated", "media"}:
         return CommitWeight(c.sha, 0.02, ["only lockfiles, generated or media files"], eff_lines)
+    n_version = kinds.count("version")
+    if n_version and kindset <= NEAR_ZERO | {"version"}:
+        files = f"{n_version} file{'s' if n_version != 1 else ''}"
+        return CommitWeight(c.sha, VERSION_BUMP_WEIGHT, [f"version bump only ({files})"], eff_lines)
     if raw_lines > 0 and eff_lines == 0:
         return CommitWeight(c.sha, 0.05, ["whitespace-only change"], 0)
     if c.sha in renames and eff_lines == 0:
@@ -132,12 +242,14 @@ def heuristic_weight(
     reasons.append(f"{eff_lines} effective lines")
 
     code_files = [f for f, k in zip(c.files, kinds, strict=True) if k == "code"]
-    if not code_files and kindset <= {"test", "docs", "lock", "generated", "media"}:
+    if not code_files and kindset <= NEAR_ZERO | {"test", "version"}:
         w *= 0.4
         reasons.append("tests only")
     if "manifest" in kindset:
         w += 0.3
         reasons.append("dependencies changed")
+    if n_version:
+        reasons.append(f"{n_version} version-only file{'s' if n_version != 1 else ''}")
     if "infra" in kindset:
         w += 0.15
         reasons.append("infrastructure changed")
@@ -148,7 +260,9 @@ def heuristic_weight(
     if new_dirs:
         w += 0.3
         reasons.append("new top-level dir " + ",".join(sorted(new_dirs))[:30])
-    tops = {t for t in (_toplevel(f) for f in c.files) if t}
+    tops = {
+        t for f, k in zip(c.files, kinds, strict=True) if k != "version" and (t := _toplevel(f))
+    }
     if len(tops) > 1:
         w += min(0.2, 0.1 * (len(tops) - 1))
         reasons.append(f"spans {len(tops)} top-level dirs")
@@ -158,14 +272,33 @@ def heuristic_weight(
     return CommitWeight(c.sha, round(max(0.0, min(1.0, w)), 3), reasons, eff_lines)
 
 
+@dataclass
+class WeighInputs:
+    """What the heuristics read from git besides the commits themselves, per sha. The
+    parsed-commit cache (cache.py) keeps them so `weigh` does not rerun its passes."""
+
+    eff: dict[str, tuple[int, int]]  # (effective lines, effective lines outside lockfiles)
+    added: dict[str, set[str]]  # files first added
+    renames: set[str]  # commits with a rename or move
+    versions: dict[str, set[str]]  # files whose diff is a version bump
+
+    @classmethod
+    def from_git(cls, root: Path, commits: list[Commit], renames: set[str]) -> WeighInputs:
+        """Full passes over history (no cache)."""
+        return cls(_effective(root), added_files(root), renames, version_bumps(root, None, commits))
+
+
 def compute_weights(
     root: Path,
     commits: list[Commit],
     renames: set[str],
     group_max: int = GROUP_MAX_COMMITS,
+    inputs: WeighInputs | None = None,
 ) -> dict[str, CommitWeight]:
-    eff = _effective(root)
-    added = added_files(root)
+    """Heuristic weights for every commit, branch commits grouped under their merge.
+    `inputs` comes from the parsed-commit cache; without it the passes run over history."""
+    inputs = inputs or WeighInputs.from_git(root, commits, renames)
+    eff, added, versions = inputs.eff, inputs.added, inputs.versions
     seen_dirs: set[str] = set()
     new_dirs: dict[str, set[str]] = {}
     out: dict[str, CommitWeight] = {}
@@ -174,13 +307,18 @@ def compute_weights(
         new_dirs[c.sha] = (dirs - seen_dirs) if i >= 3 else set()
         seen_dirs |= dirs
         out[c.sha] = heuristic_weight(
-            c, eff.get(c.sha, (0, 0))[0], added.get(c.sha, set()), renames, new_dirs[c.sha]
+            c,
+            eff.get(c.sha, (0, 0))[0],
+            added.get(c.sha, set()),
+            inputs.renames,
+            new_dirs[c.sha],
+            versions.get(c.sha),
         )
     by_sha = {c.sha: c for c in commits}
     for merge, members in branch_groups(commits).items():
         work = [by_sha[s] for s in members if by_sha[s].files]  # merges inside land nothing
         if 2 <= len(work) <= group_max:
-            _weigh_group(by_sha[merge], work, out, eff, added, renames, new_dirs)
+            _weigh_group(by_sha[merge], work, out, inputs, new_dirs)
     return out
 
 
@@ -258,14 +396,14 @@ def _weigh_group(
     merge: Commit,
     work: list[Commit],
     out: dict[str, CommitWeight],
-    eff: dict[str, tuple[int, int]],
-    added: dict[str, set[str]],
-    renames: set[str],
+    inputs: WeighInputs,
     new_dirs: dict[str, set[str]],
 ) -> None:
     """Weigh a branch's commits as if squashed into one, then share that weight among them
     by their effective lines outside lockfiles and generated files, the same lines that
-    decide which units a commit's weight lands in."""
+    decide which units a commit's weight lands in. A file is a version bump in the squashed
+    commit when every branch commit that touched it only bumped a version there."""
+    eff, added, renames, versions = inputs.eff, inputs.added, inputs.renames, inputs.versions
     files: list[str] = []
     per_file: dict[str, int] = {}
     for c in work:
@@ -286,12 +424,14 @@ def _weigh_group(
         file_lines=per_file,
     )
     renamed = {squashed.sha} if any(c.sha in renames for c in work) else set()
+    bumped = {f for f in files if all(f in versions.get(c.sha, ()) for c in work if f in c.files)}
     g = heuristic_weight(
         squashed,
         sum(eff.get(c.sha, (0, 0))[0] for c in work),
         set().union(*(added.get(c.sha, set()) for c in work)),
         renamed,
         set().union(*(new_dirs.get(c.sha, set()) for c in work)),
+        bumped,
     )
     basis = [eff.get(c.sha, (0, 0))[1] for c in work]
     if sum(basis) <= 0:
@@ -350,17 +490,26 @@ def ensure_weights(
     root: Path,
     cache_path: Path,
     commits: list[Commit],
-    renames: set[str],
+    renames: set[str] | None = None,
     group_max: int = GROUP_MAX_COMMITS,
+    inputs: Any = None,
 ) -> dict[str, CommitWeight]:
     """Cached weights. When history has commits the cache has not seen, or the cache is an
     older version, the heuristics are recomputed for every commit (a new merge can group
     commits weighed before) and the LLM classes of refined commits are blended in again on
-    the new heuristic, so a refinement is paid for once and never lost."""
+    the new heuristic, so a refinement is paid for once and never lost. `inputs` is a
+    WeighInputs, or a callable returning one, called only when a recompute is needed (the
+    parsed-commit cache passes one, so a current commits.json needs no git pass at all)."""
     cached = load_cache(cache_path)
     stale = cache_version(cache_path) < CACHE_VERSION
     if stale or any(c.sha not in cached for c in commits):
-        fresh = compute_weights(root, commits, renames, group_max)
+        if callable(inputs):
+            inputs = inputs()
+        if renames is None:
+            from .history import rename_shas
+
+            renames = inputs.renames if inputs is not None else rename_shas(root)
+        fresh = compute_weights(root, commits, renames, group_max, inputs)
         for sha, w in fresh.items():
             old = cached.get(sha)
             if old is not None and old.refined in CLASS_WEIGHT:

@@ -80,7 +80,23 @@ ignored lines, log scale), dependency and infrastructure changes, new code files
 top-level directories and changes spanning several directories push the weight up; merges
 weigh 0. `udebt weigh --refine` asks the model to classify the heaviest commits as
 architectural, behavioural, refactor or cosmetic and blends that in. Weights are cached in
-`.udebt/commits.json` (version 2; a version 1 cache is recomputed, keeping refinements).
+`.udebt/commits.json` (version 3; an older cache is recomputed, keeping refinements).
+
+**Version bumps are not dependency changes.** A manifest (`package.json`, `pyproject.toml`,
+`Cargo.toml`, `setup.py`, `pom.xml`, `go.mod` and the rest) or a version file (`VERSION`,
+`_version.py`, `version.ts`, `lerna.json`, `Chart.yaml`, ...) whose diff in a commit changes
+only version strings is a *version bump* in that commit, not a manifest change. A changed
+line counts when it sets a version (`"version": "1.2.3"`, `version = "1.2.3"`,
+`__version__ = ...`, `<version>...</version>`, a bare version) or when its old and new forms
+are the same line apart from the version (`"@sentry/core": "8.1.0"` to `"8.2.0"`, which a
+monorepo release rewrites in every package, or `playwright==1.56.0` to `==1.61.0`); a version
+string needs at least `major.minor`, so `"port": 3000` is not one. A version bump adds nothing
+for dependencies, does not count towards the directories a commit spans, and its lines are
+left out of line share like lockfile lines. A commit whose changes are all version bumps,
+apart from docs (a changelog), lockfiles and generated files, weighs 0.03, like a lockfile
+bump, so a monorepo release no longer decays every unit. Adding, removing or swapping a
+dependency is still a dependency change (+0.3). One `git log -p -U0` pass, restricted to
+manifest and version files, reads the diffs; the parsed-commit cache keeps the result.
 
 **A merged branch is weighed as one commit.** A repository that squashes every pull request
 lands it as one commit; one that merges keeps the branch's commits, and weighed one by one
@@ -117,7 +133,7 @@ For each architectural unit `u` and developer `d`:
 | evidence of one answer | correct 1.0, partial 0.5, wrong 0.0, unknown 0.0, **confidently wrong -0.5** |
 | verified understanding | mean evidence over the last 5 answers on `u`, clamped to [0, 1] |
 | understanding | verified x 0.9^(mass landed on `u` since the last answer) |
-| line share of a commit in `u` | changed lines under `u` / all changed lines, lockfile and generated lines left out; a file listed by k top-level units counts 1/k of its lines in each, and a parent's part is split again among the sub-units listing it |
+| line share of a commit in `u` | changed lines under `u` / all changed lines, lockfile, generated and version-bump lines left out; a file listed by k top-level units counts 1/k of its lines in each, and a parent's part is split again among the sub-units listing it |
 | attribution of a commit to `u` | weight x sqrt(line share); 0 for a bot commit |
 | prior (no quiz yet) | 0.5 x your weighted share of `u` x 0.9^(mass others landed since your last commit) |
 | importance | 0.6 x centrality/5 + 0.4 x mass/max mass, centrality rated 1-5 by the mapper |

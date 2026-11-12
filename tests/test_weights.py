@@ -5,7 +5,15 @@ from conftest import AI_ENV, git
 from udebt import cli
 from udebt.history import rename_shas
 from udebt.provenance import load_commits
-from udebt.weights import branch_groups, compute_weights, ensure_weights
+from udebt.weights import (
+    CACHE_VERSION,
+    VERSION_BUMP_WEIGHT,
+    branch_groups,
+    compute_weights,
+    ensure_weights,
+    version_bumps,
+    version_only,
+)
 
 
 def test_heuristic_weights(mixed_repo):
@@ -49,7 +57,7 @@ def test_cache_keeps_refinements(mixed_repo):
     again = ensure_weights(root, path, cs, set())
     assert again[cs[0].sha].weight == 0.99 and again[cs[0].sha].refined == "architectural"
     data = json.loads(path.read_text())
-    assert data["version"] == 2 and len(data["commits"]) == len(cs)
+    assert data["version"] == CACHE_VERSION and len(data["commits"]) == len(cs)
 
 
 def test_version_1_cache_is_recomputed_keeping_refinements(mixed_repo):
@@ -71,7 +79,7 @@ def test_version_1_cache_is_recomputed_keeping_refinements(mixed_repo):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"version": 1, "commits": v1}))
     again = ensure_weights(root, path, cs, set())
-    assert json.loads(path.read_text())["version"] == 2
+    assert json.loads(path.read_text())["version"] == CACHE_VERSION
     # recomputed from the current heuristic; the refinement is blended in again, not lost
     assert again[first].refined == "architectural"
     assert again[first].weight == round(0.5 * fresh[first].weight + 0.5 * 1.0, 3)
@@ -206,3 +214,84 @@ def test_weigh_refine_and_risk_cli(mixed_repo, monkeypatch, capsys):
     assert rc == 1
     rc, out = run("hook", "install")
     assert rc == 0 and (root / ".git" / "hooks" / "pre-push").exists()
+
+
+def test_version_only_lines():
+    assert version_only(['  "version": "1.2.3",'], ['  "version": "1.3.0",'])
+    assert version_only(['version = "0.4.1"'], ['version = "0.5.0"'])  # pyproject, Cargo
+    assert version_only(["__version__ = '2.0.0'"], ["__version__ = '2.0.1'"])
+    assert version_only(["    <version>1.0</version>"], ["    <version>1.1-SNAPSHOT</version>"])
+    assert version_only(["8.1.0"], ["8.2.0"])  # a VERSION file
+    # a monorepo release rewrites the internal pins too: same line apart from the version
+    assert version_only(
+        ['"version": "8.1.0",', '"@sentry/core": "8.1.0",'],
+        ['"version": "8.2.0",', '"@sentry/core": "8.2.0",'],
+    )
+    assert not version_only([], ['"fastapi": "0.110.0",'])  # a new dependency
+    assert not version_only(['"fastapi": "0.110.0",'], ['"starlette": "0.37.0",'])  # a swap
+    assert not version_only(['"port": 3000,'], ['"port": 4000,'])  # not a version string
+    assert not version_only(['"version": "1.0.0",'], ['"version": "1.0.1",', '"private": true,'])
+    assert not version_only(["", "  "], [""])  # nothing but blank lines
+
+
+def _release_repo(tmp_path):
+    root = tmp_path / "mono"
+    root.mkdir()
+    git(root, "init", "-q", "-b", "main")
+    git(root, "config", "user.name", "Dev One")
+    git(root, "config", "user.email", "dev1@example.com")
+
+    def pkg(name, version, deps=None):
+        dep = "".join(f',\n  "dependencies": {{"{d}": "{v}"}}' for d, v in (deps or {}).items())
+        return f'{{\n  "name": "{name}",\n  "version": "{version}"{dep}\n}}\n'
+
+    for name in ("core", "browser", "node"):
+        d = root / "packages" / name
+        (d / "src").mkdir(parents=True)
+        (d / "src" / "index.ts").write_text(f"export const {name} = 1;\n")
+        deps = {} if name == "core" else {"@x/core": "1.0.0"}
+        (d / "package.json").write_text(pkg(f"@x/{name}", "1.0.0", deps))
+    (root / "CHANGELOG.md").write_text("# Changelog\n")
+    git(root, "add", ".")
+    git(root, "commit", "-q", "-m", "initial")
+    (root / "packages" / "core" / "src" / "index.ts").write_text("export const core = 2;\n")
+    git(root, "commit", "-q", "-am", "core: bump the constant")
+    return root, pkg
+
+
+def test_version_bumps_weigh_like_lockfile_bumps(tmp_path):
+    root, pkg = _release_repo(tmp_path)
+    # a release that bumps one package's version only
+    (root / "packages" / "core" / "package.json").write_text(pkg("@x/core", "1.0.1"))
+    git(root, "commit", "-q", "-am", "release: core 1.0.1")
+    # a monorepo release: three package.json files, versions and internal pins, a changelog
+    for name in ("core", "browser", "node"):
+        deps = {} if name == "core" else {"@x/core": "1.1.0"}
+        (root / "packages" / name / "package.json").write_text(pkg(f"@x/{name}", "1.1.0", deps))
+    (root / "CHANGELOG.md").write_text("# Changelog\n\n## 1.1.0\n\n- core bump\n")
+    git(root, "commit", "-q", "-am", "release: 1.1.0")
+    # a real dependency change
+    (root / "packages" / "node" / "package.json").write_text(
+        '{\n  "name": "@x/node",\n  "version": "1.1.0",\n  "dependencies": {"@x/core": '
+        '"1.1.0"},\n  "devDependencies": {"express": "4.19.2"}\n}\n'
+    )
+    git(root, "commit", "-q", "-am", "node: add express")
+
+    cs = load_commits(root)
+    by = {c.subject: c for c in cs}
+    bumps = version_bumps(root, commits=cs)
+    assert bumps[by["release: 1.1.0"].sha] == {
+        f"packages/{n}/package.json" for n in ("core", "browser", "node")
+    }
+    assert by["node: add express"].sha not in bumps
+    assert version_bumps(root) == bumps  # the full pass and the restricted one agree
+    w = compute_weights(root, cs, set())
+    one, mono = w[by["release: core 1.0.1"].sha], w[by["release: 1.1.0"].sha]
+    assert one.weight == mono.weight == VERSION_BUMP_WEIGHT
+    assert "version bump only (3 files)" in mono.reasons
+    dep = w[by["node: add express"].sha]
+    assert dep.weight >= 0.4 and "dependencies changed" in dep.reasons
+    # line share leaves the version lines out, as it does lockfiles: only the changelog counts
+    mono_c = by["release: 1.1.0"]
+    mono_c.version_files = bumps[mono_c.sha]
+    assert set(mono_c.counted_lines) == {"CHANGELOG.md"}

@@ -24,7 +24,14 @@ from .provenance import (
     unit_provenance,
 )
 from .store import Store, now_iso
-from .weights import CommitWeight, ensure_weights
+from .weights import (
+    CommitWeight,
+    WeighInputs,
+    _effective,
+    added_files,
+    ensure_weights,
+    version_bumps,
+)
 
 MAP_VERSION = 3
 IGNORED_PREFIXES = (".git/", ".udebt/", "node_modules/", "dist/", "build/", "__pycache__/")
@@ -49,8 +56,20 @@ def commits_for(root: Path, store: Store) -> list[Commit]:
 
 
 def weights_for(root: Path, store: Store, commits: list[Commit]) -> dict[str, CommitWeight]:
+    """Cached commit weights. Also marks each commit's version-bump files, which line share
+    leaves out, so call it before taking any share or attribution."""
+    versions = version_bumps(root, commits=commits)
+    for c in commits:
+        c.version_files = versions.get(c.sha, set())
+        c.__dict__.pop("counted_lines", None)  # recomputed without the version lines
+    renames = rename_shas(root)
     return ensure_weights(
-        root, store.weights_path, commits, rename_shas(root), store.config.group_max_commits
+        root,
+        store.weights_path,
+        commits,
+        renames,
+        store.config.group_max_commits,
+        lambda: WeighInputs(_effective(root), added_files(root), renames, versions),
     )
 
 
@@ -159,9 +178,7 @@ def build_map(
         raise SystemExit("No tracked files to map. Commit something first.")
     commits = commits_for(root, store)
     renames = rename_shas(root)
-    weights = ensure_weights(
-        root, store.weights_path, commits, renames, store.config.group_max_commits
-    )
+    weights = weights_for(root, store, commits)
     candidates = decision_candidates(commits, renames, max_history)
     tree = tree_summary(files) if len(files) > FILE_LIST_LIMIT else None
     struct = discover(root, store, files, commits, weights)

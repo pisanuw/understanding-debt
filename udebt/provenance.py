@@ -212,6 +212,9 @@ class Commit:
     file_lines: dict[str, int] = field(default_factory=dict)  # path -> insertions + deletions
     parents: list[str] = field(default_factory=list)
     directed_by: str | None = None  # developer who directed this agent commit (config)
+    # files whose diff here changes only version strings (weights.version_bumps); set with
+    # the weights, before any line share is taken
+    version_files: set[str] = field(default_factory=set)
 
     @property
     def short(self) -> str:
@@ -226,9 +229,14 @@ class Commit:
 
     @cached_property
     def counted_lines(self) -> dict[str, int]:
-        """Changed lines per file, without lockfiles and generated files: a 2000-line
-        package-lock.json says nothing about where a refactor's thinking went."""
-        return {f: n for f, n in self.file_lines.items() if not mechanical(f)}
+        """Changed lines per file, without lockfiles, generated files and version bumps: a
+        2000-line package-lock.json or a version field in every package.json says nothing
+        about where a refactor's thinking went."""
+        return {
+            f: n
+            for f, n in self.file_lines.items()
+            if not mechanical(f) and f not in self.version_files
+        }
 
     def share(
         self,
@@ -376,6 +384,101 @@ def assign_directed(
 
 
 _NUMSTAT = re.compile(r"^(\d+|-)\t(\d+|-)\t(.+)$")
+_LOG_FORMAT = "%x1e%H%x1f%P%x1f%aI%x1f%aN%x1f%aE%x1f%s%x1f%b%x1d"  # %aN/%aE honour .mailmap
+
+
+def git_log(root: Path, args: list[str], shas: list[str] | None = None) -> str:
+    """`git log <args>` over history from HEAD, or over exactly `shas` (fed on stdin with
+    `--no-walk`, so nothing else is walked). Output is decoded leniently."""
+    cmd = ["git", "log", *args]
+    if shas is not None:
+        cmd[2:2] = ["--no-walk=unsorted", "--stdin"]
+    return subprocess.run(
+        cmd,
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        input="\n".join(shas) + "\n" if shas is not None else None,
+    ).stdout
+
+
+def parse_log(
+    root: Path, shas: list[str] | None = None, limit: int | None = None
+) -> list[dict[str, Any]]:
+    """What `git log --numstat` says about each commit, newest first (in log order when
+    walking from HEAD; in no particular order for `shas`): sha, parents, author date, name and
+    email, subject, body, and per-file changed lines. Plain data, so the parsed-commit cache
+    (cache.py) can store it; `commit_from` turns one into a Commit."""
+    if shas is not None and not shas:
+        return []
+    args = [f"--format={_LOG_FORMAT}", "--numstat", "--no-renames"]
+    if limit:
+        args.append(f"-n{limit}")
+    out = git_log(root, args, shas)
+    raws: list[dict[str, Any]] = []
+    for rec in out.split("\x1e"):
+        if not rec.strip():
+            continue
+        head, _, stat = rec.partition("\x1d")
+        parts = head.split("\x1f", 6)
+        if len(parts) < 7:
+            continue
+        sha, parents, date, an, ae, subject, body = parts
+        files: list[list[Any]] = []
+        ins = dels = 0
+        for line in stat.splitlines():
+            m = _NUMSTAT.match(line)
+            if m:
+                a = int(m.group(1)) if m.group(1).isdigit() else 0
+                d = int(m.group(2)) if m.group(2).isdigit() else 0
+                ins += a
+                dels += d
+                files.append([m.group(3), a + d])
+        raws.append(
+            {
+                "sha": sha.strip(),
+                "parents": parents.split(),
+                "date": date,
+                "author_name": an,
+                "author_email": ae,
+                "subject": subject,
+                "body": body.strip(),
+                "files": files,
+                "insertions": ins,
+                "deletions": dels,
+            }
+        )
+    return raws
+
+
+def commit_from(raw: dict[str, Any]) -> Commit:
+    """A Commit from one `parse_log` record, not yet classified."""
+    return Commit(
+        sha=raw["sha"],
+        date=raw["date"],
+        author_name=raw["author_name"],
+        author_email=raw["author_email"],
+        subject=raw["subject"],
+        body=raw["body"],
+        files=[f for f, _ in raw["files"]],
+        insertions=raw["insertions"],
+        deletions=raw["deletions"],
+        file_lines={f: n for f, n in raw["files"]},
+        parents=list(raw["parents"]),
+    )
+
+
+def classify_all(
+    commits: list[Commit], sigs: list[Signature] | None = None, bots: list[Signature] | None = None
+) -> list[Commit]:
+    sigs = sigs or load_signatures()
+    bots = bots if bots is not None else load_bots()
+    for c in commits:
+        c.klass, c.agent = classify(c, sigs, bots)
+    return commits
 
 
 def load_commits(
@@ -385,59 +488,10 @@ def load_commits(
     bots: list[Signature] | None = None,
 ) -> list[Commit]:
     """All commits reachable from HEAD, oldest first, with changed files, parents and
-    classification."""
-    sigs = sigs or load_signatures()
-    bots = bots if bots is not None else load_bots()
-    fmt = "%x1e%H%x1f%P%x1f%aI%x1f%aN%x1f%aE%x1f%s%x1f%b"  # %aN/%aE honour .mailmap
-    cmd = ["git", "log", f"--format={fmt}", "--numstat", "--no-renames"]
-    if limit:
-        cmd.append(f"-n{limit}")
-    out = subprocess.run(
-        cmd,
-        cwd=root,
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    ).stdout
-    commits: list[Commit] = []
-    for rec in out.split("\x1e"):
-        if not rec.strip():
-            continue
-        parts = rec.split("\x1f", 6)
-        if len(parts) < 7:
-            continue
-        sha, parents, date, an, ae, subject, rest = parts
-        body_lines, files, ins, dels, per_file = [], [], 0, 0, {}
-        for line in rest.splitlines():
-            m = _NUMSTAT.match(line)
-            if m:
-                files.append(m.group(3))
-                a = int(m.group(1)) if m.group(1).isdigit() else 0
-                d = int(m.group(2)) if m.group(2).isdigit() else 0
-                ins += a
-                dels += d
-                per_file[m.group(3)] = a + d
-            else:
-                body_lines.append(line)
-        c = Commit(
-            sha=sha.strip(),
-            date=date,
-            author_name=an,
-            author_email=ae,
-            subject=subject,
-            body="\n".join(body_lines).strip(),
-            files=files,
-            insertions=ins,
-            deletions=dels,
-            file_lines=per_file,
-            parents=parents.split(),
-        )
-        c.klass, c.agent = classify(c, sigs, bots)
-        commits.append(c)
-    commits.reverse()
-    return commits
+    classification. Parses the whole history every time; commands go through the
+    parsed-commit cache instead (cache.load_commits)."""
+    commits = [commit_from(r) for r in reversed(parse_log(root, limit=limit))]
+    return classify_all(commits, sigs, bots)
 
 
 def _emails(dev: str | set[str] | None) -> set[str]:

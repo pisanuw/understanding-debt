@@ -1,6 +1,8 @@
 """What kind of file a path is, from its name alone: lockfile, generated, media, dependency
 manifest, infrastructure, test, docs or code. Shared by commit weights, history mining,
-line-share attribution and structural clustering."""
+line-share attribution and structural clustering. A ninth kind, `version`, is per commit: a
+manifest or version file whose diff in that commit changes only version strings
+(weights.version_bumps)."""
 
 from __future__ import annotations
 
@@ -28,6 +30,46 @@ GENERATED = re.compile(
 DOCS = re.compile(r"(^|/)(docs?|doc)/|\.(md|rst|txt|adoc)$|(^|/)(LICENSE|CHANGELOG|README)[^/]*$")
 TESTS = re.compile(r"(^|/)(tests?|__tests__|spec|e2e)/|(^|/)test_[^/]+$|[._](test|spec)\.[a-z]+$")
 MEDIA = re.compile(r"\.(png|jpe?g|gif|svg|ico|webp|mp3|mp4|wav|pdf|woff2?|ttf)$")
+# Files a release rewrites to carry a version number, besides the manifests: release
+# manifests and version files. Whether one commit's edit to such a file (or to a manifest) is
+# a version bump is decided from its diff (weights.version_bumps), never from the name alone.
+VERSION_FILES = re.compile(
+    r"(^|/)(lerna\.json|\.release-please-manifest\.json|Chart\.yaml|gradle\.properties|"
+    r"VERSION(\.txt)?|__version__\.py|_?version\.(py|txt|json|rb|go|[cm]?[jt]s))$"
+)
+# git pathspecs covering every manifest and version file, for the one diff pass that reads them
+VERSION_PATHSPECS = [
+    f":(glob)**/{name}"
+    for name in (
+        "pyproject.toml",
+        "setup.py",
+        "setup.cfg",
+        "requirements*.txt",
+        "Pipfile",
+        "environment.yml",
+        "environment.yaml",
+        "package.json",
+        "go.mod",
+        "Cargo.toml",
+        "Gemfile",
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "composer.json",
+        "mix.exs",
+        "deno.json",
+        "pubspec.yaml",
+        "lerna.json",
+        ".release-please-manifest.json",
+        "Chart.yaml",
+        "gradle.properties",
+        "VERSION",
+        "VERSION.txt",
+        "__version__.py",
+        "version.*",
+        "_version.*",
+    )
+]
 
 
 def kind(path: str) -> str:
@@ -53,3 +95,8 @@ MECHANICAL = ("lock", "generated", "media")  # lines here say nothing about unde
 
 def mechanical(path: str) -> bool:
     return kind(path) in MECHANICAL
+
+
+def version_candidate(path: str) -> bool:
+    """A manifest or version file: its diff may be nothing but a version bump."""
+    return bool(MANIFESTS.search(path) or VERSION_FILES.search(path))

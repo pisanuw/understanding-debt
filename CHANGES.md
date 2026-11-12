@@ -33,3 +33,4 @@
 2026-11-12 [note] First synthetic run, digitalme at 44f520b, 12 units: 0 correct, Spearman(mass since, wrongness) -0.27 (p 0.81). No support for decay; floor effect and confidence term.
 2026-11-12 [note] Dogfood .udebt regenerated: commits.json v2, map rescored, both sessions directed by pisan@uw.edu, whose seeded set is now all 12 units (index 74.9).
 2026-11-12 [note] Starter-set offline run on ba564e2 (TESTBEDS.md): servo 0 AI in 59k commits; human-cut version bumps weigh >=0.7 (244 in sentry-js); servo weigh 18 min.
+2026-11-12 [decision] Version-only manifest/version-file edits (own version or pins) are a `version` kind: no +0.3, out of line share; a commit of only bumps weighs 0.03. commits.json v3.

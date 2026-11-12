@@ -144,6 +144,16 @@ acceptable.
   `records/`; the report is `experiments/synthetic-<sha8>-<Lisbon date>.json` and names
   the resolved sha, since `<rev>` may contain `~`. First result on digitalme: rho -0.27, no
   support for decay; recorded as is (ROADMAP Phase 5).
+- **Version bumps** (Phase 1.2): a manifest or version file whose diff changes only version
+  strings is a `version` kind for that commit: no +0.3 for dependencies, no directory spread,
+  out of line share; a commit of only version bumps (plus docs, lockfiles, generated files)
+  weighs 0.03. A changed line counts when it sets a version or is a pin whose old and new
+  forms differ only in version strings, so a dependency *upgrade* (`playwright==1.56.0` to
+  `1.61.0`) is a version bump too; adding, removing or swapping a dependency is not. This
+  goes past the four own-version patterns the owner named, because a monorepo release
+  rewrites every package's internal pins along with its version (see open questions). A
+  version needs `major.minor`. `__version__` in a package's `__init__.py` is not read (only
+  named version files are), to keep the diff pass to manifests.
 - **Team view without quizzes** (owner): when no developer has a quiz record, it says
   "no quiz evidence yet; holders need a quiz score >= threshold" and labels the holder
   column `quizzed`.
@@ -167,3 +177,6 @@ acceptable.
   `pipeline` name heuristic stay?
 - vscode's `on behalf of @user` footer names the directing developer; it could fill
   `directed` automatically from `handles`.
+- Dependency upgrades (same package, new version) now weigh like version bumps. Should a
+  major-version upgrade (`pydantic>=1` to `>=2`) with no code change keep some weight? On
+  prefect most such commits are dependabot's (already bots); on go-git several are human.

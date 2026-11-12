@@ -1,5 +1,14 @@
 {
  "commits": {
+  "09a75770c47ec3838f6f65446ecf9a82da28edc0": {
+   "effective_lines": 35,
+   "reasons": [
+    "documentation only"
+   ],
+   "refined": null,
+   "sha": "09a75770c47ec3838f6f65446ecf9a82da28edc0",
+   "weight": 0.05
+  },
   "2394341bbda5e124694cebc4bb9b2d5c67577a6d": {
    "effective_lines": 975,
    "reasons": [
@@ -115,6 +124,16 @@
    "sha": "a6a02e2a205d3caf1547dc49c2670b2dd97c33bd",
    "weight": 0.778
   },
+  "ba564e24af5cf56b7283ad5abc61c36357fac843": {
+   "effective_lines": 15,
+   "reasons": [
+    "15 effective lines",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "ba564e24af5cf56b7283ad5abc61c36357fac843",
+   "weight": 0.468
+  },
   "cf5ce6d80c776c114577bbaacc6ad91fed0831a3": {
    "effective_lines": 232,
    "reasons": [
@@ -133,6 +152,16 @@
    "refined": null,
    "sha": "e2a508610931e946f1d1e6950cd3dbdd222659ba",
    "weight": 0.082
+  },
+  "e8da3bb389776c37f80b65919c59e1b3ce077cd3": {
+   "effective_lines": 365,
+   "reasons": [
+    "365 effective lines",
+    "2 new code files"
+   ],
+   "refined": null,
+   "sha": "e8da3bb389776c37f80b65919c59e1b3ce077cd3",
+   "weight": 0.77
   },
   "e8e799a29da5fb7bb35e1b6e1c6f180f1a72f5b3": {
    "effective_lines": 1703,
@@ -164,5 +193,5 @@
    "weight": 0.8
   }
  },
- "version": 2
+ "version": 3
 }
