@@ -13,9 +13,13 @@ commit only to code that is still there; a founding commit (the first three) add
 after that, and is the only kind kept when none of its files survive. Dependencies and
 infrastructure are reasons, but count only through the weight.
 
-The cut keeps the strongest candidates, but first gives each period of the history (equal
-quarters of the weighted mass by default) a floor of slots, so a long pre-AI past cannot
-crowd out the recent, AI-built era. Ties go to the more recent commit.
+The cut gives each period of the history (equal quarters of the weighted mass by default) a
+floor of slots, filled by its strongest candidates, so a long pre-AI past cannot crowd out
+the recent, AI-built era, and the larger, fully surviving AI-era commits cannot crowd out the
+past. By default the floors take every slot (4 periods x 10 of 40), so slots are
+proportional to mass; a smaller quota leaves the rest to the strongest candidates anywhere,
+and a period with too few candidates leaves its slots to them too. Ties go to the more
+recent commit.
 
 Bot commits (dependabot, release automation) are never candidates.
 """
@@ -50,7 +54,7 @@ BONUS_RENAMES = 0.2
 BONUS_KEYWORD = 0.1  # per keyword, at most two
 MIN_SCORE = 0.5  # weight plus bonuses, before survival, that makes a commit a candidate
 PERIODS = 4  # the history is cut into this many periods of equal weighted mass
-QUOTA = 5  # slots each period is guaranteed, if it has that many candidates
+QUOTA = 10  # slots each period is guaranteed, if it has that many: 4 x 10 of 40, by mass
 
 
 def _parse_renames(out: str) -> dict[str, list[tuple[str, str]]]:

@@ -38,7 +38,7 @@ class Config:
     cochange_max_files: int = 30  # commits touching more files are left out of co-change
     group_max_commits: int = 50  # a merged branch up to this long is weighed as one commit
     history_periods: int = 4  # history mining cuts history into this many equal-mass periods
-    history_quota: int = 5  # decision candidates each period is guaranteed (of 40)
+    history_quota: int = 10  # candidates each period is guaranteed (of 40): slots by mass
     identities: dict[str, list[str]] = field(default_factory=dict)  # primary email -> aliases
     # CODEOWNERS handle -> email (or list of emails); null marks a handle still to be mapped
     handles: dict[str, Any] = field(default_factory=dict)

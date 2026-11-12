@@ -197,7 +197,7 @@ def test_history_candidates_cli(aging_repo, capsys):
     assert rc == 0 and "decision candidates" in out and "switch app step 5" in out
     assert "legacy: add stage" not in out
     cfg = json.loads((aging_repo / ".udebt" / "config.json").read_text())
-    assert cfg["history_quota"] == 5 and cfg["history_periods"] == 4
+    assert cfg["history_quota"] == 10 and cfg["history_periods"] == 4
     rc = cli.main(["--repo", str(aging_repo), "history", "--candidates", "--json"])
     rows = json.loads(capsys.readouterr().out)
     assert rc == 0 and {"survival", "weight", "period"} <= set(rows[0])
