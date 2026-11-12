@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #6f6d68;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10); --wash: rgba(11,11,11,0.04);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --other: #c3c2b7;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --good-text: #006300;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #9a988f;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --other: #4a4a46; --good-text: #0ca30c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #9a988f;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --other: #4a4a46; --good-text: #0ca30c;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--page); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  overflow-x: hidden;
+}
+main { max-width: 1120px; margin: 0 auto; padding: 20px 16px 40px; }
+h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+h2 { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
+.sub { color: var(--ink-2); margin: 0; }
+.meta { color: var(--muted); font-size: 12px; margin: 0; overflow-wrap: anywhere; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 16px 0; }
+.controls label { color: var(--ink-2); font-size: 13px; display: flex; gap: 6px; align-items: center; }
+select {
+  font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis);
+  border-radius: 6px; padding: 4px 8px; max-width: 100%;
+}
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.tile, .card {
+  background: var(--surface); border-radius: 10px; box-shadow: 0 0 0 1px var(--ring);
+}
+.tile { padding: 12px 14px; min-width: 0; }
+.tile .label { color: var(--ink-2); font-size: 12px; }
+.tile .value { font-size: 26px; font-weight: 600; line-height: 1.2; margin-top: 2px; }
+.tile .delta { font-size: 12px; color: var(--ink-2); }
+.card { padding: 14px; margin-top: 12px; min-width: 0; }
+.card .note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 4px; font-size: 12px; color: var(--ink-2); }
+.key { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.key i { display: inline-block; flex: none; width: 14px; height: 2px; border-radius: 1px; }
+.key b { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; }
+.key svg { flex: none; }
+.chartwrap { position: relative; }
+svg text { fill: var(--muted); font-size: 11px; }
+svg .ink { fill: var(--ink); }
+svg .ink2 { fill: var(--ink-2); }
+.tip {
+  position: absolute; pointer-events: none; z-index: 2; display: none;
+  background: var(--surface); color: var(--ink); border-radius: 8px; padding: 8px 10px;
+  box-shadow: 0 0 0 1px var(--ring), 0 4px 14px rgba(0,0,0,0.12); font-size: 12px;
+  max-width: 280px; overflow-wrap: anywhere;
+}
+.tip .when { color: var(--ink-2); margin-bottom: 4px; }
+.tip .row { display: flex; align-items: center; gap: 6px; }
+.tip .row strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tip .row span { color: var(--ink-2); }
+.tip i { display: inline-block; width: 12px; height: 2px; flex: none; }
+.scroll { overflow-x: auto; margin-top: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { text-align: left; font-weight: 600; color: var(--ink-2); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--axis); white-space: nowrap; }
+td { padding: 6px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.wrap { overflow-wrap: break-word; min-width: 140px; }
+td.nowrap { white-space: nowrap; }
+tr.child td:first-child { padding-left: 22px; color: var(--ink-2); }
+.badge { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; font-size: 12px; }
+.badge svg { flex: none; }
+code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink-2); }
+.seg { display: flex; gap: 2px; height: 28px; margin: 10px 0 6px; }
+.seg div {
+  border-radius: 4px; min-width: 0; color: #fff; font-size: 12px; font-weight: 600;
+  display: flex; align-items: center; padding-left: 6px; overflow: hidden; white-space: nowrap;
+}
+.seg div.dark { color: #0b0b0b; }
+.ranked { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) auto; gap: 6px 10px; align-items: center; margin-top: 10px; font-size: 13px; }
+.ranked .name { overflow-wrap: break-word; }
+@media (max-width: 560px) {
+  .ranked { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; }
+  .ranked .name { grid-column: 1 / -1; margin-top: 6px; }
+}
+.ranked .bar { height: 8px; border-radius: 4px; }
+.ranked .val { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; color: var(--ink-2); }
+.ranked .val strong { color: var(--ink); }
+button.more { font: inherit; font-size: 12px; margin-top: 8px; color: var(--ink); background: none; border: 1px solid var(--axis); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+details { margin-top: 12px; }
+summary { cursor: pointer; color: var(--ink-2); }
+footer { color: var(--muted); font-size: 12px; margin-top: 20px; }
+footer p { margin: 4px 0; }
+:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="title">Understanding debt</h1>
+    <p class="sub" id="subtitle"></p>
+    <p class="meta" id="meta"></p>
+  </header>
+  <div class="controls">
+    <label>Developer <select id="dev"></select></label>
+    <label>Risk events <select id="levels">
+      <option value="strong">OUTSIDE and HIGH</option>
+      <option value="all">all, with CAUTION</option>
+    </select></label>
+  </div>
+  <section class="tiles" id="tiles" aria-label="Summary"></section>
+
+  <section class="card">
+    <h2>Debt index over time</h2>
+    <p class="sub" id="chart-sub"></p>
+    <div class="legend" id="legend"></div>
+    <div class="chartwrap">
+      <svg id="chart" role="img" aria-label="Debt index over time, one line per developer" tabindex="0"></svg>
+      <div class="tip" id="tip" role="status"></div>
+    </div>
+    <p class="note" id="chart-note"></p>
+  </section>
+
+  <section class="card">
+    <h2 id="bd-title">Where the debt is</h2>
+    <p class="sub" id="bd-sub"></p>
+    <div class="seg" id="seg" role="img"></div>
+    <div class="legend" id="seg-legend"></div>
+    <div class="ranked" id="ranked"></div>
+    <p class="note" id="bd-note"></p>
+  </section>
+
+  <section class="card">
+      <h2>Contributors</h2>
+      <p class="sub">Labels from <code>udebt contributors</code>; AI, Bot and Joint come from commit signatures, "most likely" from metadata only.</p>
+      <div class="scroll"><table id="contributors"></table></div>
+    </section>
+    <section class="card">
+      <h2>Units</h2>
+      <p class="sub" id="units-sub"></p>
+      <div class="scroll"><table id="units"></table></div>
+    </section>
+
+  <section class="card">
+    <h2>Risk events</h2>
+    <p class="sub">A developer landed a change on a unit they understood too little at the time: OUTSIDE (outside their set), HIGH (mass >= 0.3, understanding < 0.3), CAUTION (mass >= 0.1, understanding below the threshold).</p>
+    <div class="scroll"><table id="risk"></table></div>
+    <button class="more" id="risk-more" type="button" hidden>Show all</button>
+  </section>
+
+  <details>
+    <summary>The series as a table</summary>
+    <div class="scroll"><table id="series"></table></div>
+  </details>
+
+  <footer>
+    <p id="foot"></p>
+    <p>Units are the current map's, replayed against the past: a point counts the commits landed on the first-parent line by then (a branch with its merge) and the evidence recorded by then. Regenerate with <code>udebt dashboard</code>; the data is the JSON in the <code>udebt-data</code> script tag.</p>
+  </footer>
+</main>
+<script type="application/json" id="udebt-data">__DATA__</script>
+<script>
+(function () {
+  "use strict";
+  var D = JSON.parse(document.getElementById("udebt-data").textContent);
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var P = D.snapshots || [];
+  var devs = D.devs || [];
+  var units = D.units || [];
+  var top = units.filter(function (u) { return !u.parent; });
+  var unitName = {};
+  units.forEach(function (u) { unitName[u.id] = u.name || u.id; });
+  var state = { dev: devs[0] || null, sel: Math.max(0, P.length - 1), levels: "strong", riskAll: false };
+
+  // -- helpers ------------------------------------------------------------------
+  function el(tag, attrs, text) {
+    var e = document.createElement(tag);
+    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function sv(tag, attrs, text) {
+    var e = document.createElementNS(SVGNS, tag);
+    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+  function ts(s) { return Date.parse(s); }
+  function day(s) { return s ? String(s).slice(0, 10) : ""; }
+  function short(dev) { var at = dev.indexOf("@"); return at > 0 ? dev.slice(0, at) : dev; }
+  function fmt(x, d) { return x == null ? "-" : Number(x).toFixed(d == null ? 1 : d); }
+  function color(i) { return "var(--s" + ((i % 8) + 1) + ")"; }
+  function devColor(dev) { return color(Math.max(0, devs.indexOf(dev))); }
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function md(t) { var d = new Date(t); return MONTHS[d.getUTCMonth()] + " " + d.getUTCDate(); }
+  var LEVEL = { OUTSIDE: "critical", HIGH: "serious", CAUTION: "warning" };
+  function badge(level) {
+    var b = el("span", { "class": "badge" });
+    var s = sv("svg", { width: 10, height: 10, viewBox: "0 0 10 10", "aria-hidden": "true" });
+    var shape = level === "OUTSIDE" ? sv("path", { d: "M5 0 L10 9 L0 9 Z" })
+      : level === "HIGH" ? sv("rect", { x: 1, y: 1, width: 8, height: 8, rx: 1 })
+      : sv("circle", { cx: 5, cy: 5, r: 4 });
+    shape.setAttribute("fill", "var(--" + LEVEL[level] + ")");
+    s.appendChild(shape); b.appendChild(s); b.appendChild(document.createTextNode(level));
+    return b;
+  }
+  function indexAt(dev, i) { var r = P[i] && P[i].devs[dev]; return r ? r.index : null; }
+  function pointAt(t) { // the last point at or before time t (or the first)
+    var j = 0;
+    for (var i = 0; i < P.length; i++) { if (ts(P[i].t) <= t) j = i; }
+    return j;
+  }
+  function aiShare(m) {
+    var tot = m.ai + m.assisted + m.human;
+    return tot ? (m.ai + 0.5 * m.assisted) / tot : 0;
+  }
+  function strongEvents() {
+    return (D.risk_events || []).filter(function (e) {
+      return state.levels === "all" || e.level !== "CAUTION";
+    });
+  }
+
+  // -- header, controls, tiles ----------------------------------------------------
+  document.getElementById("title").textContent = "Understanding debt: " + (D.repo || "");
+  var last = P[P.length - 1];
+  document.getElementById("subtitle").textContent = P.length
+    ? P.length + " points " + (D.settings.every === "week" ? "(weekly)" : "(every " + D.settings.every + ")") +
+      " from " + day(P[0].t) + " to " + day(last.t) + "; " + devs.length + " developer" + (devs.length === 1 ? "" : "s") +
+      ", " + top.length + " units"
+    : "No points yet: run udebt snapshot.";
+  var dec = D.settings.decay || {};
+  document.getElementById("meta").textContent = "HEAD " + String(D.head || "").slice(0, 8) +
+    " · generated " + day(D.generated_at) + " · decay " + dec.model +
+    (dec.model === "share" ? " (exp(-" + dec.rate + " x share changed))" : " (" + dec.per_mass + " per unit of mass)") +
+    " · known threshold " + D.settings.known_threshold + " · bus target " + D.settings.bus_target;
+
+  var devSel = document.getElementById("dev");
+  devs.forEach(function (d) { devSel.appendChild(el("option", { value: d }, d)); });
+  if (!devs.length) devSel.appendChild(el("option", { value: "" }, "(no developer)"));
+  devSel.addEventListener("change", function () { state.dev = devSel.value; renderAll(); });
+  var lvlSel = document.getElementById("levels");
+  lvlSel.addEventListener("change", function () { state.levels = lvlSel.value; renderAll(); });
+
+  function tile(label, value, delta) {
+    var t = el("div", { "class": "tile" });
+    t.appendChild(el("div", { "class": "label" }, label));
+    t.appendChild(el("div", { "class": "value" }, value));
+    if (delta) t.appendChild(el("div", { "class": "delta" }, delta));
+    return t;
+  }
+  function renderTiles() {
+    var box = document.getElementById("tiles"); clear(box);
+    var dev = state.dev;
+    if (dev && P.length) {
+      var now = indexAt(dev, P.length - 1);
+      var t0 = ts(last.t) - 28 * 864e5, j = pointAt(t0), then = indexAt(dev, j);
+      var delta = now != null && then != null
+        ? (now - then >= 0 ? "+" : "") + fmt(now - then) + " since " + day(P[j].t) : "";
+      box.appendChild(tile("Debt index, " + short(dev), fmt(now), delta));
+    }
+    var arch = top.filter(function (u) { return u.scope === "architectural"; });
+    var below = arch.filter(function (u) { return u.holders.length < D.settings.bus_target; });
+    box.appendChild(tile("Units below the bus target", below.length + " of " + arch.length,
+      "need " + D.settings.bus_target + " holders at understanding >= " + D.settings.known_threshold));
+    var ev = D.risk_events || [], o = 0, hgh = 0;
+    ev.forEach(function (e) { if (e.level === "OUTSIDE") o++; else if (e.level === "HIGH") hgh++; });
+    box.appendChild(tile("Risk events", String(o + hgh), o + " OUTSIDE, " + hgh + " HIGH, all developers"));
+    if (last) box.appendChild(tile("Agent share of the mass", Math.round(100 * aiShare(last.mass)) + "%",
+      "ai plus half of assisted, " + last.commits + " commits"));
+  }
+
+  // -- the main chart ---------------------------------------------------------------
+  var chart = document.getElementById("chart"), tip = document.getElementById("tip");
+  var geo = null;
+  function renderChart() {
+    clear(chart);
+    var legend = document.getElementById("legend"); clear(legend);
+    var wrap = chart.parentNode, W = Math.max(280, wrap.clientWidth);
+    var phone = W < 560;
+    var H = phone ? 250 : 300;
+    var m = { l: 46, r: phone ? 14 : 92, t: 10, b: 64 };
+    var iw = W - m.l - m.r, ih = H - m.t - m.b;
+    chart.setAttribute("viewBox", "0 0 " + W + " " + H);
+    chart.setAttribute("width", W); chart.setAttribute("height", H);
+    if (!P.length) { geo = null; return; }
+    var x0 = ts(P[0].t), x1 = ts(last.t);
+    if (x1 <= x0) { x0 -= 864e5; x1 += 864e5; }
+    function X(t) { return m.l + (t - x0) / (x1 - x0) * iw; }
+    function Y(v) { return m.t + (1 - v / 100) * ih; }
+    // grid and y axis
+    [0, 25, 50, 75, 100].forEach(function (v) {
+      chart.appendChild(sv("line", { x1: m.l, x2: m.l + iw, y1: Y(v), y2: Y(v), stroke: v === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }));
+      chart.appendChild(sv("text", { x: m.l - 6, y: Y(v) + 4, "text-anchor": "end" }, String(v)));
+    });
+    // x ticks: months, or weeks for a short span
+    var span = x1 - x0, ticks = [], d = new Date(x0);
+    if (span > 75 * 864e5) {
+      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+      while (d.getTime() <= x1) { ticks.push([d.getTime(), MONTHS[d.getUTCMonth()] + (d.getUTCMonth() === 0 ? " " + d.getUTCFullYear() : "")]); d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)); }
+    } else if (span < 2 * 864e5) {
+      var hrs = [1, 2, 3, 6, 12].filter(function (h) { return span / (h * 36e5) <= 8; })[0] || 12;
+      var t = Math.ceil(x0 / (hrs * 36e5)) * hrs * 36e5;
+      for (; t <= x1; t += hrs * 36e5) {
+        var hd = new Date(t), hh = ("0" + hd.getUTCHours()).slice(-2) + ":00";
+        ticks.push([t, hd.getUTCHours() === 0 ? md(t) : hh]);
+      }
+      if (ticks.length) ticks[0][1] = md(ticks[0][0]) + " " + ticks[0][1] + " UTC";
+    } else {
+      var step = span > 21 * 864e5 ? 7 : 1;
+      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1));
+      while (d.getTime() <= x1) { if (step === 1 || d.getUTCDay() === 1) ticks.push([d.getTime(), md(d.getTime())]); d = new Date(d.getTime() + 864e5); }
+    }
+    var lastX = -1e9, lastLen = 0;
+    ticks.forEach(function (tk) {
+      var x = X(tk[0]), need = 6.2 * (lastLen + tk[1].length) / 2 + 12;
+      if (x - lastX < need || x - 6.2 * tk[1].length / 2 < 0) return;
+      lastX = x; lastLen = tk[1].length;
+      chart.appendChild(sv("line", { x1: x, x2: x, y1: m.t + ih, y2: m.t + ih + 4, stroke: "var(--axis)" }));
+      chart.appendChild(sv("text", { x: x, y: m.t + ih + 16, "text-anchor": "middle" }, tk[1]));
+    });
+    // rugs below the axis: the selected developer's risk events, then heavy commits by others
+    var rugRisk = m.t + ih + 30, rugHeavy = m.t + ih + 50;
+    chart.appendChild(sv("text", { x: m.l - 6, y: rugRisk + 4, "text-anchor": "end" }, "risk"));
+    chart.appendChild(sv("text", { x: m.l - 6, y: rugHeavy + 4, "text-anchor": "end" }, "others"));
+    var dev = state.dev;
+    var marks = [];
+    (D.heavy_commits || []).forEach(function (c) {
+      if (c.dev && c.dev === dev) return;
+      var t = ts(c.landed); if (t < x0 || t > x1) return;
+      var h = 4 + 10 * Math.min(1, c.weight);
+      chart.appendChild(sv("line", { x1: X(t), x2: X(t), y1: rugHeavy + 6 - h, y2: rugHeavy + 6, stroke: c.klass === "ai" ? "var(--ink-2)" : "var(--muted)", "stroke-width": 1.5, "stroke-linecap": "round" }));
+      marks.push({ x: X(t), y: rugHeavy, kind: "heavy", c: c });
+    });
+    strongEvents().forEach(function (e) {
+      if (e.dev !== dev) return;
+      var t = ts(e.landed); if (t < x0 || t > x1) return;
+      var x = X(t), y = rugRisk;
+      var s = e.level === "OUTSIDE" ? sv("path", { d: "M" + x + " " + (y - 5) + " L" + (x + 5) + " " + (y + 4) + " L" + (x - 5) + " " + (y + 4) + " Z" })
+        : e.level === "HIGH" ? sv("rect", { x: x - 4, y: y - 4, width: 8, height: 8, rx: 1 })
+        : sv("circle", { cx: x, cy: y, r: 3.5 });
+      s.setAttribute("fill", "var(--" + LEVEL[e.level] + ")");
+      s.setAttribute("stroke", "var(--surface)"); s.setAttribute("stroke-width", 1.5);
+      chart.appendChild(s);
+      marks.push({ x: x, y: y, kind: "risk", e: e });
+    });
+    // one line per developer
+    devs.forEach(function (dv, k) {
+      var dpath = "", pen = false;
+      P.forEach(function (p, i) {
+        var v = indexAt(dv, i);
+        if (v == null) { pen = false; return; }
+        dpath += (pen ? " L" : " M") + X(ts(p.t)).toFixed(1) + " " + Y(v).toFixed(1); pen = true;
+      });
+      if (!dpath) return;
+      chart.appendChild(sv("path", { d: dpath, fill: "none", stroke: color(k), "stroke-width": dv === dev ? 2.5 : 2, "stroke-linejoin": "round", "stroke-linecap": "round", opacity: dev && dv !== dev ? 0.55 : 1 }));
+      var lv = indexAt(dv, P.length - 1);
+      if (lv != null && !phone && devs.length <= 4) {
+        chart.appendChild(sv("text", { x: m.l + iw + 8, y: Y(lv) + 4, "class": "ink" }, short(dv) + " " + fmt(lv)));
+      }
+      var key = el("span", { "class": "key" }); var i_ = el("i"); i_.style.background = color(k);
+      key.appendChild(i_); key.appendChild(document.createTextNode(dv)); legend.appendChild(key);
+    });
+    // evidence: quiz (circle) and dig (square) on the developer's line
+    (D.evidence || []).forEach(function (r) {
+      var t = ts(r.ts); if (!(t >= x0 && t <= x1)) return;
+      var v = indexAt(r.dev, pointAt(t)); if (v == null) return;
+      var x = X(t), y = Y(v), c = devColor(r.dev);
+      var s = r.type === "dig" ? sv("rect", { x: x - 4.5, y: y - 4.5, width: 9, height: 9, rx: 2 }) : sv("circle", { cx: x, cy: y, r: 4.5 });
+      s.setAttribute("fill", c); s.setAttribute("stroke", "var(--surface)"); s.setAttribute("stroke-width", 2);
+      chart.appendChild(s);
+      marks.push({ x: x, y: y, kind: "evidence", r: r });
+    });
+    // the selected point
+    var sp = P[state.sel], sx = X(ts(sp.t));
+    var sel = sv("g", {});
+    sel.appendChild(sv("line", { x1: sx, x2: sx, y1: m.t, y2: m.t + ih, stroke: "var(--axis)", "stroke-width": 1 }));
+    devs.forEach(function (dv, k) {
+      var v = indexAt(dv, state.sel); if (v == null) return;
+      sel.appendChild(sv("circle", { cx: sx, cy: Y(v), r: 4.5, fill: color(k), stroke: "var(--surface)", "stroke-width": 2 }));
+    });
+    chart.appendChild(sel);
+    var cross = sv("line", { x1: 0, x2: 0, y1: m.t, y2: m.t + ih, stroke: "var(--ink-2)", "stroke-width": 1, visibility: "hidden" });
+    chart.appendChild(cross);
+    geo = { X: X, m: m, iw: iw, ih: ih, W: W, marks: marks, cross: cross };
+    legendExtras(legend);
+    var ev = (D.evidence || []).length;
+    document.getElementById("chart-sub").textContent = "0 = understands every unit in the set, 100 = none. Click or use the arrow keys to pick a point.";
+    document.getElementById("chart-note").textContent = "Rugs: risk = " + (dev ? short(dev) + "'s " : "") +
+      "risk events; others = commits weighing >= " + D.settings.heavy + " by anyone else, agents in the stronger tone, height by weight. " +
+      (ev ? ev + " evidence records (circle quiz, square dig)." : "No quiz or dig evidence yet: every understanding here is the own-commit prior.");
+  }
+  function legendExtras(legend) {
+    function shape(kind, fill) {
+      var s = sv("svg", { width: 10, height: 10, viewBox: "0 0 10 10", "aria-hidden": "true" });
+      var e = kind === "sq" ? sv("rect", { x: 1, y: 1, width: 8, height: 8, rx: 2 }) : kind === "tri" ? sv("path", { d: "M5 0 L10 9 L0 9 Z" }) : sv("circle", { cx: 5, cy: 5, r: 4 });
+      e.setAttribute("fill", fill); s.appendChild(e); return s;
+    }
+    [["c", "var(--ink-2)", "quiz"], ["sq", "var(--ink-2)", "dig"], ["tri", "var(--critical)", "OUTSIDE"], ["sq", "var(--serious)", "HIGH"]].forEach(function (k) {
+      var key = el("span", { "class": "key" }); key.appendChild(shape(k[0], k[1])); key.appendChild(document.createTextNode(k[2])); legend.appendChild(key);
+    });
+  }
+  function nearestPoint(px) {
+    var best = 0, bd = 1e9;
+    P.forEach(function (p, i) { var d = Math.abs(geo.X(ts(p.t)) - px); if (d < bd) { bd = d; best = i; } });
+    return best;
+  }
+  function showTip(px, py, rows, when) {
+    clear(tip);
+    tip.appendChild(el("div", { "class": "when" }, when));
+    rows.forEach(function (r) {
+      var row = el("div", { "class": "row" });
+      if (r.c) { var i_ = el("i"); i_.style.background = r.c; row.appendChild(i_); }
+      row.appendChild(el("strong", null, r.v)); row.appendChild(el("span", null, r.k));
+      tip.appendChild(row);
+    });
+    tip.style.display = "block";
+    var w = tip.offsetWidth, ww = chart.parentNode.clientWidth;
+    tip.style.left = Math.max(0, Math.min(ww - w, px + 12)) + "px";
+    tip.style.top = Math.max(0, py - 10) + "px";
+  }
+  function pointTip(i, px) {
+    var p = P[i];
+    var rows = devs.map(function (dv, k) { return { c: color(k), v: fmt(indexAt(dv, i)), k: dv }; });
+    rows.push({ v: Math.round(100 * aiShare(p.mass)) + "%", k: "agent share of the mass" });
+    rows.push({ v: String(p.commits), k: "commits" });
+    showTip(px, 10, rows, day(p.t) + " · " + p.sha.slice(0, 8));
+  }
+  function markTip(mk) {
+    if (mk.kind === "evidence") {
+      var r = mk.r;
+      showTip(mk.x, mk.y, [{ c: devColor(r.dev), v: r.verdict || "", k: r.type + " on " + (unitName[r.unit] || r.unit) }, { v: r.dev, k: "" }], day(r.ts));
+    } else if (mk.kind === "risk") {
+      var e = mk.e;
+      showTip(mk.x, mk.y - 70, [{ v: e.level, k: unitName[e.unit.split(" ")[0]] || e.unit }, { v: fmt(e.understanding, 2), k: "understanding then" }, { v: fmt(e.mass, 2), k: "mass landed; weight " + fmt(e.weight, 2) }, { v: e.sha.slice(0, 8), k: e.subject }], day(e.landed));
+    } else {
+      var c = mk.c;
+      showTip(mk.x, mk.y - 70, [{ v: fmt(c.weight, 2), k: "weight, " + c.klass + (c.agent ? " (" + c.agent + ")" : "") }, { v: c.sha.slice(0, 8), k: c.subject }, { v: c.dev || c.author, k: "" }], day(c.landed));
+    }
+  }
+  function pos(ev) { var r = chart.getBoundingClientRect(); return [(ev.clientX - r.left) * (geo.W / r.width), ev.clientY - r.top]; }
+  chart.addEventListener("pointermove", function (ev) {
+    if (!geo) return;
+    var xy = pos(ev), px = xy[0], py = xy[1] * (geo.W / chart.getBoundingClientRect().width);
+    var hit = null, hd = 12;
+    geo.marks.forEach(function (mk) { var d = Math.hypot(mk.x - px, mk.y - py); if (d < hd) { hd = d; hit = mk; } });
+    if (hit) { geo.cross.setAttribute("visibility", "hidden"); markTip(hit); return; }
+    if (py > geo.m.t + geo.ih) { tip.style.display = "none"; geo.cross.setAttribute("visibility", "hidden"); return; }
+    var i = nearestPoint(px), x = geo.X(ts(P[i].t));
+    geo.cross.setAttribute("x1", x); geo.cross.setAttribute("x2", x); geo.cross.setAttribute("visibility", "visible");
+    pointTip(i, x * chart.getBoundingClientRect().width / geo.W);
+  });
+  chart.addEventListener("pointerleave", function () { tip.style.display = "none"; if (geo) geo.cross.setAttribute("visibility", "hidden"); });
+  chart.addEventListener("click", function (ev) {
+    if (!geo) return;
+    var xy = pos(ev), py = xy[1] * (geo.W / chart.getBoundingClientRect().width);
+    if (py > geo.m.t + geo.ih) return;
+    state.sel = nearestPoint(xy[0]); renderChart(); renderBreakdown();
+  });
+  chart.addEventListener("keydown", function (ev) {
+    if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+    ev.preventDefault();
+    state.sel = Math.max(0, Math.min(P.length - 1, state.sel + (ev.key === "ArrowRight" ? 1 : -1)));
+    renderChart(); renderBreakdown();
+    var x = geo.X(ts(P[state.sel].t)); pointTip(state.sel, x * chart.getBoundingClientRect().width / geo.W);
+  });
+
+  // -- per-unit breakdown at the selected point -----------------------------------
+  function renderBreakdown() {
+    var seg = document.getElementById("seg"), sl = document.getElementById("seg-legend"), rk = document.getElementById("ranked");
+    clear(seg); clear(sl); clear(rk);
+    var dev = state.dev, p = P[state.sel];
+    if (!dev || !p) return;
+    var row = p.devs[dev] || { debt: {}, und: {} };
+    var idx = row.index;
+    document.getElementById("bd-title").textContent = "Where " + short(dev) + "'s debt is on " + day(p.t);
+    document.getElementById("bd-sub").textContent = "Debt index " + fmt(idx) + " at " + p.sha.slice(0, 8) +
+      ": each unit's importance x (1 - understanding), as a share of the index. " + Object.keys(p.units).length + " units existed then.";
+    // colours: the units with most debt at the latest point keep one slot each, after the developers' slots
+    var latest = (last.devs[dev] || {}).debt || {};
+    var nColored = Math.max(0, Math.min(5, 8 - devs.length));
+    var colored = Object.keys(latest).sort(function (a, b) { return latest[b] - latest[a]; }).slice(0, nColored);
+    var parts = [], other = 0, total = 0;
+    Object.keys(row.debt).forEach(function (u) { total += row.debt[u]; if (colored.indexOf(u) < 0) other += row.debt[u]; });
+    colored.forEach(function (u, k) { if (row.debt[u]) parts.push({ u: u, v: row.debt[u], c: color(devs.length + k), slot: devs.length + k }); });
+    if (other > 0) parts.push({ u: null, v: other, c: "var(--other)" });
+    seg.setAttribute("aria-label", parts.map(function (q) { return (q.u ? unitName[q.u] : "other units") + " " + fmt(q.v); }).join(", "));
+    var segW = seg.clientWidth || 600;
+    parts.forEach(function (q) {
+      var b = el("div"); b.style.flex = q.v + " 1 0"; b.style.background = q.c;
+      var label = Math.round(100 * q.v / (total || 1)) + "%";
+      if ((q.slot === 3 || q.u === null) && cssVar("color-scheme") !== "dark") b.className = "dark";
+      if (segW * q.v / (total || 1) > 8 * label.length + 14) b.textContent = label;
+      b.title = (q.u ? unitName[q.u] : "Other units") + ": " + fmt(q.v) + " of " + fmt(total);
+      seg.appendChild(b);
+      var key = el("span", { "class": "key" }); var sw = el("b"); sw.style.background = q.c;
+      key.appendChild(sw); key.appendChild(document.createTextNode(q.u ? unitName[q.u] : "other units")); sl.appendChild(key);
+    });
+    var ids = Object.keys(row.und).sort(function (a, b) { return (row.debt[b] || 0) - (row.debt[a] || 0); });
+    var mx = Math.max.apply(null, ids.map(function (u) { return row.debt[u] || 0; }).concat([1]));
+    var mine = D.responsibility[dev] || null, outside = 0;
+    ids.forEach(function (u) {
+      var inIndex = row.debt[u] != null;
+      if (!inIndex && mine && mine.indexOf(u) < 0) outside++;
+      rk.appendChild(el("div", { "class": "name" }, unitName[u] || u));
+      var barBox = el("div"); var bar = el("div", { "class": "bar" });
+      bar.style.width = Math.max(1, 100 * (row.debt[u] || 0) / mx) + "%"; bar.style.background = devColor(dev);
+      if (!inIndex) bar.style.opacity = "0.25";
+      barBox.appendChild(bar); rk.appendChild(barBox);
+      var val = el("div", { "class": "val" });
+      val.appendChild(el("strong", null, inIndex ? fmt(row.debt[u]) : "-"));
+      val.appendChild(document.createTextNode("  und " + fmt(row.und[u], 2)));
+      rk.appendChild(val);
+    });
+    document.getElementById("bd-note").textContent = (outside ? outside + " unit(s) outside " + short(dev) + "'s responsibility set count no debt (bar faded, -). " : "") +
+      "und = understanding then (0-1)" + ((row.quizzed || []).length ? "; quizzed: " + row.quizzed.join(", ") : "; no quiz yet, so it is the own-commit prior") + ".";
+  }
+
+  // -- tables ---------------------------------------------------------------------
+  function table(id, heads, rows) {
+    var t = document.getElementById(id); clear(t);
+    var thead = el("thead"), tr = el("tr");
+    heads.forEach(function (h) { tr.appendChild(el("th", h.num ? { "class": "num" } : null, h.t)); });
+    thead.appendChild(tr); t.appendChild(thead);
+    var tb = el("tbody");
+    rows.forEach(function (r) {
+      var row = el("tr", r.cls ? { "class": r.cls } : null);
+      r.cells.forEach(function (c, i) {
+        var cls = heads[i].num ? "num" : heads[i].wrap ? "wrap" : heads[i].nowrap ? "nowrap" : null;
+        var td = el("td", cls ? { "class": cls } : null);
+        if (c instanceof Node) td.appendChild(c); else td.textContent = c == null ? "-" : c;
+        row.appendChild(td);
+      });
+      tb.appendChild(row);
+    });
+    t.appendChild(tb);
+  }
+  function renderContributors() {
+    table("contributors",
+      [{ t: "Contributor", wrap: true }, { t: "Label", nowrap: true }, { t: "Commits", num: true }, { t: "ai / assisted / human / bot", num: true }, { t: "Active", nowrap: true }],
+      (D.contributors || []).map(function (c) {
+        return { cells: [c.name, c.label, String(c.commits), c.ai + " / " + c.assisted + " / " + c.human + " / " + c.bot, day(c.first) + " to " + day(c.last)] };
+      }));
+  }
+  function renderUnits() {
+    var dev = state.dev, target = D.settings.bus_target;
+    document.getElementById("units-sub").textContent = "Top-level units now; you% and und for " + (dev || "nobody") +
+      "; holders understand the unit at >= " + D.settings.known_threshold + " (bus target " + target + ").";
+    var rows = top.slice().sort(function (a, b) { return (b.importance || 0) - (a.importance || 0); }).map(function (u) {
+      var ok = u.holders.length >= target;
+      var bus = el("span", { "class": "badge" });
+      var s = sv("svg", { width: 10, height: 10, viewBox: "0 0 10 10", "aria-hidden": "true" });
+      var c = sv("circle", { cx: 5, cy: 5, r: 4 }); c.setAttribute("fill", ok ? "var(--good)" : "var(--serious)"); s.appendChild(c);
+      bus.appendChild(s); bus.appendChild(document.createTextNode(u.holders.length + "/" + target + (ok ? "" : " below")));
+      var name = u.name || u.id; if (u.scope !== "architectural") name += " (blackbox)";
+      return { cells: [name, fmt(u.importance, 2), Math.round(100 * u.ai_share) + "%",
+        dev && u.you[dev] != null ? Math.round(100 * u.you[dev]) + "%" : "-",
+        dev && u.understanding[dev] != null ? fmt(u.understanding[dev], 2) : "-", bus,
+        (u.responsible || []).join(", ") || "nobody"] };
+    });
+    table("units", [{ t: "Unit", wrap: true }, { t: "imp", num: true }, { t: "ai%", num: true }, { t: "you%", num: true }, { t: "und", num: true }, { t: "Holders" }, { t: "Responsible", wrap: true }], rows);
+  }
+  function renderRisk() {
+    var ev = strongEvents().slice().sort(function (a, b) { return a.landed < b.landed ? 1 : a.landed > b.landed ? -1 : 0; });
+    if (state.dev) ev = ev.filter(function (e) { return e.dev === state.dev; }).concat(ev.filter(function (e) { return e.dev !== state.dev; }));
+    var more = document.getElementById("risk-more");
+    var shown = state.riskAll ? ev : ev.slice(0, 20);
+    more.hidden = ev.length <= 20 || state.riskAll;
+    more.textContent = "Show all " + ev.length;
+    table("risk", [{ t: "Landed", nowrap: true }, { t: "Level" }, { t: "Unit", wrap: true }, { t: "mass", num: true }, { t: "und then", num: true }, { t: "weight", num: true }, { t: "Developer" }, { t: "Commit", wrap: true }],
+      shown.map(function (e) {
+        var u = e.unit.split(" ")[0];
+        return { cells: [day(e.landed), badge(e.level), (unitName[u] || u) + (e.in_set === false ? " (outside set)" : ""), fmt(e.mass, 2), fmt(e.understanding, 2), fmt(e.weight, 2), e.dev, e.sha.slice(0, 8) + " " + e.subject] };
+      }));
+    if (!shown.length) table("risk", [{ t: "No risk events at this level." }], []);
+  }
+  document.getElementById("risk-more").addEventListener("click", function () { state.riskAll = true; renderRisk(); });
+  function renderSeries() {
+    var heads = [{ t: "Date" }, { t: "sha" }, { t: "commits", num: true }, { t: "agent share", num: true }].concat(devs.map(function (d) { return { t: short(d), num: true }; }));
+    table("series", heads, P.map(function (p, i) {
+      return { cells: [day(p.t), p.sha.slice(0, 8), String(p.commits), Math.round(100 * aiShare(p.mass)) + "%"].concat(devs.map(function (d) { return fmt(indexAt(d, i)); })) };
+    }));
+  }
+  document.getElementById("foot").textContent = "udebt export format v" + D.version + "; " + (D.evidence || []).length +
+    " evidence records, " + (D.risk_events || []).length + " risk events, " + (D.heavy_commits || []).length + " heavy commits.";
+
+  function renderAll() { renderTiles(); renderChart(); renderBreakdown(); renderUnits(); renderRisk(); }
+  renderAll(); renderContributors(); renderSeries();
+  var rt = null;
+  window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(function () { renderChart(); renderBreakdown(); }, 80); });
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    if (mq.addEventListener) mq.addEventListener("change", renderBreakdown);
+  }
+})();
+</script>
+</body>
+</html>

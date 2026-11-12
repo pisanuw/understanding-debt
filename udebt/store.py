@@ -6,7 +6,9 @@ commits.json         per-commit weights (heuristic, LLM-refined for the heaviest
 commits-parsed.json  parsed git history, a cache (`.json.gz` when large); gitignored, derived
 responsibility.json  each developer's responsibility set and per-developer scope (commit this)
 config.json          settings (model, decay, identities, handles, directed agents, bus target,
-                     history quota)
+                     history quota, snapshot interval)
+snapshots.json       the replayed series and risk events (replay.py); commit this
+sizes.json           line counts per blob, for the share decay; gitignored, derived
 """
 
 from __future__ import annotations
@@ -41,6 +43,7 @@ class Config:
     group_max_commits: int = 50  # a merged branch up to this long is weighed as one commit
     history_periods: int = 4  # history mining cuts history into this many equal-mass periods
     history_quota: int = 10  # candidates each period is guaranteed (of 40): slots by mass
+    snapshot_every: str = "week"  # replay points: week, day or mass:N (`udebt snapshot`)
     identities: dict[str, list[str]] = field(default_factory=dict)  # primary email -> aliases
     # CODEOWNERS handle -> email (or list of emails); null marks a handle still to be mapped
     handles: dict[str, Any] = field(default_factory=dict)
@@ -95,6 +98,7 @@ class Config:
             "group_max_commits": self.group_max_commits,
             "history_periods": self.history_periods,
             "history_quota": self.history_quota,
+            "snapshot_every": self.snapshot_every,
             "identities": self.identities,
             "handles": self.handles,
             "directed": self.directed,

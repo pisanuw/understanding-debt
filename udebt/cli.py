@@ -14,6 +14,10 @@ udebt dig [<id>]                guided walkthrough of the worst unit (or a chose
 udebt directed add <session>    count agent commits you directed as your assisted work
 udebt experiment synthetic --snapshots <rev>,...   synthetic developers frozen at old snapshots
 udebt cache [status|rebuild]    the parsed-commit cache under .udebt/ (gitignored)
+udebt snapshot [--every week]   replay debt at past points into .udebt/snapshots.json
+udebt timeline [--dev X|--unit U]   the series, and the risk events, as a table, CSV or JSON
+udebt export [--format csv|json]    full history for the hosted import
+udebt dashboard [--open]        a static, self-contained HTML dashboard
 """
 
 from __future__ import annotations
@@ -682,7 +686,7 @@ def cmd_dig(args) -> int:
         results = grade(root, llm, answered)
     except LLMError as e:
         raise SystemExit(str(e)) from e
-    record_results(store, root, email, results)
+    record_results(store, root, email, results, source="dig")
     r = results[0]
     print(f"\n[{r['verdict'].upper()}] {r['feedback']}")
     return 0
@@ -782,6 +786,8 @@ def cmd_weigh(args) -> int:
 
 
 def cmd_risk(args) -> int:
+    if args.history:
+        return _risk_history(args)
     root, store = _ctx(args)
     store.require()
     m = store.require_map()
@@ -862,6 +868,314 @@ def cmd_risk(args) -> int:
         )
     if level in ("HIGH", "OUTSIDE") and args.strict:
         return 1
+    return 0
+
+
+# -- time series (replay.py) ---------------------------------------------------------
+
+
+def _replayed(args, save: bool = True):
+    """The history and its stored series, brought up to date (appending only what is new)."""
+    import time
+
+    from . import replay
+
+    root, store = _ctx(args)
+    store.require()
+    t0 = time.monotonic()
+    h = replay.load(root, store)
+    res = replay.ensure(h, getattr(args, "every", None), save=save)
+    if res.note:
+        print(f"Note: {res.note}.", file=sys.stderr)
+    return root, store, h, res, time.monotonic() - t0
+
+
+def cmd_snapshot(args) -> int:
+    import time
+
+    from . import replay
+
+    root, store = _ctx(args)
+    store.require()
+    t0 = time.monotonic()
+    h = replay.load(root, store)
+    res = replay.ensure(h, args.every, rebuild=args.rebuild)
+    secs = time.monotonic() - t0
+    pts, ev = res.data["points"], res.data["risk"]["events"]
+    p = replay.path(store)
+    size = p.stat().st_size if p.exists() else 0
+    if res.note:
+        print(f"Note: {res.note}.")
+    print(
+        f"{p.relative_to(root)}: {len(pts)} points ({res.appended} new), every "
+        f"{res.data['fingerprint']['every']}; {len(ev)} risk events ({res.events_added} new); "
+        f"{len(h.devs)} developer{'s' if len(h.devs) != 1 else ''}; {size / 1024:.1f} KB; "
+        f"{secs:.1f}s"
+    )
+    if pts:
+        print(f"From {pts[0]['t'][:10]} to {pts[-1]['t'][:10]} (HEAD {pts[-1]['sha'][:8]}).")
+    if res.written:
+        print("Units are the current map's, replayed against the past. Commit the file.")
+    return 0
+
+
+def _label_dev(dev: str, width: int = 18) -> str:
+    return dev if len(dev) <= width else dev[: width - 1] + "~"
+
+
+def cmd_timeline(args) -> int:
+    import csv
+    import json as _json
+
+    from . import replay
+
+    root, store, h, res, _ = _replayed(args)
+    pts = res.data["points"]
+    events = res.data["risk"]["events"]
+    if args.dev:
+        dev = _dev_key(args, root, store, args.dev, h.commits)
+        if dev not in h.devs:
+            raise SystemExit(f"{dev} has no footprint, set or evidence here: {', '.join(h.devs)}")
+        events = [e for e in events if e["dev"] == dev]
+    unit = None
+    if args.unit:
+        u = hier.resolve(h.units, args.unit)
+        if u is None or hier.parent_of(h.units).get(u["id"]):
+            raise SystemExit(f"Not a top-level unit: {args.unit}")
+        unit = u["id"]
+        events = [e for e in events if e["unit"].split()[0] == unit]
+    if args.dev:
+        top_ids = sorted(
+            {uid for p in pts for uid in p["devs"].get(dev, {}).get("debt", {})},
+            key=lambda uid: -(pts[-1]["devs"].get(dev, {}).get("debt", {}).get(uid, 0.0)),
+        )
+        cols = ["t", "sha", "index", *top_ids]
+        rows = [
+            [p["t"], p["sha"], p["devs"].get(dev, {}).get("index")]
+            + [p["devs"].get(dev, {}).get("debt", {}).get(uid, 0.0) for uid in top_ids]
+            for p in pts
+        ]
+    elif unit:
+        cols = ["t", "sha", "importance", "size", *h.devs]
+        rows = [
+            [p["t"], p["sha"], *(p["units"].get(unit) or [None, None])]
+            + [p["devs"].get(d, {}).get("und", {}).get(unit) for d in h.devs]
+            for p in pts
+        ]
+    else:
+        cols = ["t", "sha", "commits", "mass", "ai_share", *h.devs]
+        rows = []
+        for p in pts:
+            m = p["mass"]
+            total = m["ai"] + m["assisted"] + m["human"]
+            ai = round((m["ai"] + 0.5 * m["assisted"]) / total, 3) if total else 0.0
+            rows.append(
+                [p["t"], p["sha"], p["commits"], round(total, 2), ai]
+                + [p["devs"].get(d, {}).get("index") for d in h.devs]
+            )
+    if args.format == "json":
+        out = {"columns": cols, "rows": rows, "risk_events": replay.interesting(events)}
+        print(_json.dumps(out, indent=1))
+        return 0
+    if args.format == "csv":
+        w = csv.writer(sys.stdout)
+        w.writerow(cols)
+        w.writerows(rows)
+        return 0
+    what = (
+        f"debt per unit for {dev} (its share of the index)"
+        if args.dev
+        else f"understanding of {unit}"
+        if unit
+        else "debt index per developer"
+    )
+    print(f"\nTimeline for {root.name}: {what}, {len(pts)} points")
+    shown = cols[2:] if not args.dev else cols[2:11]
+    heads = [_label_dev(c, 12 if args.dev else 18) for c in shown]
+    print(f"{'date':<10} {'sha':<8} " + " ".join(f"{c:>{max(7, len(c))}}" for c in heads))
+    for r in rows:
+        vals = r[2 : 2 + len(shown)]
+        cells = []
+        for c, v in zip(heads, vals, strict=True):
+            width = max(7, len(c))
+            cells.append(f"{'-' if v is None else v:>{width}}")
+        print(f"{r[0][:10]:<10} {r[1][:8]:<8} " + " ".join(cells))
+    if args.dev and len(cols) > 11:
+        print(f"(+ {len(cols) - 11} more units: `--format csv` has them all)")
+    _print_events(events, 8, args.all)
+    print(
+        "\nUnits are the current map's, replayed against the past; a point counts the commits "
+        "landed on the first-parent line by then and the evidence recorded by then."
+    )
+    return 0
+
+
+def _print_events(events, limit: int | None, all_levels: bool = False, since=None) -> None:
+    from collections import Counter
+
+    from . import replay
+
+    if since:
+        events = [e for e in events if e["landed"][:10] >= since]
+    counts = Counter(e["level"] for e in events)
+    keep = [e for e in events if all_levels or e["level"] in ("OUTSIDE", "HIGH")]
+    summary = ", ".join(f"{k} {counts[k]}" for k in replay.LEVELS if counts[k]) or "none"
+    print(f"\nRisk events: {summary} (a developer landing a change on a unit they understood")
+    print("too little at the time; CAUTION shown with --all)")
+    if not keep:
+        return
+    shown = replay.interesting(keep, limit)
+    print(
+        f"{'landed':<10} {'sha':<8} {'level':<8} {'unit':<26} {'mass':>5} {'und':>5} {'w':>5}  "
+        "dev; subject"
+    )
+    for e in shown:
+        print(
+            f"{e['landed'][:10]:<10} {e['sha'][:8]:<8} {e['level']:<8} {e['unit'][:26]:<26} "
+            f"{e['mass']:>5.2f} {e['understanding']:>5.2f} {e['weight']:>5.2f}  "
+            f"{e['dev']}; {e['subject'][:50]}"
+        )
+    if limit and len(keep) > limit:
+        print(f"(strongest {limit} of {len(keep)}; `udebt risk --history` lists them all)")
+
+
+def _risk_history(args) -> int:
+    root, store, h, res, _ = _replayed(args)
+    events = res.data["risk"]["events"]
+    if args.as_user:
+        dev = store.config.primary(args.as_user)
+        events = [e for e in events if e["dev"] == dev]
+    print(f"\nRisk history for {root.name}: every commit a developer landed, assessed against")
+    print("their understanding just before it landed (units as the current map defines them)")
+    _print_events(events, None, args.all, args.since)
+    return 0
+
+
+def cmd_export(args) -> int:
+    import csv
+    import json as _json
+
+    from . import replay
+
+    root, store, h, res, _ = _replayed(args)
+    data = replay.export_data(h, res, with_answers=args.with_answers)
+    if args.format == "json":
+        out = Path(args.out) if args.out else store.dir / "export" / "udebt-export.json"
+        text = _json.dumps(data, indent=1, ensure_ascii=False) + "\n"
+        if str(out) == "-":
+            sys.stdout.write(text)
+            return 0
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        print(f"Wrote {out} ({out.stat().st_size / 1024:.1f} KB)")
+    else:
+        out = Path(args.out) if args.out else store.dir / "export"
+        out.mkdir(parents=True, exist_ok=True)
+        tables = _export_tables(data)
+        for name, (cols, rows) in tables.items():
+            with (out / f"{name}.csv").open("w", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                w.writerow(cols)
+                w.writerows(rows)
+        print(f"Wrote {len(tables)} CSV files to {out}: {', '.join(tables)}")
+    if not args.with_answers:
+        print("Evidence without answer text (`--with-answers` adds answers, feedback, references).")
+    return 0
+
+
+def _export_tables(data: dict[str, Any]) -> dict[str, tuple[list[str], list[list[Any]]]]:
+    """The export as flat tables, one CSV each."""
+    snaps = [
+        [p["t"], p["sha"], dev, uid, row["und"].get(uid), row["debt"].get(uid), row["index"]]
+        for p in data["snapshots"]
+        for dev, row in p["devs"].items()
+        for uid in sorted(set(row["und"]) | set(row["debt"]))
+    ]
+    prov = [
+        [
+            p["t"],
+            p["sha"],
+            p["commits"],
+            *(p["mass"][k] for k in ("ai", "assisted", "human", "bot")),
+        ]
+        for p in data["snapshots"]
+    ]
+    units_t = [
+        [p["t"], p["sha"], uid, imp, size]
+        for p in data["snapshots"]
+        for uid, (imp, size) in p["units"].items()
+    ]
+    ev_cols = ["ts", "dev", "unit", "type", "verdict", "confidence", "evidence", "head", "question"]
+    if data["evidence"] and "answer" in data["evidence"][0]:
+        ev_cols += ["answer", "feedback", "reference"]
+    risk_cols = [
+        "landed", "date", "sha", "dev", "klass", "weight", "unit", "level", "mass",
+        "understanding", "source", "in_set", "subject",
+    ]  # fmt: skip
+    heavy_cols = ["landed", "date", "sha", "dev", "author", "klass", "agent", "weight", "subject"]
+    con_cols = [
+        "name",
+        "key",
+        "label",
+        "commits",
+        "ai",
+        "assisted",
+        "human",
+        "bot",
+        "first",
+        "last",
+    ]
+    unit_cols = ["id", "name", "kind", "parent", "scope", "importance", "ai_share"]
+    return {
+        "snapshots": (["t", "sha", "dev", "unit", "understanding", "debt", "index"], snaps),
+        "provenance": (["t", "sha", "commits", "ai", "assisted", "human", "bot"], prov),
+        "unit_points": (["t", "sha", "unit", "importance", "size"], units_t),
+        "evidence": (ev_cols, [[e.get(k) for k in ev_cols] for e in data["evidence"]]),
+        "risk_events": (risk_cols, [[e.get(k) for k in risk_cols] for e in data["risk_events"]]),
+        "heavy_commits": (
+            [*heavy_cols, "units"],
+            [
+                [e.get(k) for k in heavy_cols]
+                + [";".join(f"{u}={m}" for u, m in e["units"].items())]
+                for e in data["heavy_commits"]
+            ],
+        ),
+        "contributors": (
+            [*con_cols, "emails"],
+            [[c.get(k) for k in con_cols] + [";".join(c["emails"])] for c in data["contributors"]],
+        ),
+        "units": (
+            [*unit_cols, "holders", "responsible"],
+            [
+                [u.get(k) for k in unit_cols] + [";".join(u["holders"]), ";".join(u["responsible"])]
+                for u in data["units"]
+            ],
+        ),
+    }
+
+
+def cmd_dashboard(args) -> int:
+    import time
+    import webbrowser
+
+    from . import dashboard, replay
+
+    root, store, h, res, secs = _replayed(args)
+    t0 = time.monotonic()
+    data = replay.export_data(h, res)
+    out = Path(args.out) if args.out else store.dir / "dashboard" / "index.html"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(dashboard.render(data), encoding="utf-8")
+    secs += time.monotonic() - t0
+    pts = res.data["points"]
+    print(
+        f"Wrote {out} ({out.stat().st_size / 1024:.1f} KB; {len(pts)} points, "
+        f"{len(h.devs)} developer{'s' if len(h.devs) != 1 else ''}, "
+        f"{len(data['risk_events'])} risk events) in {secs:.1f}s"
+    )
+    _print_events(res.data["risk"]["events"], 5)
+    if args.open:
+        webbrowser.open(out.resolve().as_uri())
     return 0
 
 
@@ -1349,7 +1663,39 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--staged", action="store_true", help="assess the staged diff instead")
     s.add_argument("--deep", action="store_true", help="assess sub-units, not top-level units")
     s.add_argument("--strict", action="store_true", help="exit 1 on HIGH or OUTSIDE")
+    s.add_argument(
+        "--history",
+        action="store_true",
+        help="every past commit a developer landed, against their understanding then",
+    )
+    s.add_argument("--since", metavar="DATE", help="with --history: landed on or after DATE")
+    s.add_argument("--all", action="store_true", help="with --history: CAUTION events too")
     s.set_defaults(fn=cmd_risk)
+
+    s = sub.add_parser("snapshot", help="replay debt at past points into .udebt/snapshots.json")
+    s.add_argument("--every", metavar="week|day|mass:N", help="point interval (default week)")
+    s.add_argument("--rebuild", action="store_true", help="recompute every point")
+    s.set_defaults(fn=cmd_snapshot)
+
+    s = sub.add_parser("timeline", help="the replayed series and its risk events")
+    s.add_argument("--dev", help="one developer: debt per unit (email, @handle or me)")
+    s.add_argument("--unit", help="one top-level unit: every developer's understanding of it")
+    s.add_argument("--format", choices=["table", "csv", "json"], default="table")
+    s.add_argument("--all", action="store_true", help="list CAUTION risk events too")
+    s.set_defaults(fn=cmd_timeline)
+
+    s = sub.add_parser("export", help="full history (snapshots, evidence, risk) as CSV or JSON")
+    s.add_argument("--format", choices=["csv", "json"], default="json")
+    s.add_argument(
+        "--out", help="file (json; - for stdout) or directory (csv); under .udebt/export/"
+    )
+    s.add_argument("--with-answers", action="store_true", help="include answer text")
+    s.set_defaults(fn=cmd_export)
+
+    s = sub.add_parser("dashboard", help="a static HTML dashboard, self-contained")
+    s.add_argument("--out", help="default .udebt/dashboard/index.html")
+    s.add_argument("--open", action="store_true", help="open it in the browser")
+    s.set_defaults(fn=cmd_dashboard)
 
     s = sub.add_parser("experiment", help="validation experiments")
     ex = s.add_subparsers(dest="experiment", required=True)
