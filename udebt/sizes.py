@@ -24,7 +24,6 @@ from typing import Any
 
 from . import units as hier
 from .filekinds import mechanical
-from .provenance import _under
 
 NAME = "sizes.json"
 VERSION = 1
@@ -140,16 +139,49 @@ def open_counts(root: Path, udebt_dir: Path) -> LineCounts:
     return lc
 
 
+class _Parts:
+    """Which units a file falls under, and the part of its lines each gets, per file and
+    memoized: the units are found through the file's path prefixes (a unit path is a file or
+    a directory), so a replay over many trees does the work once per distinct file."""
+
+    def __init__(self, units: list[dict[str, Any]]):
+        self.units = units  # kept alive, so the id in _PARTS stays this list's
+        self.members = hier.Membership(units)
+        self.order = [u["id"] for u, _parent in hier.walk(units)]
+        self.by_path: dict[str, list[str]] = {}
+        for u, _parent in hier.walk(units):
+            for path in u.get("paths", []):
+                path = path.rstrip("/")
+                if path:
+                    self.by_path.setdefault(path, []).append(u["id"])
+        self.memo: dict[str, list[tuple[str, float]]] = {}
+
+    def of(self, f: str) -> list[tuple[str, float]]:
+        got = self.memo.get(f)
+        if got is None:
+            segs = f.split("/")
+            ids: dict[str, None] = {}
+            for i in range(1, len(segs) + 1):
+                for uid in self.by_path.get("/".join(segs[:i]), ()):
+                    ids[uid] = None
+            got = self.memo[f] = [(uid, self.members.split(uid)(f)) for uid in ids]
+        return got
+
+
+_PARTS: dict[int, _Parts] = {}
+
+
 def unit_sizes(units: list[dict[str, Any]], lines: dict[str, int]) -> dict[str, float]:
     """unit id -> its size in lines: the lines of the files under its paths, a file several
     units list split among them (units.Membership), for every unit of the hierarchy."""
-    members = hier.Membership(units)
-    out: dict[str, float] = {}
-    for u, _parent in hier.walk(units):
-        paths = u.get("paths", [])
-        split = members.split(u["id"])
-        out[u["id"]] = round(sum(n * split(f) for f, n in lines.items() if _under(f, paths)), 1)
-    return out
+    parts = _PARTS.get(id(units))
+    if parts is None or parts.units is not units:
+        parts = _PARTS[id(units)] = _Parts(units)
+    out = dict.fromkeys(parts.order, 0.0)
+    for f, n in lines.items():
+        for uid, part in parts.of(f):
+            out[uid] += n * part
+    return {uid: round(v, 1) for uid, v in out.items()}
 
 
 def share(lines_since: float, size: float) -> float:
