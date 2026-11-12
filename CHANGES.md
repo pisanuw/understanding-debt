@@ -18,3 +18,4 @@
 2026-11-12 [decision] Scope is per developer by default (`--for <dev>`; `--team` writes the map). Risk adds OUTSIDE (outside your set, mass >= 0.1, und < 0.6) as its strongest level.
 2026-11-12 [decision] Footprint ignores AI-authored commits and counts assisted ones in full: responsibility is human. A unit only agents touched is in nobody's set until a lead assigns it.
 2026-11-12 [decision] Team view checks a bus target per unit (config bus_target, default 2) and lists units below it with who is responsible. Parents roll up sub-unit quizzes only, not their priors.
+2026-11-12 [note] Real runs: digitalme 12 units/3 sub-units in 37s; dsa-instructor 12/9 in 62s (graph 4s). risk on dsa b194175 flags teachback OUTSIDE. Agent-only units are in nobody's set.

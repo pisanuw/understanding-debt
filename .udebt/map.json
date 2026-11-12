@@ -1,163 +1,594 @@
 {
-  "version": 1,
-  "generated_at": "2026-11-11T20:49:34+00:00",
-  "head": "5fafc04741592cf9d66bf8a72aeb718d963f9d4e",
+  "version": 3,
+  "generated_at": "2026-11-12T12:15:44+00:00",
+  "head": "a156812ec4137ae5f279b72e0452b8100d6421e6",
+  "repo_provenance": {
+    "total": 10,
+    "ai": 9,
+    "assisted": 0,
+    "human": 1,
+    "agents": {
+      "claude-code": 9
+    },
+    "dev": 0
+  },
+  "structure": {
+    "nodes": 34,
+    "edges": 308,
+    "import_edges": 96,
+    "cochange_edges": 294,
+    "languages": {
+      ".py": 34
+    },
+    "hubs": [],
+    "singletons": 0,
+    "seconds": {
+      "imports": 0.07,
+      "cochange": 0.0,
+      "louvain": 0.0,
+      "summaries": 0.0
+    },
+    "clusters": [
+      {
+        "id": "C1",
+        "label": "udebt/ cli prompts mapping",
+        "files": 24,
+        "mass": 9.19,
+        "dirs": [
+          "udebt (12)"
+        ],
+        "children": [
+          {
+            "id": "C1.1",
+            "label": "udebt/ cli prompts mapping",
+            "files": 17
+          },
+          {
+            "id": "C1.2",
+            "label": "udebt/ quiz scoring risk",
+            "files": 7
+          }
+        ]
+      },
+      {
+        "id": "C2",
+        "label": "udebt/ provenance structure weights",
+        "files": 13,
+        "mass": 5.46,
+        "dirs": [
+          "udebt (7)"
+        ],
+        "children": [
+          {
+            "id": "C2.1",
+            "label": "udebt/ provenance history",
+            "files": 5
+          },
+          {
+            "id": "C2.2",
+            "label": "udebt/ structure weights filekinds",
+            "files": 4
+          },
+          {
+            "id": "C2.3",
+            "label": "udebt/ imports graph",
+            "files": 4
+          }
+        ]
+      },
+      {
+        "id": "C3",
+        "label": "udebt/ responsibility contributors",
+        "files": 4,
+        "mass": 1.07,
+        "dirs": [
+          "udebt (2)"
+        ]
+      }
+    ],
+    "coverage": 0.95
+  },
   "units": [
     {
-      "id": "scoring-model",
-      "name": "Debt scoring model",
-      "kind": "module",
-      "summary": "Pure, I/O-free functions turn quiz evidence, centrality, churn and commit decay into per-unit understanding, debt and a 0-100 debt index, plus team bus-factor view.",
-      "decision": "Importance = 0.6*centrality/5 + 0.4*churn; evidence is 1/0.5/0/-0.5 (confident wrong); verified = clamped mean of last K records; understanding decays 0.9 per later commit touching the unit; debt = importance*(1-understanding); team understanding = max over developers.",
-      "alternatives": "Provenance-based scoring; time-based decay; static-analysis importance; team understanding as mean rather than max; ML-calibrated scores.",
-      "why": "BRIEFING: provenance misstates architectural understanding; confident misconceptions should cost more than gaps; commit decay makes debt grow while AI builds. Pure functions keep it testable.",
+      "id": "prediction-scoring",
+      "name": "Prediction-based scoring model",
+      "kind": "decision",
+      "summary": "Understanding is measured by graded prediction answers per unit and developer, decayed by weighted commit mass, and turned into importance-weighted debt.",
+      "decision": "Measure by quiz evidence (1/0.5/0/-0.5), decay 0.9 per weighted commit landed on the unit, weak capped prior from own commits, debt = importance*(1-understanding), team view via bus factor; pure functions with no I/O.",
+      "alternatives": "Provenance-only (who typed it) scoring; time-based decay; self-reported understanding.",
+      "why": "BRIEFING argues provenance says nothing at the architectural level in AI-driven workflows, so prediction tests the actual mental model; math in a pure module is easy to test.",
       "paths": [
         "udebt/scoring.py",
+        "udebt/quiz.py",
         "tests/test_scoring.py",
-        "README.md"
+        "README.md",
+        "BRIEFING.md"
       ],
       "centrality": 5,
-      "churn": 2,
+      "clusters": [
+        "C1.2"
+      ],
       "scope": "architectural",
-      "importance": 1.0
+      "history": [
+        {
+          "sha": "5fafc04",
+          "date": "2026-11-11",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
+        }
+      ],
+      "churn": 1.67,
+      "provenance": {
+        "total": 8,
+        "ai": 7,
+        "assisted": 0,
+        "human": 1,
+        "ai_share": 0.97,
+        "mass": 1.67,
+        "first": "2026-11-11",
+        "last": "2026-11-12"
+      },
+      "importance": 0.902
+    },
+    {
+      "id": "arch-map",
+      "name": "Architectural map and unit hierarchy",
+      "kind": "module",
+      "summary": "Builds a two-level map of decisions/modules/boundaries/flows from structural clusters, history candidates and an LLM, then attaches churn, importance and provenance.",
+      "decision": "Units are LLM-proposed architectural units (not files), stored as a versioned (v3) hierarchy with ids parent/child, capped in number, and rescorable without the LLM.",
+      "alternatives": "File- or directory-level units; purely algorithmic clustering; flat unit list.",
+      "why": "Package internals are out of scope by design and only architectural understanding counts as debt.",
+      "paths": [
+        "udebt/mapping.py",
+        "udebt/units.py",
+        "udebt/dig.py",
+        "tests/test_hierarchy.py"
+      ],
+      "centrality": 5,
+      "clusters": [
+        "C1",
+        "C1.1"
+      ],
+      "scope": "architectural",
+      "history": [
+        {
+          "sha": "5fafc04",
+          "date": "2026-11-11",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
+        },
+        {
+          "sha": "3b3f9a1",
+          "date": "2026-11-11",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Warn when dig returns no check question; enforce map unit cap"
+        }
+      ],
+      "churn": 1.069,
+      "provenance": {
+        "total": 5,
+        "ai": 5,
+        "assisted": 0,
+        "human": 0,
+        "ai_share": 1.0,
+        "mass": 1.069,
+        "first": "2026-11-11",
+        "last": "2026-11-12"
+      },
+      "importance": 0.793
     },
     {
       "id": "llm-backend",
-      "name": "LLM backend via claude CLI",
+      "name": "LLM backend via claude CLI and prompts",
       "kind": "boundary",
-      "summary": "An LLM protocol (structured/text) implemented by ClaudeCLI, which shells out to `claude -p` with read-only tools and JSON schema, and by a deterministic FakeLLM selected with UDEBT_LLM=fake.",
-      "decision": "Call the local `claude` CLI as a subprocess (subscription-billed, tools limited to Read/Glob/Grep, structured output via --json-schema), with a prompt-marker-keyed FakeLLM for offline tests.",
-      "alternatives": "Anthropic API SDK with an API key; other providers; local models; mocking per-test with unittest.mock.",
-      "why": "No API key or runtime dependency needed (stdlib only), the model can explore the repo itself with read tools, and fake mode enables end-to-end CLI tests.",
+      "summary": "All LLM use goes through an LLM protocol that shells out to the claude CLI with read-only tools and JSON schemas, with a FakeLLM for offline tests.",
+      "decision": "Subprocess the subscription-billed claude CLI with --json-schema and Read/Glob/Grep only; prompts begin with a TASK: marker that FakeLLM keys on; UDEBT_LLM=fake selects the fake.",
+      "alternatives": "Anthropic API SDK with an API key; no tool access; mocking per test.",
+      "why": "No API key or billing setup, and LLM can verify claims against code; fake keeps tests deterministic.",
       "paths": [
         "udebt/llm.py",
-        "udebt/prompts.py",
-        "tests/conftest.py",
-        "tests/test_cli_fake.py"
-      ],
-      "centrality": 5,
-      "churn": 1,
-      "scope": "architectural",
-      "importance": 0.8
-    },
-    {
-      "id": "prompts-and-schemas",
-      "name": "Prompts and JSON schemas with TASK markers",
-      "kind": "boundary",
-      "summary": "Prompt builders and JSON schemas for map, questions, grade and dig; each prompt begins with a TASK: marker that FakeLLM dispatches on.",
-      "decision": "Contract with the LLM is a JSON schema plus a prompt starting with a `TASK:` marker; FakeLLM parses the prompt text (e.g. '- unit_id:' lines, 'ANSWER:' lines) to produce canned answers.",
-      "alternatives": "Separate method per task on the LLM interface; templating files; free-form text parsing.",
-      "why": "Keeps one generic structured() entry point while letting the fake emulate each task; unclear beyond testing convenience.",
-      "paths": [
-        "udebt/prompts.py",
-        "udebt/llm.py"
+        "udebt/prompts.py"
       ],
       "centrality": 4,
-      "churn": 1,
+      "clusters": [
+        "C1.1"
+      ],
       "scope": "architectural",
-      "importance": 0.68
+      "history": [
+        {
+          "sha": "5fafc04",
+          "date": "2026-11-11",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
+        }
+      ],
+      "churn": 1.241,
+      "provenance": {
+        "total": 4,
+        "ai": 4,
+        "assisted": 0,
+        "human": 0,
+        "ai_share": 1.0,
+        "mass": 1.241,
+        "first": "2026-11-11",
+        "last": "2026-11-12"
+      },
+      "importance": 0.704
     },
     {
-      "id": "json-storage",
-      "name": "JSON files under .udebt/, committed",
+      "id": "store-persistence",
+      "name": "JSON persistence under .udebt/",
       "kind": "decision",
-      "summary": "All state lives in .udebt/: shared map.json, per-developer append-only records/<email-slug>.jsonl, and optional config.json.",
-      "decision": "Plain JSON/JSONL files in the repo, one record file per developer (keyed by git email slug), append-only; config loaded fresh with defaults.",
-      "alternatives": "SQLite; a hosted service; storing in git notes; an untracked local cache.",
-      "why": "Zero dependencies, diff-friendly, and per-developer files avoid merge conflicts while enabling team view via git.",
+      "summary": "All state lives as committed JSON files in .udebt/: shared map, per-developer append-only records, commit weights, responsibility, config.",
+      "decision": "File-based JSON in the repo, one jsonl file per developer so merges are conflict-free, committed by default.",
+      "alternatives": "A database; local-only untracked state; hosted store.",
+      "why": "Team sharing through git with no merge conflicts and no server; hosted is deferred to a later phase.",
       "paths": [
-        "udebt/store.py"
+        "udebt/store.py",
+        ".udebt",
+        "udebt/repo.py"
       ],
       "centrality": 4,
-      "churn": 1,
-      "scope": "architectural",
-      "importance": 0.68
-    },
-    {
-      "id": "git-integration",
-      "name": "Git helpers and developer identity",
-      "kind": "module",
-      "summary": "Thin subprocess wrappers around git for repo root, HEAD, user identity, tracked files and commit counts touching paths since a given commit.",
-      "decision": "Shell out to git; identify developers by git config user.email slug; commit churn per unit's paths drives both importance and decay; if the recorded head is gone (rebase) fall back to counting all commits.",
-      "alternatives": "GitPython/libgit2; explicit user accounts; file-content hashing for change detection.",
-      "why": "Stdlib-only constraint and commit-count is a cheap proxy for change; identity from git needs no auth.",
-      "paths": [
-        "udebt/repo.py",
-        "tests/test_repo.py"
+      "clusters": [
+        "C1.1"
       ],
-      "centrality": 4,
-      "churn": 1,
       "scope": "architectural",
-      "importance": 0.68
-    },
-    {
-      "id": "architecture-map",
-      "name": "Architectural map generation",
-      "kind": "flow",
-      "summary": "`udebt map` sends tracked files to the LLM, receives units, then attaches unique ids, churn, importance and preserved scope before saving map.json.",
-      "decision": "The LLM proposes architectural units (decisions/modules/boundaries/flows), the code adds churn and importance, and previously set blackbox scopes survive regeneration by id.",
-      "alternatives": "File- or directory-level units; static analysis/import graph; hand-authored maps.",
-      "why": "BRIEFING: measure understanding of architecture, not files; package internals are out of scope; blackbox is a deliberate-ignorance declaration.",
-      "paths": [
-        "udebt/mapping.py",
-        "udebt/cli.py"
+      "history": [
+        {
+          "sha": "5fafc04",
+          "date": "2026-11-11",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
+        }
       ],
-      "centrality": 4,
-      "churn": 1,
-      "scope": "architectural",
-      "importance": 0.68
-    },
-    {
-      "id": "quiz-flow",
-      "name": "Prediction quiz and grading flow",
-      "kind": "flow",
-      "summary": "Pick highest-debt units, LLM generates questions, developer answers with confidence, LLM grades against code, results are appended as records and status is shown.",
-      "decision": "Measure understanding by prediction questions graded by an LLM against the code; blank answers are 'unknown' with no penalty; confidence >=3 with wrong answer is a misconception.",
-      "alternatives": "Multiple-choice quizzes; provenance tracking; self-reported understanding; deterministic grading.",
-      "why": "BRIEFING: prediction tests the real mental model; known unknowns should not be penalized.",
-      "paths": [
-        "udebt/quiz.py",
-        "udebt/cli.py",
-        "tests/test_cli_fake.py"
-      ],
-      "centrality": 4,
-      "churn": 1,
-      "scope": "architectural",
-      "importance": 0.68
+      "churn": 1.344,
+      "provenance": {
+        "total": 5,
+        "ai": 5,
+        "assisted": 0,
+        "human": 0,
+        "ai_share": 1.0,
+        "mass": 1.344,
+        "first": "2026-11-11",
+        "last": "2026-11-12"
+      },
+      "importance": 0.723
     },
     {
       "id": "cli-contract",
-      "name": "udebt CLI surface",
+      "name": "CLI command surface",
       "kind": "boundary",
-      "summary": "argparse commands (init, map, units, scope, quiz, status [--team], dig) with global --repo/--model/--as-user, orchestrating the other modules and formatting the debt tables.",
-      "decision": "Single stdlib argparse entry point where cmd_* functions wire store, git, LLM and scoring; errors become SystemExit messages; --as-user overrides identity.",
-      "alternatives": "Click/Typer; a library API or web UI; editor/hook integration (deferred).",
-      "why": "Stdlib-only runtime and a team-oriented CLI product per BRIEFING.",
+      "summary": "The argparse CLI (init, clusters, map, units, responsibility, scope, quiz, status, risk, dig) orchestrates every flow and resolves repo, identity and LLM.",
+      "decision": "One large cli.py module with subcommands as the only public interface, advisory outputs, optional --strict exit codes.",
+      "alternatives": "Library API; per-command modules; editor/Claude Code hook integration.",
+      "why": "Standalone CLI product over git is the stated scope; hooks are a non-goal for now.",
       "paths": [
         "udebt/cli.py",
-        "README.md"
+        "tests/test_cli_fake.py"
       ],
-      "centrality": 3,
-      "churn": 2,
+      "centrality": 4,
+      "clusters": [
+        "C1",
+        "C1.1"
+      ],
       "scope": "architectural",
-      "importance": 0.76
+      "history": [
+        {
+          "sha": "5fafc04",
+          "date": "2026-11-11",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
+        },
+        {
+          "sha": "3b3f9a1",
+          "date": "2026-11-11",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Warn when dig returns no check question; enforce map unit cap"
+        }
+      ],
+      "churn": 2.176,
+      "provenance": {
+        "total": 6,
+        "ai": 6,
+        "assisted": 0,
+        "human": 0,
+        "ai_share": 1.0,
+        "mass": 2.176,
+        "first": "2026-11-11",
+        "last": "2026-11-12"
+      },
+      "importance": 0.873
     },
     {
-      "id": "dig-walkthrough",
-      "name": "Guided dig walkthrough",
+      "id": "quiz-flow",
+      "name": "Quiz and dig flow",
       "kind": "flow",
-      "summary": "`udebt dig` asks the LLM for a markdown walkthrough ending in 'CHECK QUESTION:', then optionally quizzes and records the answer.",
-      "decision": "Free-text LLM output parsed with a regex for a trailing CHECK QUESTION line, reusing the grade/record path.",
-      "alternatives": "Structured walkthrough output via schema; separate learning-record type.",
-      "why": "Teaching text is easier as free-form markdown; reuses the quiz evidence pipeline so learning counts toward scores.",
+      "summary": "Pick the highest-debt units, generate verified prediction questions, grade free-text answers with the LLM, and append evidence records; dig walks the worst unit.",
+      "decision": "Five questions per session, misconceptions score negative, blank answers are no-penalty known unknowns, graded against the code by the LLM.",
+      "alternatives": "Multiple choice quizzes; static question bank; penalising blanks.",
+      "why": "Confident wrong beliefs are the real hazard; short sessions can be run often.",
       "paths": [
+        "udebt/quiz.py",
         "udebt/dig.py",
+        "udebt/prompts.py",
         "udebt/cli.py"
       ],
-      "centrality": 2,
-      "churn": 1,
+      "centrality": 4,
+      "clusters": [
+        "C1.2"
+      ],
       "scope": "architectural",
-      "importance": 0.44
+      "history": [
+        {
+          "sha": "5fafc04",
+          "date": "2026-11-11",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
+        },
+        {
+          "sha": "3b3f9a1",
+          "date": "2026-11-11",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Warn when dig returns no check question; enforce map unit cap"
+        }
+      ],
+      "churn": 2.215,
+      "provenance": {
+        "total": 5,
+        "ai": 5,
+        "assisted": 0,
+        "human": 0,
+        "ai_share": 1.0,
+        "mass": 2.215,
+        "first": "2026-11-11",
+        "last": "2026-11-12"
+      },
+      "importance": 0.88
+    },
+    {
+      "id": "provenance-history",
+      "name": "Commit provenance and history mining",
+      "kind": "module",
+      "summary": "Classifies commits as ai, assisted or human from configurable signatures, loads git history, and mines decision-bearing commits.",
+      "decision": "Signatures are data in config; three commit classes; cheap git heuristics (founding, dependencies, infra, renames) select candidate decision commits for the LLM.",
+      "alternatives": "Hardcoded Claude detection; LLM-only history reading; ignoring provenance.",
+      "why": "Mixed human/AI repos are the primary target and other agents will be added later.",
+      "paths": [
+        "udebt/provenance.py",
+        "udebt/history.py",
+        "tests/test_provenance.py",
+        "tests/conftest.py"
+      ],
+      "centrality": 4,
+      "clusters": [
+        "C2",
+        "C2.1"
+      ],
+      "scope": "architectural",
+      "history": [
+        {
+          "sha": "5fafc04",
+          "date": "2026-11-11",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
+        }
+      ],
+      "churn": 1.435,
+      "provenance": {
+        "total": 4,
+        "ai": 4,
+        "assisted": 0,
+        "human": 0,
+        "ai_share": 1.0,
+        "mass": 1.435,
+        "first": "2026-11-11",
+        "last": "2026-11-12"
+      },
+      "importance": 0.739
+    },
+    {
+      "id": "commit-weights",
+      "name": "Commit weight model",
+      "kind": "decision",
+      "summary": "Each commit gets a weight in [0,1] from heuristics, optionally LLM-refined for the heaviest, cached in .udebt/commits.json, and split across units by line share.",
+      "decision": "Every former commit count (churn, decay, provenance, prior) is weighted mass; the top 40 commits are LLM-classified.",
+      "alternatives": "Raw commit counts; LLM weighting of all commits.",
+      "why": "Reformats and lockfile bumps should not create debt; refinement cost is paid once through caching.",
+      "paths": [
+        "udebt/weights.py",
+        "udebt/filekinds.py",
+        "tests/test_weights.py"
+      ],
+      "centrality": 4,
+      "clusters": [
+        "C2.2"
+      ],
+      "scope": "architectural",
+      "history": [],
+      "churn": 0.716,
+      "provenance": {
+        "total": 2,
+        "ai": 2,
+        "assisted": 0,
+        "human": 0,
+        "ai_share": 1.0,
+        "mass": 0.716,
+        "first": "2026-11-12",
+        "last": "2026-11-12"
+      },
+      "importance": 0.609
+    },
+    {
+      "id": "structural-discovery",
+      "name": "Structural cluster discovery",
+      "kind": "module",
+      "summary": "Builds import and co-change graphs and partitions them with Louvain into candidate clusters fed to the map prompt.",
+      "decision": "Merge import and weighted co-change graphs, ignore huge commits, cluster only code files, attach docs/config afterwards; stdlib-only implementation.",
+      "alternatives": "LLM-only discovery; directory layout as units; third-party graph libraries.",
+      "why": "Gives the LLM grounded structure and keeps runtime dependencies at zero.",
+      "paths": [
+        "udebt/structure.py",
+        "udebt/graph.py",
+        "udebt/imports.py",
+        "tests/test_structure.py",
+        "tests/test_graph.py",
+        "tests/test_imports.py"
+      ],
+      "centrality": 3,
+      "clusters": [
+        "C2.2",
+        "C2.3"
+      ],
+      "scope": "architectural",
+      "history": [],
+      "churn": 0.887,
+      "provenance": {
+        "total": 1,
+        "ai": 1,
+        "assisted": 0,
+        "human": 0,
+        "ai_share": 1.0,
+        "mass": 0.887,
+        "first": "2026-11-12",
+        "last": "2026-11-12"
+      },
+      "importance": 0.52
+    },
+    {
+      "id": "risk-gating",
+      "name": "Change risk and advisory gating",
+      "kind": "flow",
+      "summary": "Scores a change's weight per unit against the author's understanding and reports OUTSIDE/HIGH/CAUTION/OK, usable in a warn-only pre-push hook.",
+      "decision": "Risk is the min over touched units with sqrt line share; signals are advisory, only --strict gives non-zero exit.",
+      "alternatives": "Blocking merges; averaging across units.",
+      "why": "Owner decided gating stays advisory with opt-in soft block; a change is as risky as the unit least understood.",
+      "paths": [
+        "udebt/risk.py",
+        "tests/test_risk.py"
+      ],
+      "centrality": 3,
+      "clusters": [
+        "C1.2"
+      ],
+      "scope": "architectural",
+      "history": [],
+      "churn": 0.584,
+      "provenance": {
+        "total": 2,
+        "ai": 2,
+        "assisted": 0,
+        "human": 0,
+        "ai_share": 1.0,
+        "mass": 0.584,
+        "first": "2026-11-12",
+        "last": "2026-11-12"
+      },
+      "importance": 0.465
+    },
+    {
+      "id": "responsibility-contributors",
+      "name": "Responsibility sets and contributor labels",
+      "kind": "module",
+      "summary": "Defines which units each developer is expected to understand (CODEOWNERS, footprint, manual) and labels contributors as AI, Joint, Human or Bot.",
+      "decision": "Seeded sets curated by leads with per-developer scope overrides; AI-likelihood labels from metadata only and display-only.",
+      "alternatives": "Everyone responsible for everything; authorship-based scoring.",
+      "why": "Owner answers: repo owners assign roles, metadata-only heuristics; avoids penalising people for units they were never expected to know.",
+      "paths": [
+        "udebt/responsibility.py",
+        "udebt/contributors.py",
+        "tests/test_responsibility.py",
+        "tests/test_contributors.py"
+      ],
+      "centrality": 3,
+      "clusters": [
+        "C3"
+      ],
+      "scope": "architectural",
+      "history": [],
+      "churn": 0.799,
+      "provenance": {
+        "total": 2,
+        "ai": 2,
+        "assisted": 0,
+        "human": 0,
+        "ai_share": 1.0,
+        "mass": 0.799,
+        "first": "2026-11-12",
+        "last": "2026-11-12"
+      },
+      "importance": 0.504
+    },
+    {
+      "id": "project-governance",
+      "name": "Briefing and change log discipline",
+      "kind": "decision",
+      "summary": "BRIEFING.md, CHANGES.md and CLAUDE.md hold scope, decisions and agent instructions that agents must keep in sync with code and README math.",
+      "decision": "Decisions are recorded in docs read and appended by agents, and scoring changes must update the README table alongside.",
+      "alternatives": "ADRs; issue tracker; undocumented decisions.",
+      "why": "Agents build most of the code, so intent needs to be written where they read it.",
+      "paths": [
+        "BRIEFING.md",
+        "CHANGES.md",
+        "CLAUDE.md",
+        "ROADMAP.md",
+        "README.md"
+      ],
+      "centrality": 2,
+      "clusters": [],
+      "scope": "architectural",
+      "history": [
+        {
+          "sha": "5fafc04",
+          "date": "2026-11-11",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
+        }
+      ],
+      "churn": 1.371,
+      "provenance": {
+        "total": 9,
+        "ai": 8,
+        "assisted": 0,
+        "human": 1,
+        "ai_share": 0.96,
+        "mass": 1.371,
+        "first": "2026-11-11",
+        "last": "2026-11-12"
+      },
+      "importance": 0.488
     }
   ]
 }

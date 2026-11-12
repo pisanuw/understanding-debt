@@ -11,7 +11,7 @@ Dates are deliberately absent; phases are ordered by dependency.
 |---|---|---|
 | Who wrote it | each commit is `ai`, `assisted` or `human` from agent signatures; counts shown | no contributor list, no bots, no "most likely" classes, no "you vs others" view |
 | How much a commit matters | every commit counts one; decay is 0.9 per commit; churn is a commit count | a 200-file reformat and a new package weigh the same |
-| What must be understood | one flat list of LLM-proposed units with paths; a team-wide `blackbox` flag | nothing per developer; every developer's index sums over every unit |
+| What must be understood | two levels of units, proposed from import and co-change clusters and named by the LLM; responsibility sets per developer; scope per developer or team | sets are seeded from humans only, so agent-only units need a lead to assign them |
 | Evidence of understanding | quiz answers graded against code; own-commit prior capped at 0.5 | prior is authorship-based, which AI authorship undermines (see research) |
 | Over time | point-in-time `status`; records carry timestamps and commit shas | no replay, no series, no graph |
 | Where it runs | local CLI over a clone, `claude` CLI for the model | no server, no shared store, no PR signal |
@@ -135,6 +135,27 @@ hierarchy levels are enough for repos up to a few thousand files.
 
 **Exit** when dsa-instructor maps to a hierarchy a maintainer agrees with and
 `udebt risk` on a historical multi-unit commit flags the right unit.
+
+**Status 2026-11-12: done**, except where noted.
+
+| item | status |
+|---|---|
+| import graph | done for Python (`ast`) and JS/TS (regex) behind a one-function-per-language registry; C++, Rust, Java deferred (owner order); Go not planned; no tree-sitter |
+| co-change graph | done, every language; commits over 30 files ignored (`cochange_max_files`) |
+| community detection | done: stdlib Louvain, seeded for determinism; Leiden deferred, since none of dsa-instructor's 12 clusters or 51 sub-clusters is disconnected (the failure Leiden fixes). Another seed keeps 84% of files in the same cluster; the LLM pass absorbs the rest |
+| LLM names, merges, splits, adds cross-cutting decisions | done; units record the cluster ids they cover |
+| two-level hierarchy | done: map v3, `children`, `--deep` on status, quiz and risk; v2 maps still load |
+| responsibility sets | done: CODEOWNERS, else human footprint; `responsibility seed / add / remove`; developers declaring their own sets deferred (owner answer 4, "later") |
+| per-developer scope | done (`--for`, `--team`) |
+| risk uses the sets | done: OUTSIDE level |
+| `@org/team` handles | mapped by hand in config `handles`; expanding them through the GitHub API deferred to Phase 4 |
+
+Exit check. digitalme (225 files) maps to 12 units, one with three sub-units, in 37 s;
+dsa-instructor (1902 files, 2510 commits) to 12 units, two with nine sub-units between them,
+in 62 s, with about 4 s of graph work, and the hierarchy follows the architecture notes in its
+own CLAUDE.md. `risk` on dsa-instructor's `b194175` (Teach-Back tables, migration and engine)
+flags `teachback` as OUTSIDE and the migration's unit as HIGH; on digitalme's `e45fe82` (the
+June refactor) every touched unit is CAUTION for the sole author, heaviest first.
 
 ## Phase 3: time series and the local dashboard
 

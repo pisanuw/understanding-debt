@@ -59,6 +59,34 @@ acceptable.
 - **Contributor labels**: explicit (AI, Bot, Joint) feed nothing but display; "most likely"
   labels are metadata-only and advisory.
 
+- **Structural discovery (Phase 2)**: candidate units come from an import graph (Python by
+  `ast`, JS/TS by regex; one registered function per language, C++/Rust/Java next) merged
+  with a co-change graph (weight / (files - 1) per commit, commits over 30 files ignored),
+  partitioned by a seeded stdlib Louvain, sub-clusters for 8+ files. Only source files are
+  clustered; docs and config attach afterwards so journals do not glue code together. The
+  LLM names, merges and splits clusters and adds cross-cutting decisions. No tree-sitter, no
+  networkx: runtime stays stdlib only.
+- **Two levels are enough**: map v3 gives top-level units up to six sub-units
+  (`parent/child`). Sub-units split the parent's importance; a parent quiz gives sub-units
+  half; sub-unit quizzes roll up to the parent (priors do not, they share the same commits).
+  Default views are top level; `--deep` or a unit argument goes down. v1/v2 maps still load.
+- **Responsibility sets** in `.udebt/responsibility.json` (committed): per developer, from
+  CODEOWNERS when it names them (an owner of >= 30% of a unit's files), else from their
+  share of the human-led work (>= 10% and >= 0.1 mass). AI-authored commits count for
+  nobody: a unit only agents touched is in nobody's set until a lead assigns it. Unknown
+  handles stay pending with a null slot in config `handles`. A lead's add/remove marks the
+  set curated; a plain re-seed leaves it alone, `--force` re-seeds and keeps manual entries.
+- **Your index is over your set** plus the units you are touching now (uncommitted or
+  unpushed changes); with no set, over every unit as before.
+- **Scope is per developer by default**; `--team` writes the map. A developer's own choice
+  beats the team's in both directions.
+- **OUTSIDE is the strongest risk level**: real weight (>= 0.1) in a unit outside your set
+  that you understand below the known threshold. `--strict` exits 1 on it as on HIGH.
+- **Bus target per unit** (config `bus_target`, default 2): the team view lists every
+  architectural unit with fewer holders above the known threshold, and who is responsible.
+- **Line share ignores lockfile and generated lines**, so a lockfile bump inside a refactor
+  does not steer the refactor's weight to the frontend.
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.
@@ -70,3 +98,11 @@ acceptable.
 
 - Threshold for "architectural decision worth an acknowledgement" when we add
   capture-at-generation-time.
+- Agent commits a human directed (cloud sessions authored as the agent) count for nobody's
+  footprint, so on dsa-instructor two units built only by agent sessions are in nobody's set
+  and this repo seeds no set at all. Should config map an agent identity, or a
+  `Claude-Session` trailer, to the human who directed it?
+- The own-commit prior is capped at 0.5, below the 0.6 known threshold, so no unit has a
+  holder until someone takes a quiz and the bus target reads 0 everywhere at first. Intended?
+- A file listed under several units (digitalme's `backend/main.py` is in four) lands its full
+  line share in each, which inflates the mass of hub files.
