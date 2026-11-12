@@ -17,8 +17,9 @@ lacks are parsed (`git log --no-walk --stdin`, so nothing else is walked) and ap
 cached shas no longer reachable from HEAD (a rebase, an amend, a reset) are dropped and never
 used. Classification (ai, assisted, human, bot) and directed work are not cached: they are
 recomputed from the cached fields on every load, so a signature or config change applies
-without a re-parse. The author name and email honour .mailmap, so a .mailmap change, or a
-change to this file's format, rebuilds the cache.
+without a re-parse. When the rule behind one weighing input changes (INPUT_VERSIONS), only
+that input is dropped and recomputed. The author name and email honour .mailmap, so a
+.mailmap change, or a change to this file's format, rebuilds the cache.
 
 The file is `.udebt/commits-parsed.json`, gzipped to `commits-parsed.json.gz` when the plain
 file would pass GZIP_OVER bytes. It is derived data, rebuilt by any command, and on a large
@@ -47,6 +48,10 @@ FORMAT = 1  # bump when the stored record changes; an older file is rebuilt
 NAME = "commits-parsed.json"
 GZIP_OVER = 4_000_000  # bytes of plain JSON above which the file is written gzipped
 INPUT_KINDS = ("eff", "add", "ren", "ver")
+# A weighing input whose rule changed: cached values of an older version are dropped and
+# recomputed (one restricted pass) without re-parsing the history. `ver` 2: a dependency
+# moved to a new major version is no longer a version bump.
+INPUT_VERSIONS = {"ver": 2}
 GITIGNORE = "# derived by udebt, rebuilt on demand (`udebt cache status`)\n{name}\n{name}.gz\n"
 
 
@@ -89,6 +94,7 @@ class Stats:
     parsed: int = 0  # shas parsed from git this load
     dropped: int = 0  # cached shas no longer reachable from HEAD
     inputs: dict[str, int] = field(default_factory=dict)  # weighing inputs computed, by kind
+    reset: list[str] = field(default_factory=list)  # inputs dropped because their rule changed
     written: bool = False
 
 
@@ -176,8 +182,14 @@ class ParsedCache:
         elif data.get("mailmap") != key:
             self.stats.rebuilt, data = ".mailmap changed", None
         if data is None:
-            data = {"format": FORMAT, "mailmap": key, "commits": {}}
+            data = {"format": FORMAT, "mailmap": key, "commits": {}, "inputs": INPUT_VERSIONS}
         cached: dict[str, dict[str, Any]] = data["commits"]
+        have = data.get("inputs", {})
+        self.stats.reset = [k for k, v in INPUT_VERSIONS.items() if have.get(k, 1) != v]
+        for e in cached.values():
+            for k in self.stats.reset:
+                e.pop(k, None)
+        data["inputs"] = dict(INPUT_VERSIONS)
         newest_first = reachable(self.root)
         live = set(newest_first)
         stale = [s for s in cached if s not in live]
@@ -191,7 +203,7 @@ class ParsedCache:
         self.stats.parsed, self.stats.dropped = len(new), len(stale)
         self.data = data
         self.order = newest_first[::-1]
-        if new or stale or self.stats.rebuilt:
+        if new or stale or self.stats.rebuilt or self.stats.reset:
             data["head"] = newest_first[0] if newest_first else None
             self._write()
         return self.order

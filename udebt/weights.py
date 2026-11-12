@@ -34,7 +34,7 @@ from .provenance import Commit, git_log
 
 # LLM refinement classes and the weight each implies.
 CLASS_WEIGHT = {"architectural": 1.0, "behavioural": 0.6, "refactor": 0.3, "cosmetic": 0.05}
-CACHE_VERSION = 3  # 2: branch commits grouped under their merge; 3: version bumps
+CACHE_VERSION = 4  # 2: branch commits grouped; 3: version bumps; 4: major upgrades weigh
 VERSION_BUMP_WEIGHT = 0.03  # a release that only moves version numbers, like a lockfile bump
 NEAR_ZERO = {"docs", "lock", "generated", "media"}  # kinds that leave a version bump a bump
 GROUP_MAX_COMMITS = 50  # a longer branch is a long-lived line of work, not a pull request
@@ -114,11 +114,33 @@ _VERSION_TOKEN = re.compile(r"v?\d+(\.\d+)+([-+][0-9A-Za-z.-]+)?")
 _HUNK = re.compile(r"^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@")
 
 
+def major(token: str) -> tuple[int, ...] | None:
+    """The part of a version string a breaking upgrade changes: the first number, or the
+    first two for 0.x (0.x minors break). None for a calendar version (a first number of
+    1000 or more), where the first number is a year, not a promise about compatibility."""
+    m = re.match(r"v?(\d+)\.(\d+)", token, re.I)
+    if m is None:
+        return None
+    first, second = int(m.group(1)), int(m.group(2))
+    if first >= 1000:
+        return None
+    return (0, second) if first == 0 else (first,)
+
+
+def _tokens(line: str) -> list[str]:
+    return [m.group(0) for m in _VERSION_TOKEN.finditer(line)]
+
+
 def version_only(removed: list[str], added: list[str]) -> bool:
     """Whether a file's diff (its removed and added lines) changes nothing but versions.
     Every changed line either sets a version, or is a pin whose removed and added forms are
     the same line apart from version strings (`"@sentry/core": "8.1.0"` to `"8.2.0"`, which
-    a monorepo release rewrites in every package). Blank lines are ignored."""
+    a monorepo release rewrites in every package), within the same major version. A pin
+    moved to a new major (`8.1.0` to `9.0.0`, `0.23` to `0.30`, `<2.0.0` to `<3.0.0`) is a
+    dependency change: someone has to understand what the upgrade broke. The project's own
+    version lines never count as one, nor does a pin moved to the version this diff gives
+    the project (a monorepo's major release pinning its own packages). Blank lines are
+    ignored."""
     rem = [ln.strip() for ln in removed if ln.strip()]
     add = [ln.strip() for ln in added if ln.strip()]
     if not rem and not add:
@@ -127,10 +149,31 @@ def version_only(removed: list[str], added: list[str]) -> bool:
     if any(not _VERSION_TOKEN.search(ln) for ln in pins):
         return False
 
-    def shape(lines: list[str]) -> Counter:
-        return Counter(_VERSION_TOKEN.sub("#", ln) for ln in lines if not _VERSION_LINE.search(ln))
+    def shaped(lines: list[str]) -> dict[str, list[str]]:
+        out: dict[str, list[str]] = {}
+        for ln in lines:
+            if not _VERSION_LINE.search(ln):
+                out.setdefault(_VERSION_TOKEN.sub("#", ln), []).append(ln)
+        return out
 
-    return shape(rem) == shape(add)
+    before, after = shaped(rem), shaped(add)
+    if Counter({k: len(v) for k, v in before.items()}) != Counter(
+        {k: len(v) for k, v in after.items()}
+    ):
+        return False
+    own = {t.lower().lstrip("v") for ln in add if _VERSION_LINE.search(ln) for t in _tokens(ln)}
+    for key, olds in before.items():
+        for old, new in zip(olds, after[key], strict=True):
+            for a, b in zip(_tokens(old), _tokens(new), strict=True):
+                ma, mb = major(a), major(b)
+                if (
+                    ma != mb
+                    and ma is not None
+                    and mb is not None
+                    and b.lower().lstrip("v") not in own
+                ):
+                    return False
+    return True
 
 
 def parse_version_diff(out: str) -> dict[str, bool]:

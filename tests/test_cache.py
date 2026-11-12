@@ -163,10 +163,32 @@ def test_cache_cli_and_gitignore(mixed_repo, monkeypatch, capsys):
     rc, out = run("weigh")
     rc, out = run("cache", "status")
     assert rc == 0 and "7 commits cached; 7 reachable from HEAD: 0 new" in out
-    assert "gitignored: yes" in out and "version 3" in out
+    assert "gitignored: yes" in out and "version 4" in out
     rc, out = run("cache", "rebuild")
     assert rc == 0 and "Rebuilt: parsed 7 commits" in out and "versions 7" in out
     status = subprocess.run(
         ["git", "status", "--porcelain", "--ignored"], cwd=root, capture_output=True, text=True
     ).stdout
     assert "!! .udebt/commits-parsed.json" in status  # ignored, not untracked
+
+
+def test_a_changed_input_rule_recomputes_only_that_input(mixed_repo, tmp_path):
+    root = mixed_repo
+    d = tmp_path / "udebt-dir"
+    pc = cache_mod.ParsedCache(root, d)
+    commits = pc.commits()
+    want = pc.versions(commits)
+    pc.inputs(commits)
+    data = json.loads(pc.path.read_text())
+    data.pop("inputs")  # a cache written before `ver` had a version
+    for e in data["commits"].values():
+        e["ver"] = ["stale.json"]
+    pc.path.write_text(json.dumps(data))
+    again = cache_mod.ParsedCache(root, d)
+    commits = again.commits()
+    assert again.stats.reset == ["ver"] and again.stats.parsed == 0
+    assert again.versions(commits) == want
+    assert again.stats.inputs == {"ver": len(commits)}  # eff, add and ren were kept
+    third = cache_mod.ParsedCache(root, d)
+    third.commits()
+    assert third.stats.reset == [] and not third.stats.written

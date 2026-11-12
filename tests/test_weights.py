@@ -234,6 +234,43 @@ def test_version_only_lines():
     assert not version_only(["", "  "], [""])  # nothing but blank lines
 
 
+def test_major_upgrades_are_dependency_changes():
+    def bump(a, b):
+        return version_only([a], [b])
+
+    # patch and minor upgrades stay version bumps, in every common format
+    assert bump('"left-pad": "1.4.2",', '"left-pad": "1.5.0",')
+    assert bump('"react": "^18.2.0",', '"react": "^18.3.1",')
+    assert bump('"zod": "~3.22.4",', '"zod": "~3.23.0",')
+    assert bump('"pydantic>=2.5.0",', '"pydantic>=2.9.2",')
+    assert bump("uvicorn[standard]>=0.23.0", "uvicorn[standard]>=0.23.2")
+    assert bump("django~=4.2.0", "django~=4.2.7")
+    assert bump(
+        'serde = { version = "1.0.188", features = ["derive"] }',
+        'serde = { version = "1.0.190", features = ["derive"] }',
+    )
+    assert bump("\tgithub.com/go-git/go-billy/v5 v5.5.0", "\tgithub.com/go-git/go-billy/v5 v5.6.0")
+    assert bump('gem "rails", "~> 7.0.4"', 'gem "rails", "~> 7.1.0"')
+    # a new major is a dependency change; for 0.x the minor is the major
+    assert not bump('"left-pad": "1.5.0",', '"left-pad": "2.0.0",')
+    assert not bump('"react": "^17.0.2",', '"react": "^18.2.0",')
+    assert not bump('"pydantic>=1.10.0",', '"pydantic>=2.0.0",')
+    assert not bump("uvicorn[standard]>=0.23.0", "uvicorn[standard]>=0.30.0")
+    assert not bump('"griffe>=0.49.0,<2.0.0",', '"griffe>=0.49.0,<3.0.0",')  # allows a new major
+    assert not bump('tokio = "0.2.22"', 'tokio = "1.0.0"')
+    assert not bump('gem "rails", "~> 6.1"', 'gem "rails", "~> 7.0"')
+    assert not bump("\tgithub.com/x/y/v2 v2.1.0", "\tgithub.com/x/y/v3 v3.0.0")  # module path
+    # the project's own version, and its own packages pinned to it, stay version bumps
+    assert bump('"version": "1.9.0",', '"version": "2.0.0",')
+    assert version_only(
+        ['"version": "7.120.0",', '"@sentry/core": "7.120.0",'],
+        ['"version": "8.0.0",', '"@sentry/core": "8.0.0",'],
+    )
+    # calendar versions and versions that are not numbers keep the old behaviour
+    assert bump("certifi==2023.7.22", "certifi==2024.2.2")
+    assert not bump('"foo": "latest",', '"foo": "next",')
+
+
 def _release_repo(tmp_path):
     root = tmp_path / "mono"
     root.mkdir()
@@ -295,6 +332,43 @@ def test_version_bumps_weigh_like_lockfile_bumps(tmp_path):
     mono_c = by["release: 1.1.0"]
     mono_c.version_files = bumps[mono_c.sha]
     assert set(mono_c.counted_lines) == {"CHANGELOG.md"}
+
+
+def test_major_upgrade_commits_keep_their_weight(tmp_path):
+    root = tmp_path / "deps"
+    root.mkdir()
+    git(root, "init", "-q", "-b", "main")
+    git(root, "config", "user.name", "Dev One")
+    git(root, "config", "user.email", "dev1@example.com")
+
+    def files(dep: str, mod: str) -> None:
+        (root / "package.json").write_text(
+            f'{{\n  "name": "app",\n  "version": "1.0.0",\n  "dependencies": '
+            f'{{"left-pad": "{dep}"}}\n}}\n'
+        )
+        (root / "go.mod").write_text(f"module example.com/app\n\nrequire (\n\t{mod}\n)\n")
+
+    files("1.4.2", "github.com/x/y/v2 v2.1.0")
+    (root / "main.go").write_text("package main\n")
+    git(root, "add", ".")
+    git(root, "commit", "-q", "-m", "initial")
+    files("1.5.0", "github.com/x/y/v2 v2.1.0")
+    git(root, "commit", "-q", "-am", "left-pad 1.5.0")
+    files("2.0.0", "github.com/x/y/v2 v2.1.0")
+    git(root, "commit", "-q", "-am", "left-pad 2.0.0")
+    files("2.0.0", "github.com/x/y/v3 v3.0.0")
+    git(root, "commit", "-q", "-am", "y v3")
+    cs = load_commits(root)
+    by = {c.subject: c for c in cs}
+    bumps = version_bumps(root, commits=cs)
+    w = compute_weights(root, cs, set())
+    minor = w[by["left-pad 1.5.0"].sha]
+    assert bumps[by["left-pad 1.5.0"].sha] == {"package.json"}
+    assert minor.weight == VERSION_BUMP_WEIGHT
+    for subject in ("left-pad 2.0.0", "y v3"):
+        assert by[subject].sha not in bumps
+        assert "dependencies changed" in w[by[subject].sha].reasons
+        assert w[by[subject].sha].weight >= 0.4
 
 
 def test_staged_version_bump(tmp_path):
