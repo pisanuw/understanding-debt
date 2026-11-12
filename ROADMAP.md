@@ -133,6 +133,52 @@ unchanged, since only Claude Code works there. Grouping cuts total mass on digit
 squashes every pull request and is unchanged. A test repository with a ten-commit branch and
 its squashed twin now weighs within 20%, against 6x before.
 
+### Phase 1.2: version bumps, a parsed-commit cache, the synthetic rerun
+
+**Status 2026-11-12: done.** From the starter-set run in TESTBEDS.md, which found human-cut
+releases weighing as dependency changes and every command re-parsing the whole history.
+
+| item | status |
+|---|---|
+| version-only manifest edits | done: a manifest or version file whose diff changes only version strings (own version lines, or pins that differ only in the version) is a `version` kind: no +0.3, no directory spread, out of line share; a commit of only bumps weighs 0.03; `commits.json` v3 |
+| parsed-commit cache | done: `.udebt/commits-parsed.json` (`.json.gz` above 4 MB), new shas parsed via `rev-list`, unreachable ones dropped, classification redone each load, weighing inputs cached; gitignored; `udebt cache status\|rebuild` |
+| `risk --staged` | reads staged version bumps, and uses staged line counts for line share |
+| synthetic rerun | done: `--snapshots`, `--per-unit 2`, decision and behaviour questions, edited-vs-new split, `--suggest`, `--resume`; on digitalme every answer is right at mass 2.3 and the score falls to 0.46 and 0.21 at 25.7 and 50.4 (30 of 31 unit pairs worse with more mass), but within a snapshot mass ranks units weakly (rho 0.39, 0.00); Phase 5 |
+
+Version bumps, heuristic weights before and after on non-bot commits (no LLM blending):
+
+| repo | non-bot commits | weight changed | now "version bump only" | mass before -> after |
+|---|--:|--:|--:|---|
+| digitalme | 189 | 0 | 0 | 70.5 -> 70.5 |
+| dsa-instructor | 2,510 | 2 | 0 | 541.2 -> 540.9 |
+| PrefectHQ/prefect | 2,157 | 69 | 38 (20 weighed >= 0.7) | 1170.7 -> 1133.5 (-3.2%) |
+| go-git | 3,954 | 56 | 10 | 818.7 -> 808.3 (-1.3%) |
+
+Neither of the owner's repos has a release commit: digitalme has no version-only edit, and
+dsa-instructor's one (`818ea5e`, a Playwright pin moved with a CI change) loses the +0.3 and
+shares that with its branch. Prefect and go-git change mostly through dependency pins
+(`griffe>=0.49.0,<2.0.0` to `<3.0.0`, `go.mod` bumps), many by dependabot or renovate, which
+already land no mass. sentry-javascript, the motivating case, was not cloned here; its
+releases rewrite each `package.json`'s version and internal pins, which the pin rule covers.
+
+Wall time, `udebt contributors` and `udebt weigh` (4 cores; cold = no parsed cache):
+
+| repo | command | before | after, cold | after, warm |
+|---|---|--:|--:|--:|
+| dsa-instructor (2,510 commits) | contributors | 4.8 s | 5.0 s | 0.26 s |
+| | weigh, weights current | 5.2 s | | 0.30 s |
+| | weigh, weights recomputed | 14.6 s | 15.2 s | 0.62 s |
+| prefect (2,671, shallow) | contributors | 4.1 s | 4.2 s | 0.28 s |
+| | weigh, weights current | 4.2 s | | 0.29 s |
+| | weigh, weights recomputed | 9.4 s | 10.2 s | 0.49 s |
+
+Fifty new commits on dsa-instructor parse in 0.36 s. The cache is 3.6 MB of plain JSON for
+dsa-instructor (2.6 MB for prefect), about a quarter of that gzipped; servo was not cloned
+here, so its cold run should cost what it did (8-9 and 18 minutes) and a warm one seconds,
+with a cache of roughly 85 MB plain, 20-25 MB gzipped (extrapolated). Cached and uncached
+results are identical on digitalme, dsa-instructor, prefect, go-git and this repository:
+every commit field, the four weighing inputs and every weight.
+
 ## Phase 2: conceptual units and responsibility
 
 **Adds**
@@ -287,6 +333,84 @@ and answered from the old code where it could.
 What it suggests for the model, untested: decay may need to distinguish edits to code a
 developer has seen (misconceptions) from new code (known gaps), rather than summing both as
 mass; and a small edit to a decision a question can hit may matter more than its line count.
+
+**Second result, 2026-11-12** (Phase 1.2 design: digitalme at HEAD `f93102b`, three
+snapshots on the first-parent line sharing one question set written from HEAD, all 12
+top-level units, two questions each, the first on the decision and the second on current
+behaviour, no history in the question prompt; 7 model calls). The brief asked for snapshots
+near 10, 25 and 50 mass with a third of the units unchanged at the nearest, but at mass 10
+only 1 of 12 units is unchanged (`--suggest`), so the nearest moved to 2.3, the closest with
+4 unchanged. digitalme has no version-only edits, so mass is the same in Phase 1.1 weights.
+
+| snapshot | commits since | mass since | units unchanged | mean score | wrong / partial / correct / unknown | confidently wrong | Spearman(mass since, 1 - score) |
+|---|--:|--:|--:|--:|---|--:|---|
+| `7f463b1` (2026-09-02) | 8 | 2.3 | 4 of 12 | 1.00 | 0 / 0 / 24 / 0 | 0 | undefined: every answer correct |
+| `f557893` (2026-06-04) | 98 | 25.7 | 0 | 0.46 | 9 / 6 / 8 / 1 | 2 | 0.39 (p = 0.10) |
+| `7b1895d` (2026-05-24) | 160 | 50.4 | 0 | 0.21 | 14 / 8 / 1 / 1 | 0 | 0.00 (p = 0.49) |
+
+Per unit, mass since / mean score:
+
+| unit | `7f463b1` | `f557893` | `7b1895d` |
+|---|--:|--:|--:|
+| chat-flow | 0.23 / 1.00 | 3.56 / 0.00 | 7.11 / 0.00 |
+| cost-control | 0.08 / 1.00 | 3.89 / 0.50 | 8.33 / 0.00 |
+| persona-retrieval | 0.07 / 1.00 | 1.98 / 0.75 | 6.07 / 0.25 |
+| admin-persona-fix-loop | 0.08 / 1.00 | 4.14 / 0.50 | 9.63 / 0.25 |
+| auth-rbac | 0.26 / 1.00 | 2.90 / 1.00 | 5.61 / 0.25 |
+| analytics-persistence | 0 / 1.00 | 2.18 / 0.50 | 4.18 / 0.25 |
+| frontend-spa | 1.07 / 1.00 | 4.05 / 0.25 | 9.69 / 0.50 |
+| safety-guardrails | 0 / 1.00 | 1.64 / 0.50 | 3.69 / 0.00 |
+| content-pipeline | 0.17 / 1.00 | 2.92 / 0.25 | 7.62 / 0.25 |
+| faq-cache-tts | 0.04 / 1.00 | 2.25 / 0.00 | 4.38 / 0.00 |
+| email-notifications | 0 / 1.00 | 0.31 / 0.75 | 1.98 / 0.25 |
+| contacts-db | 0 / 1.00 | 0.12 / 0.50 | 0.45 / 0.50 |
+
+New against edited code (a unit is mostly-new when under half of its changed lines since
+were in files the snapshot had):
+
+| snapshot | mostly-edited: units, mean mass, wrongness, confidently wrong | mostly-new: units, mean mass, wrongness, confidently wrong |
+|---|---|---|
+| `7f463b1` | 8, 0.25, 0.00, 0 (and 4 unchanged, 0.00) | none |
+| `f557893` | 10, 2.48, 0.48, 1 | 2, 2.59, 0.88, 1 |
+| `7b1895d` | 9, 5.90, 0.75, 0 | 3, 5.23, 0.92, 0 |
+
+Across snapshots, the same unit with more mass since scored worse in 30 pairs, better in 1
+(frontend-spa, 0.25 to 0.50) and the same in 5; pooled over all 36 unit-snapshots, rho =
+0.79 (p < 0.001, but the points are not independent). Udebt's own evidence (confidently
+wrong -0.5) gives 0.30 and 0.00 within the two older snapshots; share since gives 0.33
+(p = 0.15) and 0.47 (p = 0.06). Reading it honestly:
+
+- **The floor is gone.** At the nearest snapshot every answer was right, including the 8 on
+  the 4 unchanged units and the 16 on units with mass up to 1.07. The questions can be
+  answered from old code, so what goes wrong at older snapshots is the code having moved.
+- **Decay shows across snapshots, not yet across units.** The 30-to-1 paired count says a
+  developer frozen earlier knows less of the same unit, but that is mostly the age of the
+  snapshot. Within one snapshot, the rank of mass since barely says which units go wrong:
+  0.39 (p = 0.10) at 25.7, 0.00 at 50.4 where nearly everything is wrong. Unit attribution
+  is not shown by this run.
+- **Understanding falls faster than 0.9 per unit of mass.** 0.9^mass predicts mean scores
+  of 0.78 and 0.57 at the two older snapshots, against 0.46 and 0.21 observed; about 0.70
+  per unit would fit both. Small units go wrong on little mass of their own: contacts-db scored
+  0.50 at 0.12 (the substring privacy filter again), email-notifications 0.75 at 0.31.
+  Their answers lean on code outside their paths (`backend/main.py`, shared helpers).
+- **Unknowns did not dominate**: 2 of 72 answers. Confidently wrong answers were rare too,
+  2 of 72: this answerer gave confidence 1 or 2 to most wrong answers, so the confidence
+  penalty that set the first run's sign barely moves anything here.
+- **New code was worse than edited code**, at similar or lower mass, but the groups are two
+  and three units. The first run's hint (new code gives known unknowns, edits give
+  confident misconceptions) is not supported: new code gave low-confidence wrong answers,
+  not blanks, and edits rarely gave confident ones.
+- Caveats: one repository, one run, an LLM as the developer (it recalls its snapshot
+  perfectly, hence the ceiling), graded by the same model family against references written
+  from HEAD; across snapshots, mass since and age move together.
+
+What it suggests for the model, untested: keep commit-based decay, but 0.9 per unit of mass
+looks slow for a unit that moved a lot; do not retune on one synthetic run, wait for human
+quizzes. Attribute some mass beyond a unit's own paths (the files it imports, or a small
+repo-wide term), since small units decayed on little mass of their own. Do not discount new
+code: it was the worse case. Next: the same design on dsa-instructor (7 calls), a repeat on
+digitalme for variance, and a snapshot near mass 10 with a third of the units unchanged on
+a repository where one exists.
 
 ## Decisions assumed in this roadmap
 

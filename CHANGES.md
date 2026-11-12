@@ -38,3 +38,5 @@
 2026-11-12 [note] Cache on dsa-instructor: contributors 4.8 -> 0.26 s, weigh 5.2 (14.6 recompute) -> 0.30 s warm; prefect 4.1 -> 0.28, 4.2 (9.4) -> 0.29 s. Cold costs as before.
 2026-11-12 [code] risk --staged reads staged version bumps, and its line share now uses the staged per-file line counts it already computed (it fell back to file counts).
 2026-11-12 [code] experiment synthetic: --snapshots (one shared HEAD question set), --per-unit 2, decision/behaviour questions, edited-vs-new split, paired counts, --suggest, --resume.
+2026-11-12 [note] Synthetic rerun, digitalme, snapshots at mass 2.3/25.7/50.4: score 1.00/0.46/0.21, 30 of 31 pairs worse; within-snapshot rho 0.39, 0.00. Decay over time, not units.
+2026-11-12 [decision] No model change from one synthetic run: decay looks faster than 0.9/mass and spills past unit paths; wait for human quizzes (BRIEFING open questions).

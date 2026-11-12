@@ -8,7 +8,14 @@ from test_provenance import mk
 
 from udebt import cli
 from udebt import llm as llm_mod
-from udebt.synthetic import change_lines, classify_change, permutation_p, ranks, spearman
+from udebt.synthetic import (
+    change_lines,
+    classify_change,
+    permutation_p,
+    ranks,
+    reading,
+    spearman,
+)
 
 
 def test_rank_statistics():
@@ -20,6 +27,9 @@ def test_rank_statistics():
     xs = list(range(10))
     assert permutation_p(xs, xs, n=500) < 0.01
     assert permutation_p(xs, xs[::-1], n=500) > 0.99
+    assert reading(0.0, 0.49).startswith("no correlation") and "chance" in reading(0.0, 0.49)
+    assert reading(0.79, 0.0001).endswith("consistent with decay")
+    assert reading(-0.27, 0.81).endswith("against the decay model")
 
 
 def test_new_versus_edited_lines():

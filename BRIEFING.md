@@ -167,6 +167,11 @@ acceptable.
   The nearest snapshot should leave at least a third of the units unchanged, as a control;
   `--suggest` lists candidates. Reports are saved after every call and `--resume` finishes
   one, because a run has a fixed call budget.
+  Second result on digitalme (snapshots at mass 2.3, 25.7, 50.4; the nearest moved in from
+  10, which leaves only 1 of 12 units unchanged): mean score 1.00, 0.46, 0.21; the same
+  unit scored worse with more mass in 30 of 31 pairs; within a snapshot rho 0.39 (p 0.10)
+  and 0.00. Decay across snapshots, unit attribution not shown; 2 of 72 unknown, 2 of 72
+  confidently wrong. No model change made on it (ROADMAP Phase 5).
 - **Version bumps** (Phase 1.2): a manifest or version file whose diff changes only version
   strings is a `version` kind for that commit: no +0.3 for dependencies, no directory spread,
   out of line share; a commit of only version bumps (plus docs, lockfiles, generated files)
@@ -200,6 +205,9 @@ acceptable.
   `pipeline` name heuristic stay?
 - vscode's `on behalf of @user` footer names the directing developer; it could fill
   `directed` automatically from `handles`.
+- The synthetic rerun suggests decay faster than 0.9 per unit of mass and mass reaching
+  small units from outside their paths (contacts-db wrong at 0.12). Change the model now,
+  or wait for human quizzes on digitalme? Run the same design on dsa-instructor next?
 - Dependency upgrades (same package, new version) now weigh like version bumps. Should a
   major-version upgrade (`pydantic>=1` to `>=2`) with no code change keep some weight? On
   prefect most such commits are dependabot's (already bots); on go-git several are human.

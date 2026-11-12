@@ -139,6 +139,9 @@ which ba564e2 now builds in.
   `weigh` 18.5 minutes, because every command re-parses `git log --numstat` for the whole
   history. The stress tier (vscode 171k commits, llvm 608k) needs a parsed-commit cache.
 - `udebt map` (the `claude` CLI) has not been run on these yet.
+- **Status (Phase 1.2, 2026-11-12):** version-only manifest edits now weigh 0.03 and leave
+  line share alone, and a parsed-commit cache makes a warm `contributors` or `weigh` take
+  well under a second on 2,500-commit histories (ROADMAP Phase 1.2).
 
 ## Caveats
 

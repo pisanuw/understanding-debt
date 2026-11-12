@@ -148,12 +148,12 @@ def permutation_p(xs: list[float], ys: list[float], n: int = 10000, seed: int = 
 def reading(rho: float | None, p: float | None) -> str:
     if rho is None:
         return "undefined: no variation in mass or in wrongness"
-    size = abs(rho)
-    strength = (
-        "no" if size < 0.1 else "weak" if size < 0.3 else "moderate" if size < 0.5 else "strong"
-    )
-    sign = "positive" if rho > 0 else "negative"
     sig = f", one-sided permutation p = {p:.3f}" if p is not None else ""
+    size = abs(rho)
+    if size < 0.1:
+        return f"no correlation (rho = {rho:.2f}{sig}): not distinguishable from chance"
+    strength = "weak" if size < 0.3 else "moderate" if size < 0.5 else "strong"
+    sign = "positive" if rho > 0 else "negative"
     verdict = (
         "consistent with decay"
         if rho > 0 and p is not None and p < 0.05
