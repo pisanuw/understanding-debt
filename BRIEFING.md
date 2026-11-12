@@ -42,13 +42,17 @@ acceptable.
 - **Five questions per quiz session** by default. Short enough to run often.
 - **Python, stdlib only** at runtime. Dev deps: pytest, ruff.
 
+- **Roadmap** in ROADMAP.md: contributors and commit weight, conceptual units and
+  responsibility sets, time series and a local dashboard, then hosted (Netlify, Render,
+  Supabase) with the CLI as the local twin, then validity. Authorship stays a decaying
+  prior that may be dropped (Wheeler 2026, "Substrate Collapse").
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.
 - Time-based decay. Only commit-based decay in the slice.
-- Validating that the debt index predicts outcomes (bug-fix time). Would be a research
-  project; not needed for the product slice.
-- Language-specific static analysis for importance. Churn plus LLM centrality is the proxy.
+- Blocking merges. Every signal is advisory unless a team opts in (ROADMAP).
+- Storing source code in the hosted service. Metadata only (ROADMAP Phase 4).
 
 ## Open questions
 

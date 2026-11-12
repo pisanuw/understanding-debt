@@ -8,3 +8,4 @@
 2026-11-12 [decision] Commit .udebt/records/ by default (one file per developer). Keep 5 questions per quiz session.
 2026-11-12 [scope] Primary use is an existing repo with mixed human/AI history: make sure the developer understands the decisions that shaped it. Testbed digitalme, stress test dsa-instructor.
 2026-11-12 [code] Provenance classifier (ai/assisted/human, data-driven signatures), history mining for decision commits, history-aware map, own-commit prior (cap 0.5), identity aliases, `udebt history`, ai%/you% in status.
+2026-11-12 [plan] ROADMAP.md: 5 phases (contributors+commit weight, units+responsibility, time series+local dashboard, hosted Netlify/Render/Supabase, validity). 8 open questions. Research: Substrate Collapse, DOK/DOA, Osmani, Storey, Assisted-by trailers.
