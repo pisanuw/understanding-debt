@@ -145,18 +145,28 @@ def attach_scores(
     then split among its sub-units by the same blend among siblings. A file several units list
     counts a part in each (units.Membership)."""
     members = hier.Membership(units)
-    for u in units:
+    for u, _parent in hier.walk(units):
         _attach_one(u, commits, weights, members)
-    max_churn = max((u["churn"] for u in units), default=0)
+    set_importance(units, {u["id"]: u["churn"] for u in hier.flat(units)})
+
+
+def set_importance(units: list[dict[str, Any]], churn: dict[str, float]) -> None:
+    """Importance from centrality and churn (unit id -> weighted mass): a top-level unit
+    against the busiest top-level unit, a sub-unit's share of its parent's by the same blend
+    among its siblings. The replay (replay.py) calls it with the churn up to a cut-off."""
+    max_churn = max((churn.get(u["id"], 0.0) for u in units), default=0)
     for u in units:
-        u["importance"] = scoring.importance(u.get("centrality", 3), u["churn"], max_churn)
+        u["importance"] = scoring.importance(
+            u.get("centrality", 3), churn.get(u["id"], 0.0), max_churn
+        )
         kids = hier.children_of(u)
         if not kids:
             continue
-        for c in kids:
-            _attach_one(c, commits, weights, members)
-        sib_max = max(c["churn"] for c in kids)
-        raw = [scoring.importance(c.get("centrality", 3), c["churn"], sib_max) for c in kids]
+        sib_max = max(churn.get(c["id"], 0.0) for c in kids)
+        raw = [
+            scoring.importance(c.get("centrality", 3), churn.get(c["id"], 0.0), sib_max)
+            for c in kids
+        ]
         for c, imp in zip(kids, scoring.split_importance(u["importance"], raw), strict=True):
             c["importance"] = imp
 

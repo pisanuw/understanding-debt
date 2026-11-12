@@ -8,6 +8,7 @@ from typing import Any
 
 from . import repo, scoring
 from . import units as hier
+from .ledger import Cutoff, Ledger
 from .llm import LLM
 from .mapping import commits_for, weights_for
 from .prompts import (
@@ -17,7 +18,7 @@ from .prompts import (
     questions_prompt,
     stable_questions_prompt,
 )
-from .provenance import Commit, landed, line_weight, unit_provenance
+from .provenance import Commit, landed, line_weight, provenance_of
 from .responsibility import Responsibility, effective_scope
 from .responsibility import load as load_responsibility
 from .sizes import share
@@ -78,36 +79,48 @@ def compute_scores(
     weights: dict[str, Any] | None = None,
     resp: Responsibility | None = None,
     sizes: dict[str, float] | None = None,
+    *,
+    ledger: Ledger | None = None,
+    cutoff: Cutoff | None = None,
 ) -> list[scoring.UnitScore]:
     """Score every unit of the hierarchy for one developer, parents before their sub-units.
     Flat (version 1 and 2) maps simply have no sub-units. `commits`/`weights` let callers
-    share one parse; `sizes` (unit id -> lines, unit_sizes_at) one count of the tree, which
-    the share decay model needs. The developer's own scope choices (responsibility.json)
-    override the team-wide scope."""
+    share one parse, `ledger` (built from them and `units`) one pass over where each commit
+    landed, `sizes` (unit id -> lines, unit_sizes_at) one count of the tree, which the share
+    decay model needs. The developer's own scope choices (responsibility.json) override the
+    team-wide scope.
+
+    `cutoff` scores the repository as it stood at a past point: only the commits that had
+    landed by then, only the evidence recorded by then, sizes from that tree. Without one,
+    everything counts (`status`). The replay (replay.py) and `status` share this code."""
     cfg = store.config
     decay = cfg.decay
     recs = store.load_records(email) if records is None else records
+    if cutoff is not None:
+        recs = cutoff.records(recs)
     if commits is None:
         commits = commits_for(root, store)
     if weights is None:
         weights = weights_for(root, store, commits)
     if sizes is None and decay.model == "share":
-        sizes = unit_sizes_at(root, store, units)
+        sizes = unit_sizes_at(root, store, units, cutoff.rev if cutoff else "HEAD")
+    if ledger is None:
+        ledger = Ledger(commits, units)
     lws = line_weights(weights)
     resp = resp if resp is not None else load_responsibility(store)
     dev_scope = resp.scope(cfg.primary(email))
     team_scope = {u["id"]: u.get("scope", "architectural") for u in hier.flat(units)}
     mine = cfg.emails_for(email)
-    members = hier.Membership(units)
     own: dict[str, scoring.UnitScore] = {}
     for u, parent in hier.walk(units):
-        paths = u.get("paths", [])
-        split = members.split(u["id"])
+        touches = ledger.touches(u)
+        if cutoff is not None:
+            touches = cutoff.touches(touches)
         size = sizes.get(u["id"], 0.0) if sizes is not None else None
         unit_recs = [r for r in recs if r.get("unit") == u["id"]]
         since = scoring.last_record_head(unit_recs)
-        m_since, l_since = landed_since(commits, weights, paths, since, split, lws)
-        prov = unit_provenance(commits, paths, mine, weights, split, lws)
+        m_since, l_since = ledger.since(touches, since, weights, lws)
+        prov = provenance_of(touches, mine, weights, lws)
         p_share = None if size is None else share(prov.others_since_dev_lines, size)
         prior = scoring.prior_understanding(prov.dev_share, prov.others_since_dev_w, decay, p_share)
         s = scoring.score_unit(
@@ -252,13 +265,18 @@ def grade(
     return results
 
 
-def record(store: Store, root: Path, email: str, results: list[dict[str, Any]]) -> None:
+def record(
+    store: Store, root: Path, email: str, results: list[dict[str, Any]], source: str = "quiz"
+) -> None:
+    """Append graded answers to the developer's evidence. `source` says where the question
+    came from (`quiz`, or `dig` for a walkthrough's check question); both are quiz evidence."""
     h = repo.head(root)
     for r in results:
         store.append_record(
             email,
             {
                 "type": "quiz",
+                "source": source,
                 "dev": email,
                 "unit": r["unit_id"],
                 "head": h,

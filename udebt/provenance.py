@@ -588,6 +588,28 @@ class UnitProvenance:
         return self.dev_w / self.total_w if self.total_w else 0.0
 
 
+@dataclass(slots=True)
+class Touch:
+    """One commit's landing on one unit: computed once per map (ledger.Ledger), read by every
+    mass, share and provenance that follows, at any cut-off."""
+
+    pos: int  # the commit's index in history, oldest first
+    commit: Commit
+    att: float  # attribution: the square root of its line share in the unit (shared files split)
+    lines: float  # its changed lines under the unit, counted as line share counts them
+
+
+def touches_of(
+    commits: list[Commit], paths: list[str], split: Callable[[str], float] | None = None
+) -> list[Touch]:
+    """The commits touching `paths`, oldest first, with their attribution and lines there."""
+    return [
+        Touch(i, c, c.attribution(paths, split=split), c.lines_in(paths, split))
+        for i, c in enumerate(commits)
+        if c.touches(paths)
+    ]
+
+
 def unit_provenance(
     commits: list[Commit],
     paths: list[str],
@@ -603,20 +625,27 @@ def unit_provenance(
     directed (`Commit.directed_by`) counts as their assisted work: half weight towards their
     share, and it does not erode their prior. `line_weights` (weights.line_weights) weigh the
     changed lines counted for the share-changed erosion; without them, each commit's own."""
+    return provenance_of(touches_of(commits, paths, split), dev, weights, line_weights)
+
+
+def provenance_of(
+    touches: list[Touch],
+    dev: str | set[str] | None,
+    weights: dict[str, Any] | None = None,
+    line_weights: dict[str, float] | None = None,
+) -> UnitProvenance:
+    """unit_provenance over a unit's touches (touches_of, or a ledger's, cut off as wanted)."""
     p = UnitProvenance()
     mine = _emails(dev)
     since, since_w, since_l = 0, 0.0, 0.0
-    for c in commits:  # oldest first
-        if not c.touches(paths):
-            continue
+    for t in touches:  # oldest first
+        c = t.commit
         if c.klass == "bot":
             p.bot += 1
-            p.bot_w += (weights[c.sha].weight if weights and c.sha in weights else 1.0) * (
-                c.attribution(paths, split=split)
-            )
+            p.bot_w += (weights[c.sha].weight if weights and c.sha in weights else 1.0) * t.att
             continue
-        w = landed(c, weights) * c.attribution(paths, split=split)  # the part landing here
-        lines = line_weight(c, line_weights, weights) * c.lines_in(paths, split)
+        w = landed(c, weights) * t.att  # the part landing here
+        lines = line_weight(c, line_weights, weights) * t.lines
         p.total += 1
         p.total_w += w
         p.lines_w += lines
