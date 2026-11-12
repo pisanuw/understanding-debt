@@ -218,6 +218,8 @@ def test_dashboard_is_one_self_contained_file(mixed_repo, capsys):
     # nothing loaded from anywhere: no external src or href, no CDN, no web font
     assert not re.search(r"""(src|href)\s*=\s*["']?(https?:)?//""", page)
     assert "@import" not in page and "url(" not in page
+    # at most eight developer lines, the rest as one mean line, and a selector to swap one in
+    assert "var MAX_LINES = 8;" in page and "Swap onto the chart" in page
     blob = re.search(
         r'<script type="application/json" id="udebt-data">(.*?)</script>', page, re.S
     ).group(1)

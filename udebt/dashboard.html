@@ -46,7 +46,8 @@ h2 { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
 .sub { color: var(--ink-2); margin: 0; }
 .meta { color: var(--muted); font-size: 12px; margin: 0; overflow-wrap: anywhere; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 16px 0; }
-.controls label { color: var(--ink-2); font-size: 13px; display: flex; gap: 6px; align-items: center; }
+.controls label { color: var(--ink-2); font-size: 13px; display: flex; gap: 6px; align-items: center; max-width: 100%; min-width: 0; }
+#dev { min-width: 0; max-width: min(380px, calc(100vw - 110px)); text-overflow: ellipsis; }
 select {
   font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis);
   border-radius: 6px; padding: 4px 8px; max-width: 100%;
@@ -64,6 +65,7 @@ select {
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 4px; font-size: 12px; color: var(--ink-2); }
 .key { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
 .key i { display: inline-block; flex: none; width: 14px; height: 2px; border-radius: 1px; }
+.key i.dash, .tip i.dash { background: repeating-linear-gradient(90deg, var(--muted) 0 4px, transparent 4px 7px); }
 .key b { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; }
 .key svg { flex: none; }
 .chartwrap { position: relative; }
@@ -123,7 +125,7 @@ footer p { margin: 4px 0; }
     <p class="meta" id="meta"></p>
   </header>
   <div class="controls">
-    <label>Developer <select id="dev"></select></label>
+    <label>Developer <select id="dev" aria-describedby="chart-sub"></select></label>
     <label>Risk events <select id="levels">
       <option value="strong">OUTSIDE and HIGH</option>
       <option value="all">all, with CAUTION</option>
@@ -164,7 +166,7 @@ footer p { margin: 4px 0; }
 
   <section class="card">
     <h2>Risk events</h2>
-    <p class="sub">A developer landed a change on a unit they understood too little at the time: OUTSIDE (outside their set), HIGH (mass >= 0.3, understanding < 0.3), CAUTION (mass >= 0.1, understanding below the threshold).</p>
+    <p class="sub">A developer landed a change on a unit they understood too little at the time: OUTSIDE (outside their set), HIGH (mass >= 0.3, understanding < 0.3), CAUTION (mass >= 0.1, understanding below the threshold, and not only the own-commit prior, which stops at 0.5).</p>
     <div class="scroll"><table id="risk"></table></div>
     <button class="more" id="risk-more" type="button" hidden>Show all</button>
   </section>
@@ -191,7 +193,30 @@ footer p { margin: 4px 0; }
   var top = units.filter(function (u) { return !u.parent; });
   var unitName = {};
   units.forEach(function (u) { unitName[u.id] = u.name || u.id; });
-  var state = { dev: devs[0] || null, sel: Math.max(0, P.length - 1), levels: "strong", riskAll: false };
+  // the chart draws at most MAX_LINES developers, the most debt now first, and one line for
+  // the mean of the rest; picking another developer swaps them into the last slot
+  var MAX_LINES = 8;
+  var commitsOf = {};
+  (D.contributors || []).forEach(function (c) { if (c.key) commitsOf[c.key] = (commitsOf[c.key] || 0) + (c.commits || 0); });
+  function lastIndex(dev) {
+    for (var i = P.length - 1; i >= 0; i--) { var r = P[i].devs[dev]; if (r && r.index != null) return r.index; }
+    return null;
+  }
+  var ranked = devs.slice().sort(function (a, b) {
+    var va = lastIndex(a), vb = lastIndex(b);
+    va = va == null ? -1 : va; vb = vb == null ? -1 : vb;
+    return (vb - va) || ((commitsOf[b] || 0) - (commitsOf[a] || 0)) || (a < b ? -1 : a > b ? 1 : 0);
+  });
+  var shown = ranked.slice(0, MAX_LINES);
+  var swapSlot = shown.length - 1;
+  var main = devs.slice().sort(function (a, b) { return (commitsOf[b] || 0) - (commitsOf[a] || 0); })[0] || null;
+  var state = { dev: main, sel: Math.max(0, P.length - 1), levels: "strong", riskAll: false };
+  function rest() { return devs.filter(function (d) { return shown.indexOf(d) < 0; }); }
+  function focus(dev) { // the focused developer is always drawn: swap them in if they are not
+    state.dev = dev;
+    if (dev && shown.indexOf(dev) < 0 && swapSlot >= 0) shown[swapSlot] = dev;
+  }
+  focus(main);
 
   // -- helpers ------------------------------------------------------------------
   function el(tag, attrs, text) {
@@ -212,7 +237,7 @@ footer p { margin: 4px 0; }
   function short(dev) { var at = dev.indexOf("@"); return at > 0 ? dev.slice(0, at) : dev; }
   function fmt(x, d) { return x == null ? "-" : Number(x).toFixed(d == null ? 1 : d); }
   function color(i) { return "var(--s" + ((i % 8) + 1) + ")"; }
-  function devColor(dev) { return color(Math.max(0, devs.indexOf(dev))); }
+  function devColor(dev) { var k = shown.indexOf(dev); return k >= 0 ? color(k) : "var(--muted)"; }
   function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
   var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   function md(t) { var d = new Date(t); return MONTHS[d.getUTCMonth()] + " " + d.getUTCDate(); }
@@ -228,6 +253,12 @@ footer p { margin: 4px 0; }
     return b;
   }
   function indexAt(dev, i) { var r = P[i] && P[i].devs[dev]; return r ? r.index : null; }
+  function othersAt(i) { // mean index of the developers not drawn, over those with one
+    var sum = 0, n = 0;
+    rest().forEach(function (d) { var v = indexAt(d, i); if (v != null) { sum += v; n++; } });
+    return n ? sum / n : null;
+  }
+  function othersLabel() { var n = rest().length; return "others (" + n + ", mean)"; }
   function pointAt(t) { // the last point at or before time t (or the first)
     var j = 0;
     for (var i = 0; i < P.length; i++) { if (ts(P[i].t) <= t) j = i; }
@@ -258,9 +289,25 @@ footer p { margin: 4px 0; }
     " · known threshold " + D.settings.known_threshold + " · bus target " + D.settings.bus_target;
 
   var devSel = document.getElementById("dev");
-  devs.forEach(function (d) { devSel.appendChild(el("option", { value: d }, d)); });
-  if (!devs.length) devSel.appendChild(el("option", { value: "" }, "(no developer)"));
-  devSel.addEventListener("change", function () { state.dev = devSel.value; renderAll(); });
+  function fillSelect() {
+    clear(devSel);
+    if (!devs.length) { devSel.appendChild(el("option", { value: "" }, "(no developer)")); return; }
+    var others = rest();
+    var g1 = others.length ? el("optgroup", { label: "On the chart" }) : devSel;
+    shown.forEach(function (d) { g1.appendChild(el("option", { value: d }, d)); });
+    if (others.length) {
+      devSel.appendChild(g1);
+      var g2 = el("optgroup", { label: "Swap onto the chart (" + others.length + ")" });
+      ranked.filter(function (d) { return shown.indexOf(d) < 0; }).forEach(function (d) {
+        var v = lastIndex(d);
+        g2.appendChild(el("option", { value: d }, d + (v == null ? "" : " (" + fmt(v) + ")")));
+      });
+      devSel.appendChild(g2);
+    }
+    devSel.value = state.dev || "";
+  }
+  fillSelect();
+  devSel.addEventListener("change", function () { focus(devSel.value); fillSelect(); renderAll(); });
   var lvlSel = document.getElementById("levels");
   lvlSel.addEventListener("change", function () { state.levels = lvlSel.value; renderAll(); });
 
@@ -366,26 +413,37 @@ footer p { margin: 4px 0; }
       chart.appendChild(s);
       marks.push({ x: x, y: y, kind: "risk", e: e });
     });
-    // one line per developer
-    devs.forEach(function (dv, k) {
+    // one line per drawn developer, then the mean of the rest
+    function line(val, attrs) {
       var dpath = "", pen = false;
       P.forEach(function (p, i) {
-        var v = indexAt(dv, i);
+        var v = val(i);
         if (v == null) { pen = false; return; }
         dpath += (pen ? " L" : " M") + X(ts(p.t)).toFixed(1) + " " + Y(v).toFixed(1); pen = true;
       });
-      if (!dpath) return;
-      chart.appendChild(sv("path", { d: dpath, fill: "none", stroke: color(k), "stroke-width": dv === dev ? 2.5 : 2, "stroke-linejoin": "round", "stroke-linecap": "round", opacity: dev && dv !== dev ? 0.55 : 1 }));
+      if (!dpath) return false;
+      attrs.d = dpath; attrs.fill = "none"; attrs["stroke-linejoin"] = "round"; attrs["stroke-linecap"] = "round";
+      chart.appendChild(sv("path", attrs));
+      return true;
+    }
+    var others = rest();
+    var drewOthers = others.length && line(othersAt, { stroke: "var(--muted)", "stroke-width": 1.5, "stroke-dasharray": "5 4" });
+    shown.forEach(function (dv, k) {
+      if (!line(function (i) { return indexAt(dv, i); }, { stroke: color(k), "stroke-width": dv === dev ? 2.5 : 2, opacity: dev && dv !== dev ? 0.55 : 1 })) return;
       var lv = indexAt(dv, P.length - 1);
-      if (lv != null && !phone && devs.length <= 4) {
+      if (lv != null && !phone && shown.length <= 4 && !others.length) {
         chart.appendChild(sv("text", { x: m.l + iw + 8, y: Y(lv) + 4, "class": "ink" }, short(dv) + " " + fmt(lv)));
       }
       var key = el("span", { "class": "key" }); var i_ = el("i"); i_.style.background = color(k);
       key.appendChild(i_); key.appendChild(document.createTextNode(dv)); legend.appendChild(key);
     });
+    if (drewOthers) {
+      var ko = el("span", { "class": "key" }); ko.appendChild(el("i", { "class": "dash" }));
+      ko.appendChild(document.createTextNode(othersLabel())); legend.appendChild(ko);
+    }
     // evidence: quiz (circle) and dig (square) on the developer's line
     (D.evidence || []).forEach(function (r) {
-      var t = ts(r.ts); if (!(t >= x0 && t <= x1)) return;
+      var t = ts(r.ts); if (!(t >= x0 && t <= x1) || shown.indexOf(r.dev) < 0) return;
       var v = indexAt(r.dev, pointAt(t)); if (v == null) return;
       var x = X(t), y = Y(v), c = devColor(r.dev);
       var s = r.type === "dig" ? sv("rect", { x: x - 4.5, y: y - 4.5, width: 9, height: 9, rx: 2 }) : sv("circle", { cx: x, cy: y, r: 4.5 });
@@ -397,17 +455,20 @@ footer p { margin: 4px 0; }
     var sp = P[state.sel], sx = X(ts(sp.t));
     var sel = sv("g", {});
     sel.appendChild(sv("line", { x1: sx, x2: sx, y1: m.t, y2: m.t + ih, stroke: "var(--axis)", "stroke-width": 1 }));
-    devs.forEach(function (dv, k) {
+    shown.forEach(function (dv, k) {
       var v = indexAt(dv, state.sel); if (v == null) return;
       sel.appendChild(sv("circle", { cx: sx, cy: Y(v), r: 4.5, fill: color(k), stroke: "var(--surface)", "stroke-width": 2 }));
     });
+    var ov = others.length ? othersAt(state.sel) : null;
+    if (ov != null) sel.appendChild(sv("circle", { cx: sx, cy: Y(ov), r: 3.5, fill: "var(--muted)", stroke: "var(--surface)", "stroke-width": 2 }));
     chart.appendChild(sel);
     var cross = sv("line", { x1: 0, x2: 0, y1: m.t, y2: m.t + ih, stroke: "var(--ink-2)", "stroke-width": 1, visibility: "hidden" });
     chart.appendChild(cross);
     geo = { X: X, m: m, iw: iw, ih: ih, W: W, marks: marks, cross: cross };
     legendExtras(legend);
     var ev = (D.evidence || []).length;
-    document.getElementById("chart-sub").textContent = "0 = understands every unit in the set, 100 = none. Click or use the arrow keys to pick a point.";
+    document.getElementById("chart-sub").textContent = "0 = understands every unit in the set, 100 = none. Click or use the arrow keys to pick a point." +
+      (others.length ? " Lines for the " + shown.length + " developers with the most debt now (the one picked above swapped in) and the mean of the other " + others.length + "; pick a developer to swap them onto the chart." : "");
     document.getElementById("chart-note").textContent = "Rugs: risk = " + (dev ? short(dev) + "'s " : "") +
       "risk events; others = commits weighing >= " + D.settings.heavy + " by anyone else, agents in the stronger tone, height by weight. " +
       (ev ? ev + " evidence records (circle quiz, square dig)." : "No quiz or dig evidence yet: every understanding here is the own-commit prior.");
@@ -433,6 +494,7 @@ footer p { margin: 4px 0; }
     rows.forEach(function (r) {
       var row = el("div", { "class": "row" });
       if (r.c) { var i_ = el("i"); i_.style.background = r.c; row.appendChild(i_); }
+      else if (r.dash) row.appendChild(el("i", { "class": "dash" }));
       row.appendChild(el("strong", null, r.v)); row.appendChild(el("span", null, r.k));
       tip.appendChild(row);
     });
@@ -443,7 +505,8 @@ footer p { margin: 4px 0; }
   }
   function pointTip(i, px) {
     var p = P[i];
-    var rows = devs.map(function (dv, k) { return { c: color(k), v: fmt(indexAt(dv, i)), k: dv }; });
+    var rows = shown.map(function (dv, k) { return { c: color(k), v: fmt(indexAt(dv, i)), k: dv }; });
+    if (rest().length) rows.push({ dash: true, v: fmt(othersAt(i)), k: othersLabel() });
     rows.push({ v: Math.round(100 * aiShare(p.mass)) + "%", k: "agent share of the mass" });
     rows.push({ v: String(p.commits), k: "commits" });
     showTip(px, 10, rows, day(p.t) + " · " + p.sha.slice(0, 8));
@@ -500,11 +563,14 @@ footer p { margin: 4px 0; }
       ": each unit's importance x (1 - understanding), as a share of the index. " + Object.keys(p.units).length + " units existed then.";
     // colours: the units with most debt at the latest point keep one slot each, after the developers' slots
     var latest = (last.devs[dev] || {}).debt || {};
-    var nColored = Math.max(0, Math.min(5, 8 - devs.length));
+    // the units with most debt at the latest point keep one colour each: the slots after the
+    // drawn developers', or, when those leave fewer than three, the palette from the start
+    var free = 8 - shown.length, first = free >= 3 ? shown.length : 0;
+    var nColored = free >= 3 ? Math.min(5, free) : 5;
     var colored = Object.keys(latest).sort(function (a, b) { return latest[b] - latest[a]; }).slice(0, nColored);
     var parts = [], other = 0, total = 0;
     Object.keys(row.debt).forEach(function (u) { total += row.debt[u]; if (colored.indexOf(u) < 0) other += row.debt[u]; });
-    colored.forEach(function (u, k) { if (row.debt[u]) parts.push({ u: u, v: row.debt[u], c: color(devs.length + k), slot: devs.length + k }); });
+    colored.forEach(function (u, k) { if (row.debt[u]) parts.push({ u: u, v: row.debt[u], c: color(first + k), slot: (first + k) % 8 }); });
     if (other > 0) parts.push({ u: null, v: other, c: "var(--other)" });
     seg.setAttribute("aria-label", parts.map(function (q) { return (q.u ? unitName[q.u] : "other units") + " " + fmt(q.v); }).join(", "));
     var segW = seg.clientWidth || 600;
@@ -598,16 +664,20 @@ footer p { margin: 4px 0; }
   }
   document.getElementById("risk-more").addEventListener("click", function () { state.riskAll = true; renderRisk(); });
   function renderSeries() {
-    var heads = [{ t: "Date" }, { t: "sha" }, { t: "commits", num: true }, { t: "agent share", num: true }].concat(devs.map(function (d) { return { t: short(d), num: true }; }));
+    var others = rest();
+    var heads = [{ t: "Date" }, { t: "sha" }, { t: "commits", num: true }, { t: "agent share", num: true }].concat(shown.map(function (d) { return { t: short(d), num: true }; }));
+    if (others.length) heads.push({ t: othersLabel(), num: true });
     table("series", heads, P.map(function (p, i) {
-      return { cells: [day(p.t), p.sha.slice(0, 8), String(p.commits), Math.round(100 * aiShare(p.mass)) + "%"].concat(devs.map(function (d) { return fmt(indexAt(d, i)); })) };
+      var cells = [day(p.t), p.sha.slice(0, 8), String(p.commits), Math.round(100 * aiShare(p.mass)) + "%"].concat(shown.map(function (d) { return fmt(indexAt(d, i)); }));
+      if (others.length) cells.push(fmt(othersAt(i)));
+      return { cells: cells };
     }));
   }
   document.getElementById("foot").textContent = "udebt export format v" + D.version + "; " + (D.evidence || []).length +
     " evidence records, " + (D.risk_events || []).length + " risk events, " + (D.heavy_commits || []).length + " heavy commits.";
 
-  function renderAll() { renderTiles(); renderChart(); renderBreakdown(); renderUnits(); renderRisk(); }
-  renderAll(); renderContributors(); renderSeries();
+  function renderAll() { renderTiles(); renderChart(); renderBreakdown(); renderUnits(); renderRisk(); renderSeries(); }
+  renderAll(); renderContributors();
   var rt = null;
   window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(function () { renderChart(); renderBreakdown(); }, 80); });
   if (window.matchMedia) {

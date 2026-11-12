@@ -67,3 +67,4 @@
 2026-11-12 [code] Parsed-commit cache format 2 keeps per-file deletions; replay fingerprint gains a rules version; synthetic rows add lines_uncapped; status prints the decay rule.
 2026-11-12 [decision] CAUTION raised only by the own-commit prior is muted: replay drops it, live `risk` names it in a line; HIGH, OUTSIDE stay. Events: digitalme 312 -> 12, dsa-instructor 240 -> 144.
 2026-11-12 [code] Synthetic report's pooled section also correlates share changed and mass share; optional config decay_floor (floor + (1 - floor) x exp(-k s)), default 0.
+2026-11-12 [code] Dashboard draws at most eight developers (most debt now) plus a dashed "others" mean; the selector swaps a developer in. Checked at 1280/390 px, light and dark, 378-dev hf.
