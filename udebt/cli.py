@@ -140,19 +140,43 @@ def cmd_map(args) -> int:
     llm = _llm(store, args)
     print("Mapping architecture with claude (this reads the code; expect a minute or two)...")
     try:
-        data = build_map(root, store, llm, max_units=args.max_units, max_children=args.max_children)
+        data = build_map(
+            root,
+            store,
+            llm,
+            max_units=args.max_units,
+            max_children=args.max_children,
+            retry=not args.no_retry,
+        )
     except LLMError as e:
         raise SystemExit(str(e)) from e
     st = data.get("structure", {})
     n_kids = sum(len(hier.children_of(u)) for u in data["units"])
     print(_structure_line(st))
+    print(_paths_line(data.get("paths", {})))
     print(
         f"Wrote {len(data['units'])} units ({n_kids} sub-units) to "
         f"{store.map_path.relative_to(root)}; they cover {int(100 * st.get('coverage', 0))}% "
         f"of the clustered non-test source files"
     )
     _print_units(data["units"])
+    _print_warnings(data)
     return 0
+
+
+def _paths_line(p: dict[str, Any]) -> str:
+    if not p:
+        return "Paths: not checked (a map from before path resolution)."
+    retried = "; after one retry" if p.get("retried") else ""
+    return (
+        f"Paths: {p['exact'] + p['suffix']} of {p['given']} resolved ({p['exact']} exact, "
+        f"{p['suffix']} by a unique suffix), {p['unresolved']} dropped{retried}"
+    )
+
+
+def _print_warnings(m: dict[str, Any] | None) -> None:
+    for w in (m or {}).get("warnings", []):
+        print(f"Warning: {w}")
 
 
 def _structure_line(st: dict[str, Any]) -> str:
@@ -203,9 +227,11 @@ def _print_units(units: list[dict[str, Any]]) -> None:
     print(f"{'id':<{w}} {'kind':<9} {'scope':<13} {'imp':>5}  name")
     for u, depth in shown:
         uid = ("  " * depth) + u["id"]
+        lost = u.get("unresolved") or []
+        note = f"  ({len(lost)} path(s) dropped: {', '.join(lost[:3])})" if lost else ""
         print(
             f"{uid:<{w}} {u.get('kind', ''):<9} {u.get('scope', 'architectural'):<13} "
-            f"{u.get('importance', 0):>5.2f}  {u['name']}"
+            f"{u.get('importance', 0):>5.2f}  {u['name']}{note}"
         )
 
 
@@ -331,6 +357,7 @@ def cmd_status(args) -> int:
     root, store = _ctx(args)
     store.require()
     m = store.require_map()
+    _print_warnings(m)
     units = m["units"]
     cfg = store.config
     commits = commits_for(root, store)
@@ -1574,6 +1601,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--rescore",
         action="store_true",
         help="recompute churn/importance/provenance with current weights, no LLM",
+    )
+    s.add_argument(
+        "--no-retry",
+        action="store_true",
+        help="do not ask again when the paths cover under half of the source files",
     )
     s.set_defaults(fn=cmd_map)
 

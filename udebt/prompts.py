@@ -187,6 +187,7 @@ def map_prompt(
     clusters: str | None = None,
     max_children: int = 6,
     cochange_max_files: int = 30,
+    examples: list[str] | None = None,
 ) -> str:
     if tree is not None:
         files_block = f"Directory layout ({len(file_list)} tracked files):\n{tree}"
@@ -198,6 +199,14 @@ def map_prompt(
         for h in history
     ]
     hist_block = "\n".join(hist_lines) if hist_lines else "(no history available)"
+    ex = " and ".join(f"`{e}`" for e in (examples or []))
+    paths_rule = (
+        "Every path must be relative to the repository ROOT (the current directory), written "
+        "exactly as in the file list"
+        + (f", for example {ex}" if ex else "")
+        + ": keep every leading directory, such as a `src/` prefix or the package directory, "
+        "and do not give paths relative to a package or a cluster."
+    )
     if clusters:
         cluster_block = f"""
 Structural clusters (computed before you, from the code and its history): an import graph
@@ -240,9 +249,11 @@ code, boilerplate, formatting config, one-off scripts.
 For each unit give: a short kebab-case id; a name; the kind; a one-sentence summary; the decision
 it embodies (what was chosen); plausible alternatives that were NOT chosen; why this choice was
 likely made (say "unclear" if neither code nor history reveals it); the repository paths (files
-or directories, relative to the root) where it lives; centrality 1-5, where 5 means most other
-code depends on it or breaks if it changes; and `shaped_by`: the short shas from the history list
-below that introduced or materially changed this decision, oldest first (empty if none apply).
+or directories) where it lives; centrality 1-5, where 5 means most other code depends on it or
+breaks if it changes; and `shaped_by`: the short shas from the history list below that introduced
+or materially changed this decision, oldest first (empty if none apply).
+
+{paths_rule}
 
 Two levels. A top-level unit may have `children`: 2 to {max_children} sub-units, each a part
 a developer could understand and change on its own, with the same fields (no children of
