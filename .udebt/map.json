@@ -1,15 +1,15 @@
 {
   "version": 3,
   "generated_at": "2026-11-12T12:15:44+00:00",
-  "head": "9b7d0e25f69586a2ab49bc75b6399f2288b14afd",
+  "head": "323d3bfb1f39636a8cca0e78d09cb3ace62bfdb6",
   "repo_provenance": {
-    "total": 16,
-    "ai": 15,
+    "total": 36,
+    "ai": 35,
     "assisted": 0,
     "human": 1,
     "bot": 0,
     "agents": {
-      "claude-code": 15
+      "claude-code": 35
     },
     "bots": {},
     "dev": 0,
@@ -123,19 +123,19 @@
           "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
         }
       ],
-      "churn": 1.978,
+      "churn": 3.59,
       "provenance": {
-        "total": 13,
-        "ai": 12,
+        "total": 23,
+        "ai": 22,
         "assisted": 0,
         "human": 1,
         "bot": 0,
-        "ai_share": 0.98,
-        "mass": 1.978,
+        "ai_share": 0.99,
+        "mass": 3.59,
         "first": "2026-11-11",
         "last": "2026-11-12"
       },
-      "importance": 0.967
+      "importance": 0.909
     },
     {
       "id": "arch-map",
@@ -177,19 +177,19 @@
           "subject": "Warn when dig returns no check question; enforce map unit cap"
         }
       ],
-      "churn": 1.397,
+      "churn": 2.193,
       "provenance": {
-        "total": 7,
-        "ai": 7,
+        "total": 11,
+        "ai": 11,
         "assisted": 0,
         "human": 0,
         "bot": 0,
         "ai_share": 1.0,
-        "mass": 1.397,
+        "mass": 2.193,
         "first": "2026-11-11",
         "last": "2026-11-12"
       },
-      "importance": 0.859
+      "importance": 0.789
     },
     {
       "id": "llm-backend",
@@ -219,19 +219,19 @@
           "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
         }
       ],
-      "churn": 1.232,
+      "churn": 1.398,
       "provenance": {
-        "total": 5,
-        "ai": 5,
+        "total": 6,
+        "ai": 6,
         "assisted": 0,
         "human": 0,
         "bot": 0,
         "ai_share": 1.0,
-        "mass": 1.232,
+        "mass": 1.398,
         "first": "2026-11-11",
         "last": "2026-11-12"
       },
-      "importance": 0.709
+      "importance": 0.6
     },
     {
       "id": "store-persistence",
@@ -262,19 +262,19 @@
           "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
         }
       ],
-      "churn": 2.122,
+      "churn": 4.218,
       "provenance": {
-        "total": 8,
-        "ai": 8,
+        "total": 17,
+        "ai": 17,
         "assisted": 0,
         "human": 0,
         "bot": 0,
         "ai_share": 1.0,
-        "mass": 2.122,
+        "mass": 4.218,
         "first": "2026-11-11",
         "last": "2026-11-12"
       },
-      "importance": 0.874
+      "importance": 0.844
     },
     {
       "id": "cli-contract",
@@ -314,19 +314,19 @@
           "subject": "Warn when dig returns no check question; enforce map unit cap"
         }
       ],
-      "churn": 2.154,
+      "churn": 3.265,
       "provenance": {
-        "total": 8,
-        "ai": 8,
+        "total": 13,
+        "ai": 13,
         "assisted": 0,
         "human": 0,
         "bot": 0,
         "ai_share": 1.0,
-        "mass": 2.154,
+        "mass": 3.265,
         "first": "2026-11-11",
         "last": "2026-11-12"
       },
-      "importance": 0.88
+      "importance": 0.761
     },
     {
       "id": "quiz-flow",
@@ -367,19 +367,19 @@
           "subject": "Warn when dig returns no check question; enforce map unit cap"
         }
       ],
-      "churn": 2.001,
+      "churn": 3.448,
       "provenance": {
-        "total": 7,
-        "ai": 7,
+        "total": 13,
+        "ai": 13,
         "assisted": 0,
         "human": 0,
         "bot": 0,
         "ai_share": 1.0,
-        "mass": 2.001,
+        "mass": 3.448,
         "first": "2026-11-11",
         "last": "2026-11-12"
       },
-      "importance": 0.852
+      "importance": 0.777
     },
     {
       "id": "provenance-history",
@@ -412,19 +412,19 @@
           "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
         }
       ],
-      "churn": 2.023,
+      "churn": 4.641,
       "provenance": {
-        "total": 5,
-        "ai": 5,
+        "total": 13,
+        "ai": 13,
         "assisted": 0,
         "human": 0,
         "bot": 0,
         "ai_share": 1.0,
-        "mass": 2.023,
+        "mass": 4.641,
         "first": "2026-11-11",
         "last": "2026-11-12"
       },
-      "importance": 0.856
+      "importance": 0.88
     },
     {
       "id": "commit-weights",
@@ -445,19 +445,19 @@
       ],
       "scope": "architectural",
       "history": [],
-      "churn": 1.458,
+      "churn": 3.955,
       "provenance": {
-        "total": 3,
-        "ai": 3,
+        "total": 9,
+        "ai": 9,
         "assisted": 0,
         "human": 0,
         "bot": 0,
         "ai_share": 1.0,
-        "mass": 1.458,
+        "mass": 3.955,
         "first": "2026-11-12",
         "last": "2026-11-12"
       },
-      "importance": 0.751
+      "importance": 0.821
     },
     {
       "id": "structural-discovery",
@@ -494,7 +494,7 @@
         "first": "2026-11-12",
         "last": "2026-11-12"
       },
-      "importance": 0.536
+      "importance": 0.442
     },
     {
       "id": "risk-gating",
@@ -514,19 +514,19 @@
       ],
       "scope": "architectural",
       "history": [],
-      "churn": 0.639,
+      "churn": 1.186,
       "provenance": {
-        "total": 3,
-        "ai": 3,
+        "total": 5,
+        "ai": 5,
         "assisted": 0,
         "human": 0,
         "bot": 0,
         "ai_share": 1.0,
-        "mass": 0.639,
+        "mass": 1.186,
         "first": "2026-11-12",
         "last": "2026-11-12"
       },
-      "importance": 0.479
+      "importance": 0.462
     },
     {
       "id": "responsibility-contributors",
@@ -560,7 +560,7 @@
         "first": "2026-11-12",
         "last": "2026-11-12"
       },
-      "importance": 0.539
+      "importance": 0.443
     },
     {
       "id": "project-governance",
@@ -591,20 +591,20 @@
           "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
         }
       ],
-      "churn": 2.001,
+      "churn": 3.824,
       "provenance": {
-        "total": 14,
-        "ai": 13,
+        "total": 26,
+        "ai": 25,
         "assisted": 0,
         "human": 1,
         "bot": 0,
-        "ai_share": 0.98,
-        "mass": 2.001,
+        "ai_share": 0.99,
+        "mass": 3.824,
         "first": "2026-11-11",
         "last": "2026-11-12"
       },
-      "importance": 0.612
+      "importance": 0.57
     }
   ],
-  "rescored_at": "2026-11-12T12:52:45+00:00"
+  "rescored_at": "2026-11-12T16:57:23+00:00"
 }

@@ -21,5 +21,6 @@
       ],
       "agents": []
     }
-  }
+  },
+  "snapshot_every": "mass:2"
 }

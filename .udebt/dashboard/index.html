@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Understanding debt: understanding-debt</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #6f6d68;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10); --wash: rgba(11,11,11,0.04);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --other: #c3c2b7;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --good-text: #006300;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #9a988f;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --other: #4a4a46; --good-text: #0ca30c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #9a988f;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --other: #4a4a46; --good-text: #0ca30c;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--page); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  overflow-x: hidden;
+}
+main { max-width: 1120px; margin: 0 auto; padding: 20px 16px 40px; }
+h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+h2 { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
+.sub { color: var(--ink-2); margin: 0; }
+.meta { color: var(--muted); font-size: 12px; margin: 0; overflow-wrap: anywhere; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 16px 0; }
+.controls label { color: var(--ink-2); font-size: 13px; display: flex; gap: 6px; align-items: center; }
+select {
+  font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis);
+  border-radius: 6px; padding: 4px 8px; max-width: 100%;
+}
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.tile, .card {
+  background: var(--surface); border-radius: 10px; box-shadow: 0 0 0 1px var(--ring);
+}
+.tile { padding: 12px 14px; min-width: 0; }
+.tile .label { color: var(--ink-2); font-size: 12px; }
+.tile .value { font-size: 26px; font-weight: 600; line-height: 1.2; margin-top: 2px; }
+.tile .delta { font-size: 12px; color: var(--ink-2); }
+.card { padding: 14px; margin-top: 12px; min-width: 0; }
+.card .note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 4px; font-size: 12px; color: var(--ink-2); }
+.key { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.key i { display: inline-block; flex: none; width: 14px; height: 2px; border-radius: 1px; }
+.key b { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; }
+.key svg { flex: none; }
+.chartwrap { position: relative; }
+svg text { fill: var(--muted); font-size: 11px; }
+svg .ink { fill: var(--ink); }
+svg .ink2 { fill: var(--ink-2); }
+.tip {
+  position: absolute; pointer-events: none; z-index: 2; display: none;
+  background: var(--surface); color: var(--ink); border-radius: 8px; padding: 8px 10px;
+  box-shadow: 0 0 0 1px var(--ring), 0 4px 14px rgba(0,0,0,0.12); font-size: 12px;
+  max-width: 280px; overflow-wrap: anywhere;
+}
+.tip .when { color: var(--ink-2); margin-bottom: 4px; }
+.tip .row { display: flex; align-items: center; gap: 6px; }
+.tip .row strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tip .row span { color: var(--ink-2); }
+.tip i { display: inline-block; width: 12px; height: 2px; flex: none; }
+.scroll { overflow-x: auto; margin-top: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { text-align: left; font-weight: 600; color: var(--ink-2); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--axis); white-space: nowrap; }
+td { padding: 6px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.wrap { overflow-wrap: break-word; min-width: 140px; }
+td.nowrap { white-space: nowrap; }
+tr.child td:first-child { padding-left: 22px; color: var(--ink-2); }
+.badge { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; font-size: 12px; }
+.badge svg { flex: none; }
+code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink-2); }
+.seg { display: flex; gap: 2px; height: 28px; margin: 10px 0 6px; }
+.seg div {
+  border-radius: 4px; min-width: 0; color: #fff; font-size: 12px; font-weight: 600;
+  display: flex; align-items: center; padding-left: 6px; overflow: hidden; white-space: nowrap;
+}
+.seg div.dark { color: #0b0b0b; }
+.ranked { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) auto; gap: 6px 10px; align-items: center; margin-top: 10px; font-size: 13px; }
+.ranked .name { overflow-wrap: break-word; }
+@media (max-width: 560px) {
+  .ranked { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; }
+  .ranked .name { grid-column: 1 / -1; margin-top: 6px; }
+}
+.ranked .bar { height: 8px; border-radius: 4px; }
+.ranked .val { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; color: var(--ink-2); }
+.ranked .val strong { color: var(--ink); }
+button.more { font: inherit; font-size: 12px; margin-top: 8px; color: var(--ink); background: none; border: 1px solid var(--axis); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+details { margin-top: 12px; }
+summary { cursor: pointer; color: var(--ink-2); }
+footer { color: var(--muted); font-size: 12px; margin-top: 20px; }
+footer p { margin: 4px 0; }
+:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="title">Understanding debt</h1>
+    <p class="sub" id="subtitle"></p>
+    <p class="meta" id="meta"></p>
+  </header>
+  <div class="controls">
+    <label>Developer <select id="dev"></select></label>
+    <label>Risk events <select id="levels">
+      <option value="strong">OUTSIDE and HIGH</option>
+      <option value="all">all, with CAUTION</option>
+    </select></label>
+  </div>
+  <section class="tiles" id="tiles" aria-label="Summary"></section>
+
+  <section class="card">
+    <h2>Debt index over time</h2>
+    <p class="sub" id="chart-sub"></p>
+    <div class="legend" id="legend"></div>
+    <div class="chartwrap">
+      <svg id="chart" role="img" aria-label="Debt index over time, one line per developer" tabindex="0"></svg>
+      <div class="tip" id="tip" role="status"></div>
+    </div>
+    <p class="note" id="chart-note"></p>
+  </section>
+
+  <section class="card">
+    <h2 id="bd-title">Where the debt is</h2>
+    <p class="sub" id="bd-sub"></p>
+    <div class="seg" id="seg" role="img"></div>
+    <div class="legend" id="seg-legend"></div>
+    <div class="ranked" id="ranked"></div>
+    <p class="note" id="bd-note"></p>
+  </section>
+
+  <section class="card">
+      <h2>Contributors</h2>
+      <p class="sub">Labels from <code>udebt contributors</code>; AI, Bot and Joint come from commit signatures, "most likely" from metadata only.</p>
+      <div class="scroll"><table id="contributors"></table></div>
+    </section>
+    <section class="card">
+      <h2>Units</h2>
+      <p class="sub" id="units-sub"></p>
+      <div class="scroll"><table id="units"></table></div>
+    </section>
+
+  <section class="card">
+    <h2>Risk events</h2>
+    <p class="sub">A developer landed a change on a unit they understood too little at the time: OUTSIDE (outside their set), HIGH (mass >= 0.3, understanding < 0.3), CAUTION (mass >= 0.1, understanding below the threshold).</p>
+    <div class="scroll"><table id="risk"></table></div>
+    <button class="more" id="risk-more" type="button" hidden>Show all</button>
+  </section>
+
+  <details>
+    <summary>The series as a table</summary>
+    <div class="scroll"><table id="series"></table></div>
+  </details>
+
+  <footer>
+    <p id="foot"></p>
+    <p>Units are the current map's, replayed against the past: a point counts the commits landed on the first-parent line by then (a branch with its merge) and the evidence recorded by then. Regenerate with <code>udebt dashboard</code>; the data is the JSON in the <code>udebt-data</code> script tag.</p>
+  </footer>
+</main>
+<script type="application/json" id="udebt-data">{"format":"udebt-export","version":1,"repo":"understanding-debt","head":"323d3bfb1f39636a8cca0e78d09cb3ace62bfdb6","generated_at":"2026-11-12T16:57:23+00:00","settings":{"every":"mass:2","decay":{"model":"share","rate":1.386,"per_mass":0.9},"known_threshold":0.6,"bus_target":2,"heavy":0.5,"units_replayed_as_defined_now":true},"devs":["pisan@uw.edu"],"units":[{"id":"prediction-scoring","name":"Prediction-based scoring model","kind":"decision","parent":null,"scope":"architectural","importance":0.909,"ai_share":0.99,"you":{"pisan@uw.edu":0.505},"understanding":{"pisan@uw.edu":0.253},"holders":[],"responsible":["pisan@uw.edu"]},{"id":"arch-map","name":"Architectural map and unit hierarchy","kind":"module","parent":null,"scope":"architectural","importance":0.789,"ai_share":1.0,"you":{"pisan@uw.edu":0.5},"understanding":{"pisan@uw.edu":0.25},"holders":[],"responsible":["pisan@uw.edu"]},{"id":"llm-backend","name":"LLM backend via claude CLI and prompts","kind":"boundary","parent":null,"scope":"architectural","importance":0.6,"ai_share":1.0,"you":{"pisan@uw.edu":0.5},"understanding":{"pisan@uw.edu":0.25},"holders":[],"responsible":["pisan@uw.edu"]},{"id":"store-persistence","name":"JSON persistence under .udebt/","kind":"decision","parent":null,"scope":"architectural","importance":0.844,"ai_share":1.0,"you":{"pisan@uw.edu":0.5},"understanding":{"pisan@uw.edu":0.25},"holders":[],"responsible":["pisan@uw.edu"]},{"id":"cli-contract","name":"CLI command surface","kind":"boundary","parent":null,"scope":"architectural","importance":0.761,"ai_share":1.0,"you":{"pisan@uw.edu":0.5},"understanding":{"pisan@uw.edu":0.25},"holders":[],"responsible":["pisan@uw.edu"]},{"id":"quiz-flow","name":"Quiz and dig flow","kind":"flow","parent":null,"scope":"architectural","importance":0.777,"ai_share":1.0,"you":{"pisan@uw.edu":0.5},"understanding":{"pisan@uw.edu":0.25},"holders":[],"responsible":["pisan@uw.edu"]},{"id":"provenance-history","name":"Commit provenance and history mining","kind":"module","parent":null,"scope":"architectural","importance":0.88,"ai_share":1.0,"you":{"pisan@uw.edu":0.5},"understanding":{"pisan@uw.edu":0.25},"holders":[],"responsible":["pisan@uw.edu"]},{"id":"commit-weights","name":"Commit weight model","kind":"decision","parent":null,"scope":"architectural","importance":0.821,"ai_share":1.0,"you":{"pisan@uw.edu":0.5},"understanding":{"pisan@uw.edu":0.25},"holders":[],"responsible":["pisan@uw.edu"]},{"id":"structural-discovery","name":"Structural cluster discovery","kind":"module","parent":null,"scope":"architectural","importance":0.442,"ai_share":1.0,"you":{"pisan@uw.edu":0.5},"understanding":{"pisan@uw.edu":0.25},"holders":[],"responsible":["pisan@uw.edu"]},{"id":"risk-gating","name":"Change risk and advisory gating","kind":"flow","parent":null,"scope":"architectural","importance":0.462,"ai_share":1.0,"you":{"pisan@uw.edu":0.5},"understanding":{"pisan@uw.edu":0.25},"holders":[],"responsible":["pisan@uw.edu"]},{"id":"responsibility-contributors","name":"Responsibility sets and contributor labels","kind":"module","parent":null,"scope":"architectural","importance":0.443,"ai_share":1.0,"you":{"pisan@uw.edu":0.5},"understanding":{"pisan@uw.edu":0.25},"holders":[],"responsible":["pisan@uw.edu"]},{"id":"project-governance","name":"Briefing and change log discipline","kind":"decision","parent":null,"scope":"architectural","importance":0.57,"ai_share":0.991,"you":{"pisan@uw.edu":0.505},"understanding":{"pisan@uw.edu":0.252},"holders":[],"responsible":["pisan@uw.edu"]}],"responsibility":{"pisan@uw.edu":["arch-map","cli-contract","commit-weights","llm-backend","prediction-scoring","project-governance","provenance-history","quiz-flow","responsibility-contributors","risk-gating","store-persistence","structural-discovery"]},"contributors":[{"name":"Claude","emails":["noreply@anthropic.com"],"commits":35,"ai":35,"assisted":0,"human":0,"bot":0,"first":"2026-11-11","last":"2026-11-12","label":"AI","confidence":1.0,"reasons":["agent signature on the author identity"],"key":"noreply@anthropic.com"},{"name":"Yusuf Pisan","emails":["yusuf@pisan.me"],"commits":1,"ai":0,"assisted":0,"human":1,"bot":0,"first":"2026-11-11","last":"2026-11-11","label":"Human","confidence":1.0,"reasons":["too few commits to judge"],"key":"pisan@uw.edu"}],"snapshots":[{"commits":6,"devs":{"pisan@uw.edu":{"debt":{"arch-map":9.59,"cli-contract":10.37,"llm-backend":8.7,"prediction-scoring":10.66,"project-governance":5.19,"provenance-history":9.42,"quiz-flow":9.7,"store-persistence":11.1},"index":74.7,"und":{"arch-map":0.25,"cli-contract":0.25,"llm-backend":0.25,"prediction-scoring":0.261,"project-governance":0.266,"provenance-history":0.25,"quiz-flow":0.25,"store-persistence":0.25}}},"mass":{"ai":2.85,"assisted":0.0,"bot":0.0,"human":0.05},"sha":"2394341bbda5e124694cebc4bb9b2d5c67577a6d","t":"2026-11-12T07:42:26+00:00","units":{"arch-map":[0.76,103.5],"cli-contract":[0.822,324.5],"llm-backend":[0.689,297.5],"prediction-scoring":[0.858,383.0],"project-governance":[0.42,108.0],"provenance-history":[0.747,560.0],"quiz-flow":[0.769,384.5],"store-persistence":[0.88,381.0]}},{"commits":9,"devs":{"pisan@uw.edu":{"debt":{"arch-map":7.05,"cli-contract":7.57,"commit-weights":6.02,"llm-backend":6.17,"prediction-scoring":7.93,"project-governance":4.37,"provenance-history":7.78,"quiz-flow":7.18,"responsibility-contributors":4.07,"risk-gating":4.0,"store-persistence":7.34,"structural-discovery":5.37},"index":74.9,"und":{"arch-map":0.25,"cli-contract":0.25,"commit-weights":0.25,"llm-backend":0.25,"prediction-scoring":0.258,"project-governance":0.26,"provenance-history":0.25,"quiz-flow":0.25,"responsibility-contributors":0.25,"risk-gating":0.251,"store-persistence":0.25,"structural-discovery":0.25}}},"mass":{"ai":4.84,"assisted":0.0,"bot":0.0,"human":0.05},"sha":"3570a681d65fbfef8e9a674ec983d10287ec4412","t":"2026-11-12T12:13:49+00:00","units":{"arch-map":[0.797,144.5],"cli-contract":[0.855,451.5],"commit-weights":[0.68,343.0],"llm-backend":[0.697,331.0],"prediction-scoring":[0.906,434.0],"project-governance":[0.5,418.5],"provenance-history":[0.88,760.0],"quiz-flow":[0.812,525.5],"responsibility-contributors":[0.46,195.0],"risk-gating":[0.453,167.0],"store-persistence":[0.83,385.0],"structural-discovery":[0.607,1048.0]}},{"commits":11,"devs":{"pisan@uw.edu":{"debt":{"arch-map":7.34,"cli-contract":7.48,"commit-weights":5.63,"llm-backend":6.19,"prediction-scoring":7.96,"project-governance":4.37,"provenance-history":6.93,"quiz-flow":7.16,"responsibility-contributors":4.7,"risk-gating":4.31,"store-persistence":7.97,"structural-discovery":4.86},"index":74.9,"und":{"arch-map":0.25,"cli-contract":0.25,"commit-weights":0.25,"llm-backend":0.25,"prediction-scoring":0.256,"project-governance":0.257,"provenance-history":0.25,"quiz-flow":0.25,"responsibility-contributors":0.25,"risk-gating":0.25,"store-persistence":0.25,"structural-discovery":0.25}}},"mass":{"ai":6.45,"assisted":0.0,"bot":0.0,"human":0.05},"sha":"f1d259c7bdca1d0c03fcce76c46c5db32b52b48f","t":"2026-11-12T12:17:29+00:00","units":{"arch-map":[0.81,435.5],"cli-contract":[0.826,802.0],"commit-weights":[0.622,343.0],"llm-backend":[0.684,437.0],"prediction-scoring":[0.886,558.0],"project-governance":[0.487,494.5],"provenance-history":[0.765,760.0],"quiz-flow":[0.791,802.0],"responsibility-contributors":[0.519,773.0],"risk-gating":[0.476,306.0],"store-persistence":[0.88,835.0],"structural-discovery":[0.536,1048.0]}},{"commits":14,"devs":{"pisan@uw.edu":{"debt":{"arch-map":7.38,"cli-contract":7.52,"commit-weights":5.38,"llm-backend":5.9,"prediction-scoring":8.04,"project-governance":4.61,"provenance-history":7.58,"quiz-flow":7.15,"responsibility-contributors":4.75,"risk-gating":4.21,"store-persistence":7.66,"structural-discovery":4.72},"index":74.9,"und":{"arch-map":0.25,"cli-contract":0.25,"commit-weights":0.25,"llm-backend":0.25,"prediction-scoring":0.255,"project-governance":0.256,"provenance-history":0.25,"quiz-flow":0.25,"responsibility-contributors":0.25,"risk-gating":0.25,"store-persistence":0.25,"structural-discovery":0.25}}},"mass":{"ai":8.0,"assisted":0.0,"bot":0.0,"human":0.05},"sha":"f4d9f244f4ee44f34bbbf421267fa17ab1ac6f9e","t":"2026-11-12T12:44:09+00:00","units":{"arch-map":[0.849,501.5],"cli-contract":[0.864,889.0],"commit-weights":[0.619,343.0],"llm-backend":[0.678,437.0],"prediction-scoring":[0.931,617.5],"project-governance":[0.534,558.5],"provenance-history":[0.872,1218.0],"quiz-flow":[0.822,849.5],"responsibility-contributors":[0.546,780.0],"risk-gating":[0.484,307.0],"store-persistence":[0.88,838.0],"structural-discovery":[0.543,1048.0]}},{"commits":17,"devs":{"pisan@uw.edu":{"debt":{"arch-map":7.32,"cli-contract":7.18,"commit-weights":6.29,"llm-backend":6.0,"prediction-scoring":8.02,"project-governance":4.79,"provenance-history":7.01,"quiz-flow":6.99,"responsibility-contributors":4.55,"risk-gating":4.14,"store-persistence":8.12,"structural-discovery":4.53},"index":74.9,"und":{"arch-map":0.25,"cli-contract":0.25,"commit-weights":0.25,"llm-backend":0.25,"prediction-scoring":0.255,"project-governance":0.254,"provenance-history":0.25,"quiz-flow":0.25,"responsibility-contributors":0.25,"risk-gating":0.25,"store-persistence":0.25,"structural-discovery":0.25}}},"mass":{"ai":10.39,"assisted":0.0,"bot":0.0,"human":0.05},"sha":"e8da3bb389776c37f80b65919c59e1b3ce077cd3","t":"2026-11-12T12:53:36+00:00","units":{"arch-map":[0.793,505.5],"cli-contract":[0.778,912.0],"commit-weights":[0.682,658.0],"llm-backend":[0.65,471.5],"prediction-scoring":[0.874,642.5],"project-governance":[0.522,664.5],"provenance-history":[0.76,1218.0],"quiz-flow":[0.757,894.0],"responsibility-contributors":[0.493,780.0],"risk-gating":[0.448,307.0],"store-persistence":[0.88,1066.0],"structural-discovery":[0.491,1048.0]}},{"commits":21,"devs":{"pisan@uw.edu":{"debt":{"arch-map":7.42,"cli-contract":7.0,"commit-weights":6.69,"llm-backend":5.71,"prediction-scoring":8.09,"project-governance":4.95,"provenance-history":7.72,"quiz-flow":6.83,"responsibility-contributors":4.33,"risk-gating":3.96,"store-persistence":7.92,"structural-discovery":4.31},"index":74.9,"und":{"arch-map":0.25,"cli-contract":0.25,"commit-weights":0.25,"llm-backend":0.25,"prediction-scoring":0.254,"project-governance":0.254,"provenance-history":0.25,"quiz-flow":0.25,"responsibility-contributors":0.25,"risk-gating":0.25,"store-persistence":0.25,"structural-discovery":0.25}}},"mass":{"ai":12.71,"assisted":0.0,"bot":0.0,"human":0.05},"sha":"32f7a0c29ab833d10758cff0a66faa715a6897c1","t":"2026-11-12T14:12:36+00:00","units":{"arch-map":[0.825,520.5],"cli-contract":[0.778,942.0],"commit-weights":[0.743,943.0],"llm-backend":[0.635,471.5],"prediction-scoring":[0.903,672.5],"project-governance":[0.553,698.5],"provenance-history":[0.858,1267.0],"quiz-flow":[0.759,924.0],"responsibility-contributors":[0.481,780.0],"risk-gating":[0.44,307.0],"store-persistence":[0.88,1102.0],"structural-discovery":[0.479,1048.0]}},{"commits":23,"devs":{"pisan@uw.edu":{"debt":{"arch-map":7.21,"cli-contract":7.06,"commit-weights":6.86,"llm-backend":5.74,"prediction-scoring":8.1,"project-governance":5.12,"provenance-history":7.5,"quiz-flow":6.96,"responsibility-contributors":4.21,"risk-gating":4.3,"store-persistence":7.69,"structural-discovery":4.19},"index":74.9,"und":{"arch-map":0.25,"cli-contract":0.25,"commit-weights":0.25,"llm-backend":0.25,"prediction-scoring":0.253,"project-governance":0.253,"provenance-history":0.25,"quiz-flow":0.25,"responsibility-contributors":0.25,"risk-gating":0.25,"store-persistence":0.25,"structural-discovery":0.25}}},"mass":{"ai":14.14,"assisted":0.0,"bot":0.0,"human":0.05},"sha":"fecc0eae82ae50192c160f7419e3bd2b4733644d","t":"2026-11-12T14:22:32+00:00","units":{"arch-map":[0.825,520.5],"cli-contract":[0.807,979.0],"commit-weights":[0.784,954.0],"llm-backend":[0.656,499.0],"prediction-scoring":[0.931,706.0],"project-governance":[0.588,720.0],"provenance-history":[0.858,1267.0],"quiz-flow":[0.796,995.5],"responsibility-contributors":[0.481,780.0],"risk-gating":[0.492,321.0],"store-persistence":[0.88,1102.0],"structural-discovery":[0.479,1048.0]}},{"commits":28,"devs":{"pisan@uw.edu":{"debt":{"arch-map":7.19,"cli-contract":6.91,"commit-weights":7.36,"llm-backend":5.59,"prediction-scoring":7.91,"project-governance":5.36,"provenance-history":7.68,"quiz-flow":6.83,"responsibility-contributors":4.1,"risk-gating":4.19,"store-persistence":7.73,"structural-discovery":4.09},"index":74.9,"und":{"arch-map":0.25,"cli-contract":0.25,"commit-weights":0.25,"llm-backend":0.25,"prediction-scoring":0.253,"project-governance":0.253,"provenance-history":0.25,"quiz-flow":0.25,"responsibility-contributors":0.25,"risk-gating":0.25,"store-persistence":0.25,"structural-discovery":0.25}}},"mass":{"ai":16.5,"assisted":0.0,"bot":0.0,"human":0.05},"sha":"b6919dd2609b672fc3c00302ead0ff8a4e2c3814","t":"2026-11-12T14:50:37+00:00","units":{"arch-map":[0.818,544.5],"cli-contract":[0.787,1003.0],"commit-weights":[0.838,1083.0],"llm-backend":[0.636,499.0],"prediction-scoring":[0.904,710.0],"project-governance":[0.612,851.0],"provenance-history":[0.874,1413.0],"quiz-flow":[0.778,1019.5],"responsibility-contributors":[0.467,780.0],"risk-gating":[0.477,321.0],"store-persistence":[0.88,1150.0],"structural-discovery":[0.465,1048.0]}},{"commits":32,"devs":{"pisan@uw.edu":{"debt":{"arch-map":7.07,"cli-contract":6.69,"commit-weights":7.62,"llm-backend":5.51,"prediction-scoring":7.96,"project-governance":5.41,"provenance-history":7.89,"quiz-flow":6.62,"responsibility-contributors":4.06,"risk-gating":4.26,"store-persistence":7.81,"structural-discovery":4.04},"index":75.0,"und":{"arch-map":0.25,"cli-contract":0.25,"commit-weights":0.25,"llm-backend":0.25,"prediction-scoring":0.253,"project-governance":0.252,"provenance-history":0.25,"quiz-flow":0.25,"responsibility-contributors":0.25,"risk-gating":0.25,"store-persistence":0.25,"structural-discovery":0.25}}},"mass":{"ai":18.34,"assisted":0.0,"bot":0.0,"human":0.05},"sha":"40d10a87b844a39d585611b0f900921bc3709276","t":"2026-11-12T16:32:24+00:00","units":{"arch-map":[0.789,544.5],"cli-contract":[0.746,1003.0],"commit-weights":[0.85,1194.0],"llm-backend":[0.615,499.0],"prediction-scoring":[0.891,758.5],"project-governance":[0.605,1017.5],"provenance-history":[0.88,1421.0],"quiz-flow":[0.738,1019.5],"responsibility-contributors":[0.453,780.0],"risk-gating":[0.475,321.0],"store-persistence":[0.871,1199.0],"structural-discovery":[0.451,1048.0]}},{"commits":34,"devs":{"pisan@uw.edu":{"debt":{"arch-map":7.01,"cli-contract":6.77,"commit-weights":7.59,"llm-backend":5.46,"prediction-scoring":8.16,"project-governance":5.31,"provenance-history":7.9,"quiz-flow":6.74,"responsibility-contributors":4.03,"risk-gating":4.22,"store-persistence":7.76,"structural-discovery":4.01},"index":75.0,"und":{"arch-map":0.25,"cli-contract":0.25,"commit-weights":0.25,"llm-backend":0.25,"prediction-scoring":0.253,"project-governance":0.252,"provenance-history":0.25,"quiz-flow":0.25,"responsibility-contributors":0.25,"risk-gating":0.25,"store-persistence":0.25,"structural-discovery":0.25}}},"mass":{"ai":19.24,"assisted":0.0,"bot":0.0,"human":0.05},"sha":"29ce291cf19535b048431786c6d1a74993a70afa","t":"2026-11-12T16:39:25+00:00","units":{"arch-map":[0.781,544.5],"cli-contract":[0.754,1026.5],"commit-weights":[0.846,1210.0],"llm-backend":[0.609,499.0],"prediction-scoring":[0.913,871.0],"project-governance":[0.594,1182.5],"provenance-history":[0.88,1450.0],"quiz-flow":[0.751,1052.5],"responsibility-contributors":[0.449,780.0],"risk-gating":[0.47,321.0],"store-persistence":[0.865,1210.0],"structural-discovery":[0.447,1048.0]}},{"commits":36,"devs":{"pisan@uw.edu":{"debt":{"arch-map":7.13,"cli-contract":6.88,"commit-weights":7.42,"llm-backend":5.43,"prediction-scoring":8.19,"project-governance":5.14,"provenance-history":7.95,"quiz-flow":7.02,"responsibility-contributors":4.0,"risk-gating":4.18,"store-persistence":7.63,"structural-discovery":3.99},"index":75.0,"und":{"arch-map":0.25,"cli-contract":0.25,"commit-weights":0.25,"llm-backend":0.25,"prediction-scoring":0.253,"project-governance":0.252,"provenance-history":0.25,"quiz-flow":0.25,"responsibility-contributors":0.25,"risk-gating":0.25,"store-persistence":0.25,"structural-discovery":0.25}}},"mass":{"ai":20.9,"assisted":0.0,"bot":0.0,"human":0.05},"sha":"323d3bfb1f39636a8cca0e78d09cb3ace62bfdb6","t":"2026-11-12T16:57:15+00:00","units":{"arch-map":[0.789,554.5],"cli-contract":[0.761,1199.5],"commit-weights":[0.821,1210.0],"llm-backend":[0.601,499.0],"prediction-scoring":[0.909,880.0],"project-governance":[0.57,1182.5],"provenance-history":[0.88,1479.0],"quiz-flow":[0.777,1234.5],"responsibility-contributors":[0.443,780.0],"risk-gating":[0.462,321.0],"store-persistence":[0.844,1214.0],"structural-discovery":[0.442,1048.0]}}],"evidence":[],"risk_events":[{"date":"2026-11-11T20:49:05+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-11T20:49:05+00:00","level":"HIGH","mass":0.443,"sha":"5fafc04741592cf9d66bf8a72aeb718d963f9d4e","source":"none","subject":"Add udebt vertical slice: map, quiz, status, dig over a git repo","understanding":0.0,"unit":"quiz-flow","weight":1.0},{"date":"2026-11-11T20:49:05+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-11T20:49:05+00:00","level":"HIGH","mass":0.41,"sha":"5fafc04741592cf9d66bf8a72aeb718d963f9d4e","source":"none","subject":"Add udebt vertical slice: map, quiz, status, dig over a git repo","understanding":0.0,"unit":"llm-backend","weight":1.0},{"date":"2026-11-11T20:49:05+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-11T20:49:05+00:00","level":"HIGH","mass":0.386,"sha":"5fafc04741592cf9d66bf8a72aeb718d963f9d4e","source":"none","subject":"Add udebt vertical slice: map, quiz, status, dig over a git repo","understanding":0.0,"unit":"cli-contract","weight":1.0},{"date":"2026-11-11T20:49:05+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-11T20:49:05+00:00","level":"HIGH","mass":0.355,"sha":"5fafc04741592cf9d66bf8a72aeb718d963f9d4e","source":"none","subject":"Add udebt vertical slice: map, quiz, status, dig over a git repo","understanding":0.0,"unit":"store-persistence","weight":1.0},{"date":"2026-11-11T20:49:05+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-11T20:49:05+00:00","level":"CAUTION","mass":0.46,"sha":"5fafc04741592cf9d66bf8a72aeb718d963f9d4e","source":"prior","subject":"Add udebt vertical slice: map, quiz, status, dig over a git repo","understanding":0.5,"unit":"prediction-scoring","weight":1.0},{"date":"2026-11-11T20:49:05+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-11T20:49:05+00:00","level":"CAUTION","mass":0.228,"sha":"5fafc04741592cf9d66bf8a72aeb718d963f9d4e","source":"prior","subject":"Add udebt vertical slice: map, quiz, status, dig over a git repo","understanding":0.5,"unit":"project-governance","weight":1.0},{"date":"2026-11-11T20:49:05+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-11T20:49:05+00:00","level":"CAUTION","mass":0.201,"sha":"5fafc04741592cf9d66bf8a72aeb718d963f9d4e","source":"none","subject":"Add udebt vertical slice: map, quiz, status, dig over a git repo","understanding":0.0,"unit":"arch-map","weight":1.0},{"date":"2026-11-11T20:49:05+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-11T20:49:05+00:00","level":"CAUTION","mass":0.136,"sha":"5fafc04741592cf9d66bf8a72aeb718d963f9d4e","source":"none","subject":"Add udebt vertical slice: map, quiz, status, dig over a git repo","understanding":0.0,"unit":"provenance-history","weight":1.0},{"date":"2026-11-11T20:51:22+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-11T20:51:22+00:00","level":"HIGH","mass":0.742,"sha":"3b3f9a13ba989ab9a1be130bb374d3f39ae61182","source":"prior","subject":"Warn when dig returns no check question; enforce map unit cap","understanding":0.251,"unit":"store-persistence","weight":0.813},{"date":"2026-11-11T20:51:22+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-11T20:51:22+00:00","level":"CAUTION","mass":0.296,"sha":"3b3f9a13ba989ab9a1be130bb374d3f39ae61182","source":"prior","subject":"Warn when dig returns no check question; enforce map unit cap","understanding":0.25,"unit":"cli-contract","weight":0.813},{"date":"2026-11-11T20:51:22+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-11T20:51:22+00:00","level":"CAUTION","mass":0.114,"sha":"3b3f9a13ba989ab9a1be130bb374d3f39ae61182","source":"prior","subject":"Warn when dig returns no check question; enforce map unit cap","understanding":0.249,"unit":"quiz-flow","weight":0.813},{"date":"2026-11-12T07:42:26+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T07:42:26+00:00","level":"HIGH","mass":0.668,"sha":"2394341bbda5e124694cebc4bb9b2d5c67577a6d","source":"prior","subject":"Make udebt history-aware: provenance, decision mining, own-commit prior","understanding":0.25,"unit":"provenance-history","weight":0.9},{"date":"2026-11-12T07:42:26+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T07:42:26+00:00","level":"HIGH","mass":0.312,"sha":"2394341bbda5e124694cebc4bb9b2d5c67577a6d","source":"prior","subject":"Make udebt history-aware: provenance, decision mining, own-commit prior","understanding":0.25,"unit":"quiz-flow","weight":0.9},{"date":"2026-11-12T07:42:26+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T07:42:26+00:00","level":"CAUTION","mass":0.266,"sha":"2394341bbda5e124694cebc4bb9b2d5c67577a6d","source":"prior","subject":"Make udebt history-aware: provenance, decision mining, own-commit prior","understanding":0.25,"unit":"cli-contract","weight":0.9},{"date":"2026-11-12T07:42:26+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T07:42:26+00:00","level":"CAUTION","mass":0.248,"sha":"2394341bbda5e124694cebc4bb9b2d5c67577a6d","source":"prior","subject":"Make udebt history-aware: provenance, decision mining, own-commit prior","understanding":0.267,"unit":"prediction-scoring","weight":0.9},{"date":"2026-11-12T07:42:26+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T07:42:26+00:00","level":"CAUTION","mass":0.22,"sha":"2394341bbda5e124694cebc4bb9b2d5c67577a6d","source":"prior","subject":"Make udebt history-aware: provenance, decision mining, own-commit prior","understanding":0.25,"unit":"llm-backend","weight":0.9},{"date":"2026-11-12T07:42:26+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T07:42:26+00:00","level":"CAUTION","mass":0.2,"sha":"2394341bbda5e124694cebc4bb9b2d5c67577a6d","source":"prior","subject":"Make udebt history-aware: provenance, decision mining, own-commit prior","understanding":0.25,"unit":"arch-map","weight":0.9},{"date":"2026-11-12T07:42:26+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T07:42:26+00:00","level":"CAUTION","mass":0.185,"sha":"2394341bbda5e124694cebc4bb9b2d5c67577a6d","source":"prior","subject":"Make udebt history-aware: provenance, decision mining, own-commit prior","understanding":0.275,"unit":"project-governance","weight":0.9},{"date":"2026-11-12T07:42:26+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T07:42:26+00:00","level":"CAUTION","mass":0.108,"sha":"2394341bbda5e124694cebc4bb9b2d5c67577a6d","source":"prior","subject":"Make udebt history-aware: provenance, decision mining, own-commit prior","understanding":0.25,"unit":"store-persistence","weight":0.9},{"date":"2026-11-12T11:32:04+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T11:32:04+00:00","level":"HIGH","mass":0.459,"sha":"286cdd4198854ff93349d053904f556b1ac9c285","source":"none","subject":"Phase 1: commit weights, contributors, change risk, pre-push hook","understanding":0.0,"unit":"commit-weights","weight":0.95},{"date":"2026-11-12T11:32:04+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T11:32:04+00:00","level":"HIGH","mass":0.36,"sha":"286cdd4198854ff93349d053904f556b1ac9c285","source":"none","subject":"Phase 1: commit weights, contributors, change risk, pre-push hook","understanding":0.0,"unit":"responsibility-contributors","weight":0.95},{"date":"2026-11-12T11:32:04+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T11:32:04+00:00","level":"HIGH","mass":0.333,"sha":"286cdd4198854ff93349d053904f556b1ac9c285","source":"none","subject":"Phase 1: commit weights, contributors, change risk, pre-push hook","understanding":0.0,"unit":"risk-gating","weight":0.95},{"date":"2026-11-12T11:32:04+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T11:32:04+00:00","level":"HIGH","mass":0.322,"sha":"286cdd4198854ff93349d053904f556b1ac9c285","source":"prior","subject":"Phase 1: commit weights, contributors, change risk, pre-push hook","understanding":0.25,"unit":"quiz-flow","weight":0.95},{"date":"2026-11-12T11:32:04+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T11:32:04+00:00","level":"HIGH","mass":0.316,"sha":"286cdd4198854ff93349d053904f556b1ac9c285","source":"prior","subject":"Phase 1: commit weights, contributors, change risk, pre-push hook","understanding":0.25,"unit":"cli-contract","weight":0.95},{"date":"2026-11-12T11:32:04+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T11:32:04+00:00","level":"CAUTION","mass":0.283,"sha":"286cdd4198854ff93349d053904f556b1ac9c285","source":"prior","subject":"Phase 1: commit weights, contributors, change risk, pre-push hook","understanding":0.25,"unit":"provenance-history","weight":0.95},{"date":"2026-11-12T11:32:04+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T11:32:04+00:00","level":"CAUTION","mass":0.226,"sha":"286cdd4198854ff93349d053904f556b1ac9c285","source":"prior","subject":"Phase 1: commit weights, contributors, change risk, pre-push hook","understanding":0.25,"unit":"arch-map","weight":0.95},{"date":"2026-11-12T11:32:04+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T11:32:04+00:00","level":"CAUTION","mass":0.225,"sha":"286cdd4198854ff93349d053904f556b1ac9c285","source":"prior","subject":"Phase 1: commit weights, contributors, change risk, pre-push hook","understanding":0.265,"unit":"project-governance","weight":0.95},{"date":"2026-11-12T11:32:04+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T11:32:04+00:00","level":"CAUTION","mass":0.201,"sha":"286cdd4198854ff93349d053904f556b1ac9c285","source":"prior","subject":"Phase 1: commit weights, contributors, change risk, pre-push hook","understanding":0.261,"unit":"prediction-scoring","weight":0.95},{"date":"2026-11-12T11:32:04+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T11:32:04+00:00","level":"CAUTION","mass":0.149,"sha":"286cdd4198854ff93349d053904f556b1ac9c285","source":"prior","subject":"Phase 1: commit weights, contributors, change risk, pre-push hook","understanding":0.25,"unit":"llm-backend","weight":0.95},{"date":"2026-11-12T12:13:49+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:13:49+00:00","level":"HIGH","mass":0.887,"sha":"3570a681d65fbfef8e9a674ec983d10287ec4412","source":"none","subject":"Structural unit discovery: import and co-change graphs, Louvain","understanding":0.0,"unit":"structural-discovery","weight":1.0},{"date":"2026-11-12T12:13:49+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:13:49+00:00","level":"HIGH","mass":0.349,"sha":"3570a681d65fbfef8e9a674ec983d10287ec4412","source":"prior","subject":"Structural unit discovery: import and co-change graphs, Louvain","understanding":0.25,"unit":"provenance-history","weight":1.0},{"date":"2026-11-12T12:13:49+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:13:49+00:00","level":"CAUTION","mass":0.257,"sha":"3570a681d65fbfef8e9a674ec983d10287ec4412","source":"prior","subject":"Structural unit discovery: import and co-change graphs, Louvain","understanding":0.251,"unit":"commit-weights","weight":1.0},{"date":"2026-11-12T12:13:49+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:13:49+00:00","level":"CAUTION","mass":0.118,"sha":"3570a681d65fbfef8e9a674ec983d10287ec4412","source":"prior","subject":"Structural unit discovery: import and co-change graphs, Louvain","understanding":0.261,"unit":"project-governance","weight":1.0},{"date":"2026-11-12T12:13:49+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:13:49+00:00","level":"CAUTION","mass":0.111,"sha":"3570a681d65fbfef8e9a674ec983d10287ec4412","source":"prior","subject":"Structural unit discovery: import and co-change graphs, Louvain","understanding":0.259,"unit":"prediction-scoring","weight":1.0},{"date":"2026-11-12T12:15:07+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:15:07+00:00","level":"HIGH","mass":0.439,"sha":"a156812ec4137ae5f279b72e0452b8100d6421e6","source":"prior","subject":"Two-level units, responsibility sets, per-developer scope, OUTSIDE risk","understanding":0.25,"unit":"responsibility-contributors","weight":0.9},{"date":"2026-11-12T12:15:07+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:15:07+00:00","level":"HIGH","mass":0.395,"sha":"a156812ec4137ae5f279b72e0452b8100d6421e6","source":"prior","subject":"Two-level units, responsibility sets, per-developer scope, OUTSIDE risk","understanding":0.25,"unit":"cli-contract","weight":0.9},{"date":"2026-11-12T12:15:07+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:15:07+00:00","level":"HIGH","mass":0.374,"sha":"a156812ec4137ae5f279b72e0452b8100d6421e6","source":"prior","subject":"Two-level units, responsibility sets, per-developer scope, OUTSIDE risk","understanding":0.25,"unit":"quiz-flow","weight":0.9},{"date":"2026-11-12T12:15:07+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:15:07+00:00","level":"HIGH","mass":0.347,"sha":"a156812ec4137ae5f279b72e0452b8100d6421e6","source":"prior","subject":"Two-level units, responsibility sets, per-developer scope, OUTSIDE risk","understanding":0.25,"unit":"arch-map","weight":0.9},{"date":"2026-11-12T12:15:07+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:15:07+00:00","level":"CAUTION","mass":0.251,"sha":"a156812ec4137ae5f279b72e0452b8100d6421e6","source":"prior","subject":"Two-level units, responsibility sets, per-developer scope, OUTSIDE risk","understanding":0.251,"unit":"risk-gating","weight":0.9},{"date":"2026-11-12T12:15:07+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:15:07+00:00","level":"CAUTION","mass":0.244,"sha":"a156812ec4137ae5f279b72e0452b8100d6421e6","source":"prior","subject":"Two-level units, responsibility sets, per-developer scope, OUTSIDE risk","understanding":0.25,"unit":"llm-backend","weight":0.9},{"date":"2026-11-12T12:15:07+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:15:07+00:00","level":"CAUTION","mass":0.229,"sha":"a156812ec4137ae5f279b72e0452b8100d6421e6","source":"prior","subject":"Two-level units, responsibility sets, per-developer scope, OUTSIDE risk","understanding":0.258,"unit":"prediction-scoring","weight":0.9},{"date":"2026-11-12T12:15:07+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:15:07+00:00","level":"CAUTION","mass":0.135,"sha":"a156812ec4137ae5f279b72e0452b8100d6421e6","source":"prior","subject":"Two-level units, responsibility sets, per-developer scope, OUTSIDE risk","understanding":0.26,"unit":"project-governance","weight":0.9},{"date":"2026-11-12T12:17:29+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:17:29+00:00","level":"HIGH","mass":0.669,"sha":"f1d259c7bdca1d0c03fcce76c46c5db32b52b48f","source":"prior","subject":"Record Phase 2 decisions and results; regenerate the dogfood map as v3","understanding":0.25,"unit":"store-persistence","weight":0.7},{"date":"2026-11-12T12:17:29+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:17:29+00:00","level":"CAUTION","mass":0.173,"sha":"f1d259c7bdca1d0c03fcce76c46c5db32b52b48f","source":"prior","subject":"Record Phase 2 decisions and results; regenerate the dogfood map as v3","understanding":0.258,"unit":"project-governance","weight":0.7},{"date":"2026-11-12T12:17:29+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:17:29+00:00","level":"CAUTION","mass":0.113,"sha":"f1d259c7bdca1d0c03fcce76c46c5db32b52b48f","source":"prior","subject":"Record Phase 2 decisions and results; regenerate the dogfood map as v3","understanding":0.257,"unit":"prediction-scoring","weight":0.7},{"date":"2026-11-12T12:44:09+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:44:09+00:00","level":"HIGH","mass":0.588,"sha":"f4d9f244f4ee44f34bbbf421267fa17ab1ac6f9e","source":"prior","subject":"Phase 1.1 classifier: more agents, a bot class, directed work, shared files","understanding":0.25,"unit":"provenance-history","weight":0.8},{"date":"2026-11-12T12:44:09+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:44:09+00:00","level":"CAUTION","mass":0.243,"sha":"f4d9f244f4ee44f34bbbf421267fa17ab1ac6f9e","source":"prior","subject":"Phase 1.1 classifier: more agents, a bot class, directed work, shared files","understanding":0.25,"unit":"cli-contract","weight":0.8},{"date":"2026-11-12T12:44:09+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:44:09+00:00","level":"CAUTION","mass":0.232,"sha":"f4d9f244f4ee44f34bbbf421267fa17ab1ac6f9e","source":"prior","subject":"Phase 1.1 classifier: more agents, a bot class, directed work, shared files","understanding":0.256,"unit":"prediction-scoring","weight":0.8},{"date":"2026-11-12T12:44:09+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:44:09+00:00","level":"CAUTION","mass":0.232,"sha":"f4d9f244f4ee44f34bbbf421267fa17ab1ac6f9e","source":"prior","subject":"Phase 1.1 classifier: more agents, a bot class, directed work, shared files","understanding":0.25,"unit":"arch-map","weight":0.8},{"date":"2026-11-12T12:44:09+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:44:09+00:00","level":"CAUTION","mass":0.227,"sha":"f4d9f244f4ee44f34bbbf421267fa17ab1ac6f9e","source":"prior","subject":"Phase 1.1 classifier: more agents, a bot class, directed work, shared files","understanding":0.257,"unit":"project-governance","weight":0.8},{"date":"2026-11-12T12:44:09+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:44:09+00:00","level":"CAUTION","mass":0.199,"sha":"f4d9f244f4ee44f34bbbf421267fa17ab1ac6f9e","source":"prior","subject":"Phase 1.1 classifier: more agents, a bot class, directed work, shared files","understanding":0.25,"unit":"quiz-flow","weight":0.8},{"date":"2026-11-12T12:44:09+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:44:09+00:00","level":"CAUTION","mass":0.162,"sha":"f4d9f244f4ee44f34bbbf421267fa17ab1ac6f9e","source":"prior","subject":"Phase 1.1 classifier: more agents, a bot class, directed work, shared files","understanding":0.25,"unit":"responsibility-contributors","weight":0.8},{"date":"2026-11-12T12:46:22+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:46:22+00:00","level":"HIGH","mass":0.742,"sha":"a6a02e2a205d3caf1547dc49c2670b2dd97c33bd","source":"prior","subject":"Weigh a merged branch as one commit (squash bias)","understanding":0.25,"unit":"commit-weights","weight":0.778},{"date":"2026-11-12T12:46:22+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:46:22+00:00","level":"CAUTION","mass":0.146,"sha":"a6a02e2a205d3caf1547dc49c2670b2dd97c33bd","source":"prior","subject":"Weigh a merged branch as one commit (squash bias)","understanding":0.256,"unit":"project-governance","weight":0.778},{"date":"2026-11-12T12:46:22+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:46:22+00:00","level":"CAUTION","mass":0.135,"sha":"a6a02e2a205d3caf1547dc49c2670b2dd97c33bd","source":"prior","subject":"Weigh a merged branch as one commit (squash bias)","understanding":0.255,"unit":"prediction-scoring","weight":0.778},{"date":"2026-11-12T12:46:22+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:46:22+00:00","level":"CAUTION","mass":0.11,"sha":"a6a02e2a205d3caf1547dc49c2670b2dd97c33bd","source":"prior","subject":"Weigh a merged branch as one commit (squash bias)","understanding":0.25,"unit":"arch-map","weight":0.778},{"date":"2026-11-12T12:52:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:52:36+00:00","level":"HIGH","mass":0.339,"sha":"9b7d0e25f69586a2ab49bc75b6399f2288b14afd","source":"prior","subject":"Synthetic-developer experiment and its first result","understanding":0.255,"unit":"project-governance","weight":0.85},{"date":"2026-11-12T12:52:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:52:36+00:00","level":"CAUTION","mass":0.236,"sha":"9b7d0e25f69586a2ab49bc75b6399f2288b14afd","source":"prior","subject":"Synthetic-developer experiment and its first result","understanding":0.25,"unit":"quiz-flow","weight":0.85},{"date":"2026-11-12T12:52:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:52:36+00:00","level":"CAUTION","mass":0.207,"sha":"9b7d0e25f69586a2ab49bc75b6399f2288b14afd","source":"prior","subject":"Synthetic-developer experiment and its first result","understanding":0.25,"unit":"llm-backend","weight":0.85},{"date":"2026-11-12T12:52:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:52:36+00:00","level":"CAUTION","mass":0.169,"sha":"9b7d0e25f69586a2ab49bc75b6399f2288b14afd","source":"prior","subject":"Synthetic-developer experiment and its first result","understanding":0.25,"unit":"cli-contract","weight":0.85},{"date":"2026-11-12T12:52:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:52:36+00:00","level":"CAUTION","mass":0.132,"sha":"9b7d0e25f69586a2ab49bc75b6399f2288b14afd","source":"prior","subject":"Synthetic-developer experiment and its first result","understanding":0.255,"unit":"prediction-scoring","weight":0.85},{"date":"2026-11-12T12:53:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:53:36+00:00","level":"HIGH","mass":0.769,"sha":"e8da3bb389776c37f80b65919c59e1b3ce077cd3","source":"prior","subject":"Regenerate the dogfood .udebt with Phase 1.1 weights and a seeded set","understanding":0.25,"unit":"store-persistence","weight":0.77},{"date":"2026-11-12T12:54:24+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:54:24+00:00","level":"HIGH","mass":0.436,"sha":"ba564e24af5cf56b7283ad5abc61c36357fac843","source":"prior","subject":"Use placeholders instead of model identifiers in examples","understanding":0.25,"unit":"provenance-history","weight":0.468},{"date":"2026-11-12T12:54:24+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:54:24+00:00","level":"CAUTION","mass":0.121,"sha":"ba564e24af5cf56b7283ad5abc61c36357fac843","source":"prior","subject":"Use placeholders instead of model identifiers in examples","understanding":0.255,"unit":"prediction-scoring","weight":0.468},{"date":"2026-11-12T12:54:24+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T12:54:24+00:00","level":"CAUTION","mass":0.121,"sha":"ba564e24af5cf56b7283ad5abc61c36357fac843","source":"prior","subject":"Use placeholders instead of model identifiers in examples","understanding":0.254,"unit":"project-governance","weight":0.468},{"date":"2026-11-12T14:04:58+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:04:58+00:00","level":"HIGH","mass":0.631,"sha":"4ff6ad09e4bd95b167760ba738aa3dd3a2e50494","source":"prior","subject":"Weigh version-only manifest edits like lockfile bumps","understanding":0.25,"unit":"commit-weights","weight":0.8},{"date":"2026-11-12T14:04:58+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:04:58+00:00","level":"HIGH","mass":0.38,"sha":"4ff6ad09e4bd95b167760ba738aa3dd3a2e50494","source":"prior","subject":"Weigh version-only manifest edits like lockfile bumps","understanding":0.25,"unit":"provenance-history","weight":0.8},{"date":"2026-11-12T14:04:58+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:04:58+00:00","level":"CAUTION","mass":0.181,"sha":"4ff6ad09e4bd95b167760ba738aa3dd3a2e50494","source":"prior","subject":"Weigh version-only manifest edits like lockfile bumps","understanding":0.25,"unit":"store-persistence","weight":0.8},{"date":"2026-11-12T14:04:58+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:04:58+00:00","level":"CAUTION","mass":0.169,"sha":"4ff6ad09e4bd95b167760ba738aa3dd3a2e50494","source":"prior","subject":"Weigh version-only manifest edits like lockfile bumps","understanding":0.25,"unit":"arch-map","weight":0.8},{"date":"2026-11-12T14:04:58+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:04:58+00:00","level":"CAUTION","mass":0.136,"sha":"4ff6ad09e4bd95b167760ba738aa3dd3a2e50494","source":"prior","subject":"Weigh version-only manifest edits like lockfile bumps","understanding":0.254,"unit":"project-governance","weight":0.8},{"date":"2026-11-12T14:04:58+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:04:58+00:00","level":"CAUTION","mass":0.132,"sha":"4ff6ad09e4bd95b167760ba738aa3dd3a2e50494","source":"prior","subject":"Weigh version-only manifest edits like lockfile bumps","understanding":0.254,"unit":"prediction-scoring","weight":0.8},{"date":"2026-11-12T14:12:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:12:36+00:00","level":"CAUTION","mass":0.222,"sha":"32f7a0c29ab833d10758cff0a66faa715a6897c1","source":"prior","subject":"Cache parsed commits under .udebt/ and parse only new ones","understanding":0.25,"unit":"arch-map","weight":1.0},{"date":"2026-11-12T14:12:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:12:36+00:00","level":"CAUTION","mass":0.215,"sha":"32f7a0c29ab833d10758cff0a66faa715a6897c1","source":"prior","subject":"Cache parsed commits under .udebt/ and parse only new ones","understanding":0.25,"unit":"cli-contract","weight":1.0},{"date":"2026-11-12T14:12:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:12:36+00:00","level":"CAUTION","mass":0.215,"sha":"32f7a0c29ab833d10758cff0a66faa715a6897c1","source":"prior","subject":"Cache parsed commits under .udebt/ and parse only new ones","understanding":0.25,"unit":"quiz-flow","weight":1.0},{"date":"2026-11-12T14:12:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:12:36+00:00","level":"CAUTION","mass":0.182,"sha":"32f7a0c29ab833d10758cff0a66faa715a6897c1","source":"prior","subject":"Cache parsed commits under .udebt/ and parse only new ones","understanding":0.254,"unit":"project-governance","weight":1.0},{"date":"2026-11-12T14:12:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:12:36+00:00","level":"CAUTION","mass":0.173,"sha":"32f7a0c29ab833d10758cff0a66faa715a6897c1","source":"prior","subject":"Cache parsed commits under .udebt/ and parse only new ones","understanding":0.254,"unit":"prediction-scoring","weight":1.0},{"date":"2026-11-12T14:12:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:12:36+00:00","level":"CAUTION","mass":0.166,"sha":"32f7a0c29ab833d10758cff0a66faa715a6897c1","source":"prior","subject":"Cache parsed commits under .udebt/ and parse only new ones","understanding":0.25,"unit":"provenance-history","weight":1.0},{"date":"2026-11-12T14:12:36+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:12:36+00:00","level":"CAUTION","mass":0.104,"sha":"32f7a0c29ab833d10758cff0a66faa715a6897c1","source":"prior","subject":"Cache parsed commits under .udebt/ and parse only new ones","understanding":0.25,"unit":"store-persistence","weight":1.0},{"date":"2026-11-12T14:13:54+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:13:54+00:00","level":"HIGH","mass":0.411,"sha":"6cf99753bfaf58c88e051916bac06249a4e1b0e1","source":"prior","subject":"Read staged version bumps in risk --staged","understanding":0.25,"unit":"risk-gating","weight":0.531},{"date":"2026-11-12T14:13:54+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:13:54+00:00","level":"HIGH","mass":0.322,"sha":"6cf99753bfaf58c88e051916bac06249a4e1b0e1","source":"prior","subject":"Read staged version bumps in risk --staged","understanding":0.25,"unit":"commit-weights","weight":0.531},{"date":"2026-11-12T14:22:32+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:22:32+00:00","level":"CAUTION","mass":0.295,"sha":"fecc0eae82ae50192c160f7419e3bd2b4733644d","source":"prior","subject":"Rerun design for the synthetic experiment: snapshots, per-unit, splits","understanding":0.25,"unit":"quiz-flow","weight":0.9},{"date":"2026-11-12T14:22:32+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:22:32+00:00","level":"CAUTION","mass":0.224,"sha":"fecc0eae82ae50192c160f7419e3bd2b4733644d","source":"prior","subject":"Rerun design for the synthetic experiment: snapshots, per-unit, splits","understanding":0.25,"unit":"cli-contract","weight":0.9},{"date":"2026-11-12T14:22:32+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:22:32+00:00","level":"CAUTION","mass":0.221,"sha":"fecc0eae82ae50192c160f7419e3bd2b4733644d","source":"prior","subject":"Rerun design for the synthetic experiment: snapshots, per-unit, splits","understanding":0.254,"unit":"prediction-scoring","weight":0.9},{"date":"2026-11-12T14:22:32+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:22:32+00:00","level":"CAUTION","mass":0.177,"sha":"fecc0eae82ae50192c160f7419e3bd2b4733644d","source":"prior","subject":"Rerun design for the synthetic experiment: snapshots, per-unit, splits","understanding":0.253,"unit":"project-governance","weight":0.9},{"date":"2026-11-12T14:22:32+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:22:32+00:00","level":"CAUTION","mass":0.167,"sha":"fecc0eae82ae50192c160f7419e3bd2b4733644d","source":"prior","subject":"Rerun design for the synthetic experiment: snapshots, per-unit, splits","understanding":0.25,"unit":"llm-backend","weight":0.9},{"date":"2026-11-12T14:30:30+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:30:30+00:00","level":"HIGH","mass":0.574,"sha":"5351e7e9911960232e72a8ecc6dc3c7ff8d121ce","source":"prior","subject":"Record the synthetic rerun and Phase 1.2 in the docs","understanding":0.253,"unit":"project-governance","weight":0.712},{"date":"2026-11-12T14:30:30+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:30:30+00:00","level":"HIGH","mass":0.33,"sha":"5351e7e9911960232e72a8ecc6dc3c7ff8d121ce","source":"prior","subject":"Record the synthetic rerun and Phase 1.2 in the docs","understanding":0.25,"unit":"store-persistence","weight":0.712},{"date":"2026-11-12T14:30:30+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:30:30+00:00","level":"CAUTION","mass":0.101,"sha":"5351e7e9911960232e72a8ecc6dc3c7ff8d121ce","source":"prior","subject":"Record the synthetic rerun and Phase 1.2 in the docs","understanding":0.253,"unit":"prediction-scoring","weight":0.712},{"date":"2026-11-12T14:45:32+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:45:32+00:00","level":"HIGH","mass":0.535,"sha":"250a41e2ef84a4e6d9e1e9b41464a09fffcc827c","source":"prior","subject":"Mine decision candidates from weights, survival and periods","understanding":0.25,"unit":"provenance-history","weight":0.8},{"date":"2026-11-12T14:45:32+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:45:32+00:00","level":"CAUTION","mass":0.174,"sha":"250a41e2ef84a4e6d9e1e9b41464a09fffcc827c","source":"prior","subject":"Mine decision candidates from weights, survival and periods","understanding":0.25,"unit":"arch-map","weight":0.8},{"date":"2026-11-12T14:45:32+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:45:32+00:00","level":"CAUTION","mass":0.167,"sha":"250a41e2ef84a4e6d9e1e9b41464a09fffcc827c","source":"prior","subject":"Mine decision candidates from weights, survival and periods","understanding":0.25,"unit":"cli-contract","weight":0.8},{"date":"2026-11-12T14:45:32+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:45:32+00:00","level":"CAUTION","mass":0.167,"sha":"250a41e2ef84a4e6d9e1e9b41464a09fffcc827c","source":"prior","subject":"Mine decision candidates from weights, survival and periods","understanding":0.25,"unit":"quiz-flow","weight":0.8},{"date":"2026-11-12T14:45:32+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:45:32+00:00","level":"CAUTION","mass":0.114,"sha":"250a41e2ef84a4e6d9e1e9b41464a09fffcc827c","source":"prior","subject":"Mine decision candidates from weights, survival and periods","understanding":0.25,"unit":"commit-weights","weight":0.8},{"date":"2026-11-12T14:50:37+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:50:37+00:00","level":"HIGH","mass":0.688,"sha":"b6919dd2609b672fc3c00302ead0ff8a4e2c3814","source":"prior","subject":"Weigh a dependency moved to a new major version as a dependency change","understanding":0.25,"unit":"commit-weights","weight":0.797},{"date":"2026-11-12T14:55:22+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:55:22+00:00","level":"HIGH","mass":0.389,"sha":"ca70615bfd529b1655d60914632bc73c93e39aea","source":"prior","subject":"Document Phase 1.3: history mining and major upgrades","understanding":0.253,"unit":"project-governance","weight":0.626},{"date":"2026-11-12T14:55:22+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:55:22+00:00","level":"CAUTION","mass":0.294,"sha":"ca70615bfd529b1655d60914632bc73c93e39aea","source":"prior","subject":"Document Phase 1.3: history mining and major upgrades","understanding":0.25,"unit":"store-persistence","weight":0.626},{"date":"2026-11-12T14:55:22+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T14:55:22+00:00","level":"CAUTION","mass":0.276,"sha":"ca70615bfd529b1655d60914632bc73c93e39aea","source":"prior","subject":"Document Phase 1.3: history mining and major upgrades","understanding":0.253,"unit":"prediction-scoring","weight":0.626},{"date":"2026-11-12T16:30:55+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:30:55+00:00","level":"HIGH","mass":0.41,"sha":"482d1d494b36caf5de4fe109af0464605a808781","source":"prior","subject":"Give each history period slots in proportion to its mass","understanding":0.25,"unit":"provenance-history","weight":0.473},{"date":"2026-11-12T16:30:55+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:30:55+00:00","level":"CAUTION","mass":0.167,"sha":"482d1d494b36caf5de4fe109af0464605a808781","source":"prior","subject":"Give each history period slots in proportion to its mass","understanding":0.25,"unit":"store-persistence","weight":0.473},{"date":"2026-11-12T16:32:24+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:32:24+00:00","level":"HIGH","mass":0.623,"sha":"40d10a87b844a39d585611b0f900921bc3709276","source":"prior","subject":"Read a version line in a TOML dependency table as that dependency's pin","understanding":0.25,"unit":"commit-weights","weight":0.685},{"date":"2026-11-12T16:32:24+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:32:24+00:00","level":"CAUTION","mass":0.193,"sha":"40d10a87b844a39d585611b0f900921bc3709276","source":"prior","subject":"Read a version line in a TOML dependency table as that dependency's pin","understanding":0.25,"unit":"provenance-history","weight":0.685},{"date":"2026-11-12T16:32:24+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:32:24+00:00","level":"CAUTION","mass":0.137,"sha":"40d10a87b844a39d585611b0f900921bc3709276","source":"prior","subject":"Read a version line in a TOML dependency table as that dependency's pin","understanding":0.25,"unit":"risk-gating","weight":0.685},{"date":"2026-11-12T16:33:30+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:33:30+00:00","level":"HIGH","mass":0.337,"sha":"060b4a8ef164a1e7323f0977d91a48d3e3c4d0f6","source":"prior","subject":"Decay understanding by the share of a unit that changed","understanding":0.253,"unit":"prediction-scoring","weight":0.85},{"date":"2026-11-12T16:33:30+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:33:30+00:00","level":"CAUTION","mass":0.257,"sha":"060b4a8ef164a1e7323f0977d91a48d3e3c4d0f6","source":"prior","subject":"Decay understanding by the share of a unit that changed","understanding":0.25,"unit":"quiz-flow","weight":0.85},{"date":"2026-11-12T16:33:30+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:33:30+00:00","level":"CAUTION","mass":0.201,"sha":"060b4a8ef164a1e7323f0977d91a48d3e3c4d0f6","source":"prior","subject":"Decay understanding by the share of a unit that changed","understanding":0.25,"unit":"cli-contract","weight":0.85},{"date":"2026-11-12T16:33:30+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:33:30+00:00","level":"CAUTION","mass":0.182,"sha":"060b4a8ef164a1e7323f0977d91a48d3e3c4d0f6","source":"prior","subject":"Decay understanding by the share of a unit that changed","understanding":0.25,"unit":"provenance-history","weight":0.85},{"date":"2026-11-12T16:33:30+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:33:30+00:00","level":"CAUTION","mass":0.119,"sha":"060b4a8ef164a1e7323f0977d91a48d3e3c4d0f6","source":"prior","subject":"Decay understanding by the share of a unit that changed","understanding":0.25,"unit":"commit-weights","weight":0.85},{"date":"2026-11-12T16:33:30+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:33:30+00:00","level":"CAUTION","mass":0.108,"sha":"060b4a8ef164a1e7323f0977d91a48d3e3c4d0f6","source":"prior","subject":"Decay understanding by the share of a unit that changed","understanding":0.25,"unit":"store-persistence","weight":0.85},{"date":"2026-11-12T16:56:18+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:56:18+00:00","level":"HIGH","mass":0.316,"sha":"f885892f6227201e7820fa26425d1d6f9cf5bbec","source":"prior","subject":"Score at an explicit cut-off through a per-map ledger","understanding":0.25,"unit":"provenance-history","weight":0.66},{"date":"2026-11-12T16:56:18+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:56:18+00:00","level":"CAUTION","mass":0.231,"sha":"f885892f6227201e7820fa26425d1d6f9cf5bbec","source":"prior","subject":"Score at an explicit cut-off through a per-map ledger","understanding":0.25,"unit":"arch-map","weight":0.66},{"date":"2026-11-12T16:56:18+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:56:18+00:00","level":"CAUTION","mass":0.211,"sha":"f885892f6227201e7820fa26425d1d6f9cf5bbec","source":"prior","subject":"Score at an explicit cut-off through a per-map ledger","understanding":0.253,"unit":"prediction-scoring","weight":0.66},{"date":"2026-11-12T16:56:18+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:56:18+00:00","level":"CAUTION","mass":0.211,"sha":"f885892f6227201e7820fa26425d1d6f9cf5bbec","source":"prior","subject":"Score at an explicit cut-off through a per-map ledger","understanding":0.25,"unit":"quiz-flow","weight":0.66},{"date":"2026-11-12T16:57:15+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:57:15+00:00","level":"HIGH","mass":0.303,"sha":"323d3bfb1f39636a8cca0e78d09cb3ace62bfdb6","source":"prior","subject":"Replay debt over time: snapshot, timeline, export, risk history, dashboard","understanding":0.25,"unit":"cli-contract","weight":1.0},{"date":"2026-11-12T16:57:15+00:00","dev":"pisan@uw.edu","in_set":true,"klass":"ai","landed":"2026-11-12T16:57:15+00:00","level":"HIGH","mass":0.303,"sha":"323d3bfb1f39636a8cca0e78d09cb3ace62bfdb6","source":"prior","subject":"Replay debt over time: snapshot, timeline, export, risk history, dashboard","understanding":0.25,"unit":"quiz-flow","weight":1.0}],"heavy_commits":[{"sha":"5fafc04741592cf9d66bf8a72aeb718d963f9d4e","date":"2026-11-11T20:49:05+00:00","landed":"2026-11-11T20:49:05+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":1.0,"subject":"Add udebt vertical slice: map, quiz, status, dig over a git repo","units":{"prediction-scoring":0.46,"arch-map":0.2,"llm-backend":0.41,"store-persistence":0.36,"cli-contract":0.39,"quiz-flow":0.44,"provenance-history":0.14,"project-governance":0.23}},{"sha":"3b3f9a13ba989ab9a1be130bb374d3f39ae61182","date":"2026-11-11T20:51:22+00:00","landed":"2026-11-11T20:51:22+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.813,"subject":"Warn when dig returns no check question; enforce map unit cap","units":{"arch-map":0.08,"store-persistence":0.74,"cli-contract":0.3,"quiz-flow":0.11,"project-governance":0.06}},{"sha":"2394341bbda5e124694cebc4bb9b2d5c67577a6d","date":"2026-11-12T07:42:26+00:00","landed":"2026-11-12T07:42:26+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.9,"subject":"Make udebt history-aware: provenance, decision mining, own-commit prior","units":{"prediction-scoring":0.25,"arch-map":0.2,"llm-backend":0.22,"store-persistence":0.11,"cli-contract":0.27,"quiz-flow":0.31,"provenance-history":0.67,"project-governance":0.18}},{"sha":"286cdd4198854ff93349d053904f556b1ac9c285","date":"2026-11-12T11:32:04+00:00","landed":"2026-11-12T11:32:04+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.95,"subject":"Phase 1: commit weights, contributors, change risk, pre-push hook","units":{"prediction-scoring":0.2,"arch-map":0.23,"llm-backend":0.15,"store-persistence":0.05,"cli-contract":0.32,"quiz-flow":0.32,"provenance-history":0.28,"commit-weights":0.46,"risk-gating":0.33,"responsibility-contributors":0.36,"project-governance":0.22}},{"sha":"e8e799a29da5fb7bb35e1b6e1c6f180f1a72f5b3","date":"2026-11-12T11:48:44+00:00","landed":"2026-11-12T12:19:22+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.75,"subject":"Add external testbeds: 34 public repos with mixed human/AI history","units":{}},{"sha":"3570a681d65fbfef8e9a674ec983d10287ec4412","date":"2026-11-12T12:13:49+00:00","landed":"2026-11-12T12:13:49+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":1.0,"subject":"Structural unit discovery: import and co-change graphs, Louvain","units":{"prediction-scoring":0.11,"provenance-history":0.35,"commit-weights":0.26,"structural-discovery":0.89,"project-governance":0.12}},{"sha":"a156812ec4137ae5f279b72e0452b8100d6421e6","date":"2026-11-12T12:15:07+00:00","landed":"2026-11-12T12:15:07+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.9,"subject":"Two-level units, responsibility sets, per-developer scope, OUTSIDE risk","units":{"prediction-scoring":0.23,"arch-map":0.35,"llm-backend":0.24,"store-persistence":0.09,"cli-contract":0.39,"quiz-flow":0.37,"risk-gating":0.25,"responsibility-contributors":0.44,"project-governance":0.14}},{"sha":"f1d259c7bdca1d0c03fcce76c46c5db32b52b48f","date":"2026-11-12T12:17:29+00:00","landed":"2026-11-12T12:17:29+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.7,"subject":"Record Phase 2 decisions and results; regenerate the dogfood map as v3","units":{"prediction-scoring":0.11,"store-persistence":0.67,"project-governance":0.17}},{"sha":"f4d9f244f4ee44f34bbbf421267fa17ab1ac6f9e","date":"2026-11-12T12:44:09+00:00","landed":"2026-11-12T12:44:09+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.8,"subject":"Phase 1.1 classifier: more agents, a bot class, directed work, shared files","units":{"prediction-scoring":0.23,"arch-map":0.23,"store-persistence":0.05,"cli-contract":0.24,"quiz-flow":0.2,"provenance-history":0.59,"structural-discovery":0.06,"risk-gating":0.05,"responsibility-contributors":0.16,"project-governance":0.23}},{"sha":"a6a02e2a205d3caf1547dc49c2670b2dd97c33bd","date":"2026-11-12T12:46:22+00:00","landed":"2026-11-12T12:46:22+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.778,"subject":"Weigh a merged branch as one commit (squash bias)","units":{"prediction-scoring":0.13,"arch-map":0.11,"store-persistence":0.06,"commit-weights":0.74,"project-governance":0.15}},{"sha":"9b7d0e25f69586a2ab49bc75b6399f2288b14afd","date":"2026-11-12T12:52:36+00:00","landed":"2026-11-12T12:52:36+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.85,"subject":"Synthetic-developer experiment and its first result","units":{"prediction-scoring":0.13,"llm-backend":0.21,"cli-contract":0.17,"quiz-flow":0.24,"project-governance":0.34}},{"sha":"e8da3bb389776c37f80b65919c59e1b3ce077cd3","date":"2026-11-12T12:53:36+00:00","landed":"2026-11-12T12:53:36+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.77,"subject":"Regenerate the dogfood .udebt with Phase 1.1 weights and a seeded set","units":{"store-persistence":0.77}},{"sha":"4ff6ad09e4bd95b167760ba738aa3dd3a2e50494","date":"2026-11-12T14:04:58+00:00","landed":"2026-11-12T14:04:58+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.8,"subject":"Weigh version-only manifest edits like lockfile bumps","units":{"prediction-scoring":0.13,"arch-map":0.17,"store-persistence":0.18,"provenance-history":0.38,"commit-weights":0.63,"project-governance":0.14}},{"sha":"32f7a0c29ab833d10758cff0a66faa715a6897c1","date":"2026-11-12T14:12:36+00:00","landed":"2026-11-12T14:12:36+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":1.0,"subject":"Cache parsed commits under .udebt/ and parse only new ones","units":{"prediction-scoring":0.17,"arch-map":0.22,"store-persistence":0.1,"cli-contract":0.21,"quiz-flow":0.21,"provenance-history":0.17,"project-governance":0.18}},{"sha":"6cf99753bfaf58c88e051916bac06249a4e1b0e1","date":"2026-11-12T14:13:54+00:00","landed":"2026-11-12T14:13:54+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.531,"subject":"Read staged version bumps in risk --staged","units":{"commit-weights":0.32,"risk-gating":0.41,"project-governance":0.1}},{"sha":"fecc0eae82ae50192c160f7419e3bd2b4733644d","date":"2026-11-12T14:22:32+00:00","landed":"2026-11-12T14:22:32+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.9,"subject":"Rerun design for the synthetic experiment: snapshots, per-unit, splits","units":{"prediction-scoring":0.22,"llm-backend":0.17,"cli-contract":0.22,"quiz-flow":0.29,"project-governance":0.18}},{"sha":"5351e7e9911960232e72a8ecc6dc3c7ff8d121ce","date":"2026-11-12T14:30:30+00:00","landed":"2026-11-12T14:30:30+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.712,"subject":"Record the synthetic rerun and Phase 1.2 in the docs","units":{"prediction-scoring":0.1,"store-persistence":0.33,"project-governance":0.57}},{"sha":"250a41e2ef84a4e6d9e1e9b41464a09fffcc827c","date":"2026-11-12T14:45:32+00:00","landed":"2026-11-12T14:45:32+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.8,"subject":"Mine decision candidates from weights, survival and periods","units":{"arch-map":0.17,"store-persistence":0.09,"cli-contract":0.17,"quiz-flow":0.17,"provenance-history":0.54,"commit-weights":0.11}},{"sha":"b6919dd2609b672fc3c00302ead0ff8a4e2c3814","date":"2026-11-12T14:50:37+00:00","landed":"2026-11-12T14:50:37+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.797,"subject":"Weigh a dependency moved to a new major version as a dependency change","units":{"commit-weights":0.69}},{"sha":"ca70615bfd529b1655d60914632bc73c93e39aea","date":"2026-11-12T14:55:22+00:00","landed":"2026-11-12T14:55:22+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.626,"subject":"Document Phase 1.3: history mining and major upgrades","units":{"prediction-scoring":0.28,"store-persistence":0.29,"project-governance":0.39}},{"sha":"40d10a87b844a39d585611b0f900921bc3709276","date":"2026-11-12T16:32:24+00:00","landed":"2026-11-12T16:32:24+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.685,"subject":"Read a version line in a TOML dependency table as that dependency's pin","units":{"provenance-history":0.19,"commit-weights":0.62,"risk-gating":0.14}},{"sha":"060b4a8ef164a1e7323f0977d91a48d3e3c4d0f6","date":"2026-11-12T16:33:30+00:00","landed":"2026-11-12T16:33:30+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.85,"subject":"Decay understanding by the share of a unit that changed","units":{"prediction-scoring":0.34,"store-persistence":0.11,"cli-contract":0.2,"quiz-flow":0.26,"provenance-history":0.18,"commit-weights":0.12}},{"sha":"f885892f6227201e7820fa26425d1d6f9cf5bbec","date":"2026-11-12T16:56:18+00:00","landed":"2026-11-12T16:56:18+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":0.66,"subject":"Score at an explicit cut-off through a per-map ledger","units":{"prediction-scoring":0.21,"arch-map":0.23,"quiz-flow":0.21,"provenance-history":0.32}},{"sha":"323d3bfb1f39636a8cca0e78d09cb3ace62bfdb6","date":"2026-11-12T16:57:15+00:00","landed":"2026-11-12T16:57:15+00:00","dev":"pisan@uw.edu","author":"Claude","klass":"ai","agent":"claude-code","weight":1.0,"subject":"Replay debt over time: snapshot, timeline, export, risk history, dashboard","units":{"store-persistence":0.06,"cli-contract":0.3,"quiz-flow":0.3}}]}</script>
+<script>
+(function () {
+  "use strict";
+  var D = JSON.parse(document.getElementById("udebt-data").textContent);
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var P = D.snapshots || [];
+  var devs = D.devs || [];
+  var units = D.units || [];
+  var top = units.filter(function (u) { return !u.parent; });
+  var unitName = {};
+  units.forEach(function (u) { unitName[u.id] = u.name || u.id; });
+  var state = { dev: devs[0] || null, sel: Math.max(0, P.length - 1), levels: "strong", riskAll: false };
+
+  // -- helpers ------------------------------------------------------------------
+  function el(tag, attrs, text) {
+    var e = document.createElement(tag);
+    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function sv(tag, attrs, text) {
+    var e = document.createElementNS(SVGNS, tag);
+    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+  function ts(s) { return Date.parse(s); }
+  function day(s) { return s ? String(s).slice(0, 10) : ""; }
+  function short(dev) { var at = dev.indexOf("@"); return at > 0 ? dev.slice(0, at) : dev; }
+  function fmt(x, d) { return x == null ? "-" : Number(x).toFixed(d == null ? 1 : d); }
+  function color(i) { return "var(--s" + ((i % 8) + 1) + ")"; }
+  function devColor(dev) { return color(Math.max(0, devs.indexOf(dev))); }
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function md(t) { var d = new Date(t); return MONTHS[d.getUTCMonth()] + " " + d.getUTCDate(); }
+  var LEVEL = { OUTSIDE: "critical", HIGH: "serious", CAUTION: "warning" };
+  function badge(level) {
+    var b = el("span", { "class": "badge" });
+    var s = sv("svg", { width: 10, height: 10, viewBox: "0 0 10 10", "aria-hidden": "true" });
+    var shape = level === "OUTSIDE" ? sv("path", { d: "M5 0 L10 9 L0 9 Z" })
+      : level === "HIGH" ? sv("rect", { x: 1, y: 1, width: 8, height: 8, rx: 1 })
+      : sv("circle", { cx: 5, cy: 5, r: 4 });
+    shape.setAttribute("fill", "var(--" + LEVEL[level] + ")");
+    s.appendChild(shape); b.appendChild(s); b.appendChild(document.createTextNode(level));
+    return b;
+  }
+  function indexAt(dev, i) { var r = P[i] && P[i].devs[dev]; return r ? r.index : null; }
+  function pointAt(t) { // the last point at or before time t (or the first)
+    var j = 0;
+    for (var i = 0; i < P.length; i++) { if (ts(P[i].t) <= t) j = i; }
+    return j;
+  }
+  function aiShare(m) {
+    var tot = m.ai + m.assisted + m.human;
+    return tot ? (m.ai + 0.5 * m.assisted) / tot : 0;
+  }
+  function strongEvents() {
+    return (D.risk_events || []).filter(function (e) {
+      return state.levels === "all" || e.level !== "CAUTION";
+    });
+  }
+
+  // -- header, controls, tiles ----------------------------------------------------
+  document.getElementById("title").textContent = "Understanding debt: " + (D.repo || "");
+  var last = P[P.length - 1];
+  document.getElementById("subtitle").textContent = P.length
+    ? P.length + " points " + (D.settings.every === "week" ? "(weekly)" : "(every " + D.settings.every + ")") +
+      " from " + day(P[0].t) + " to " + day(last.t) + "; " + devs.length + " developer" + (devs.length === 1 ? "" : "s") +
+      ", " + top.length + " units"
+    : "No points yet: run udebt snapshot.";
+  var dec = D.settings.decay || {};
+  document.getElementById("meta").textContent = "HEAD " + String(D.head || "").slice(0, 8) +
+    " · generated " + day(D.generated_at) + " · decay " + dec.model +
+    (dec.model === "share" ? " (exp(-" + dec.rate + " x share changed))" : " (" + dec.per_mass + " per unit of mass)") +
+    " · known threshold " + D.settings.known_threshold + " · bus target " + D.settings.bus_target;
+
+  var devSel = document.getElementById("dev");
+  devs.forEach(function (d) { devSel.appendChild(el("option", { value: d }, d)); });
+  if (!devs.length) devSel.appendChild(el("option", { value: "" }, "(no developer)"));
+  devSel.addEventListener("change", function () { state.dev = devSel.value; renderAll(); });
+  var lvlSel = document.getElementById("levels");
+  lvlSel.addEventListener("change", function () { state.levels = lvlSel.value; renderAll(); });
+
+  function tile(label, value, delta) {
+    var t = el("div", { "class": "tile" });
+    t.appendChild(el("div", { "class": "label" }, label));
+    t.appendChild(el("div", { "class": "value" }, value));
+    if (delta) t.appendChild(el("div", { "class": "delta" }, delta));
+    return t;
+  }
+  function renderTiles() {
+    var box = document.getElementById("tiles"); clear(box);
+    var dev = state.dev;
+    if (dev && P.length) {
+      var now = indexAt(dev, P.length - 1);
+      var t0 = ts(last.t) - 28 * 864e5, j = pointAt(t0), then = indexAt(dev, j);
+      var delta = now != null && then != null
+        ? (now - then >= 0 ? "+" : "") + fmt(now - then) + " since " + day(P[j].t) : "";
+      box.appendChild(tile("Debt index, " + short(dev), fmt(now), delta));
+    }
+    var arch = top.filter(function (u) { return u.scope === "architectural"; });
+    var below = arch.filter(function (u) { return u.holders.length < D.settings.bus_target; });
+    box.appendChild(tile("Units below the bus target", below.length + " of " + arch.length,
+      "need " + D.settings.bus_target + " holders at understanding >= " + D.settings.known_threshold));
+    var ev = D.risk_events || [], o = 0, hgh = 0;
+    ev.forEach(function (e) { if (e.level === "OUTSIDE") o++; else if (e.level === "HIGH") hgh++; });
+    box.appendChild(tile("Risk events", String(o + hgh), o + " OUTSIDE, " + hgh + " HIGH, all developers"));
+    if (last) box.appendChild(tile("Agent share of the mass", Math.round(100 * aiShare(last.mass)) + "%",
+      "ai plus half of assisted, " + last.commits + " commits"));
+  }
+
+  // -- the main chart ---------------------------------------------------------------
+  var chart = document.getElementById("chart"), tip = document.getElementById("tip");
+  var geo = null;
+  function renderChart() {
+    clear(chart);
+    var legend = document.getElementById("legend"); clear(legend);
+    var wrap = chart.parentNode, W = Math.max(280, wrap.clientWidth);
+    var phone = W < 560;
+    var H = phone ? 250 : 300;
+    var m = { l: 46, r: phone ? 14 : 92, t: 10, b: 64 };
+    var iw = W - m.l - m.r, ih = H - m.t - m.b;
+    chart.setAttribute("viewBox", "0 0 " + W + " " + H);
+    chart.setAttribute("width", W); chart.setAttribute("height", H);
+    if (!P.length) { geo = null; return; }
+    var x0 = ts(P[0].t), x1 = ts(last.t);
+    if (x1 <= x0) { x0 -= 864e5; x1 += 864e5; }
+    function X(t) { return m.l + (t - x0) / (x1 - x0) * iw; }
+    function Y(v) { return m.t + (1 - v / 100) * ih; }
+    // grid and y axis
+    [0, 25, 50, 75, 100].forEach(function (v) {
+      chart.appendChild(sv("line", { x1: m.l, x2: m.l + iw, y1: Y(v), y2: Y(v), stroke: v === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }));
+      chart.appendChild(sv("text", { x: m.l - 6, y: Y(v) + 4, "text-anchor": "end" }, String(v)));
+    });
+    // x ticks: months, or weeks for a short span
+    var span = x1 - x0, ticks = [], d = new Date(x0);
+    if (span > 75 * 864e5) {
+      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+      while (d.getTime() <= x1) { ticks.push([d.getTime(), MONTHS[d.getUTCMonth()] + (d.getUTCMonth() === 0 ? " " + d.getUTCFullYear() : "")]); d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)); }
+    } else if (span < 2 * 864e5) {
+      var hrs = [1, 2, 3, 6, 12].filter(function (h) { return span / (h * 36e5) <= 8; })[0] || 12;
+      var t = Math.ceil(x0 / (hrs * 36e5)) * hrs * 36e5;
+      for (; t <= x1; t += hrs * 36e5) {
+        var hd = new Date(t), hh = ("0" + hd.getUTCHours()).slice(-2) + ":00";
+        ticks.push([t, hd.getUTCHours() === 0 ? md(t) : hh]);
+      }
+      if (ticks.length) ticks[0][1] = md(ticks[0][0]) + " " + ticks[0][1] + " UTC";
+    } else {
+      var step = span > 21 * 864e5 ? 7 : 1;
+      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1));
+      while (d.getTime() <= x1) { if (step === 1 || d.getUTCDay() === 1) ticks.push([d.getTime(), md(d.getTime())]); d = new Date(d.getTime() + 864e5); }
+    }
+    var lastX = -1e9, lastLen = 0;
+    ticks.forEach(function (tk) {
+      var x = X(tk[0]), need = 6.2 * (lastLen + tk[1].length) / 2 + 12;
+      if (x - lastX < need || x - 6.2 * tk[1].length / 2 < 0) return;
+      lastX = x; lastLen = tk[1].length;
+      chart.appendChild(sv("line", { x1: x, x2: x, y1: m.t + ih, y2: m.t + ih + 4, stroke: "var(--axis)" }));
+      chart.appendChild(sv("text", { x: x, y: m.t + ih + 16, "text-anchor": "middle" }, tk[1]));
+    });
+    // rugs below the axis: the selected developer's risk events, then heavy commits by others
+    var rugRisk = m.t + ih + 30, rugHeavy = m.t + ih + 50;
+    chart.appendChild(sv("text", { x: m.l - 6, y: rugRisk + 4, "text-anchor": "end" }, "risk"));
+    chart.appendChild(sv("text", { x: m.l - 6, y: rugHeavy + 4, "text-anchor": "end" }, "others"));
+    var dev = state.dev;
+    var marks = [];
+    (D.heavy_commits || []).forEach(function (c) {
+      if (c.dev && c.dev === dev) return;
+      var t = ts(c.landed); if (t < x0 || t > x1) return;
+      var h = 4 + 10 * Math.min(1, c.weight);
+      chart.appendChild(sv("line", { x1: X(t), x2: X(t), y1: rugHeavy + 6 - h, y2: rugHeavy + 6, stroke: c.klass === "ai" ? "var(--ink-2)" : "var(--muted)", "stroke-width": 1.5, "stroke-linecap": "round" }));
+      marks.push({ x: X(t), y: rugHeavy, kind: "heavy", c: c });
+    });
+    strongEvents().forEach(function (e) {
+      if (e.dev !== dev) return;
+      var t = ts(e.landed); if (t < x0 || t > x1) return;
+      var x = X(t), y = rugRisk;
+      var s = e.level === "OUTSIDE" ? sv("path", { d: "M" + x + " " + (y - 5) + " L" + (x + 5) + " " + (y + 4) + " L" + (x - 5) + " " + (y + 4) + " Z" })
+        : e.level === "HIGH" ? sv("rect", { x: x - 4, y: y - 4, width: 8, height: 8, rx: 1 })
+        : sv("circle", { cx: x, cy: y, r: 3.5 });
+      s.setAttribute("fill", "var(--" + LEVEL[e.level] + ")");
+      s.setAttribute("stroke", "var(--surface)"); s.setAttribute("stroke-width", 1.5);
+      chart.appendChild(s);
+      marks.push({ x: x, y: y, kind: "risk", e: e });
+    });
+    // one line per developer
+    devs.forEach(function (dv, k) {
+      var dpath = "", pen = false;
+      P.forEach(function (p, i) {
+        var v = indexAt(dv, i);
+        if (v == null) { pen = false; return; }
+        dpath += (pen ? " L" : " M") + X(ts(p.t)).toFixed(1) + " " + Y(v).toFixed(1); pen = true;
+      });
+      if (!dpath) return;
+      chart.appendChild(sv("path", { d: dpath, fill: "none", stroke: color(k), "stroke-width": dv === dev ? 2.5 : 2, "stroke-linejoin": "round", "stroke-linecap": "round", opacity: dev && dv !== dev ? 0.55 : 1 }));
+      var lv = indexAt(dv, P.length - 1);
+      if (lv != null && !phone && devs.length <= 4) {
+        chart.appendChild(sv("text", { x: m.l + iw + 8, y: Y(lv) + 4, "class": "ink" }, short(dv) + " " + fmt(lv)));
+      }
+      var key = el("span", { "class": "key" }); var i_ = el("i"); i_.style.background = color(k);
+      key.appendChild(i_); key.appendChild(document.createTextNode(dv)); legend.appendChild(key);
+    });
+    // evidence: quiz (circle) and dig (square) on the developer's line
+    (D.evidence || []).forEach(function (r) {
+      var t = ts(r.ts); if (!(t >= x0 && t <= x1)) return;
+      var v = indexAt(r.dev, pointAt(t)); if (v == null) return;
+      var x = X(t), y = Y(v), c = devColor(r.dev);
+      var s = r.type === "dig" ? sv("rect", { x: x - 4.5, y: y - 4.5, width: 9, height: 9, rx: 2 }) : sv("circle", { cx: x, cy: y, r: 4.5 });
+      s.setAttribute("fill", c); s.setAttribute("stroke", "var(--surface)"); s.setAttribute("stroke-width", 2);
+      chart.appendChild(s);
+      marks.push({ x: x, y: y, kind: "evidence", r: r });
+    });
+    // the selected point
+    var sp = P[state.sel], sx = X(ts(sp.t));
+    var sel = sv("g", {});
+    sel.appendChild(sv("line", { x1: sx, x2: sx, y1: m.t, y2: m.t + ih, stroke: "var(--axis)", "stroke-width": 1 }));
+    devs.forEach(function (dv, k) {
+      var v = indexAt(dv, state.sel); if (v == null) return;
+      sel.appendChild(sv("circle", { cx: sx, cy: Y(v), r: 4.5, fill: color(k), stroke: "var(--surface)", "stroke-width": 2 }));
+    });
+    chart.appendChild(sel);
+    var cross = sv("line", { x1: 0, x2: 0, y1: m.t, y2: m.t + ih, stroke: "var(--ink-2)", "stroke-width": 1, visibility: "hidden" });
+    chart.appendChild(cross);
+    geo = { X: X, m: m, iw: iw, ih: ih, W: W, marks: marks, cross: cross };
+    legendExtras(legend);
+    var ev = (D.evidence || []).length;
+    document.getElementById("chart-sub").textContent = "0 = understands every unit in the set, 100 = none. Click or use the arrow keys to pick a point.";
+    document.getElementById("chart-note").textContent = "Rugs: risk = " + (dev ? short(dev) + "'s " : "") +
+      "risk events; others = commits weighing >= " + D.settings.heavy + " by anyone else, agents in the stronger tone, height by weight. " +
+      (ev ? ev + " evidence records (circle quiz, square dig)." : "No quiz or dig evidence yet: every understanding here is the own-commit prior.");
+  }
+  function legendExtras(legend) {
+    function shape(kind, fill) {
+      var s = sv("svg", { width: 10, height: 10, viewBox: "0 0 10 10", "aria-hidden": "true" });
+      var e = kind === "sq" ? sv("rect", { x: 1, y: 1, width: 8, height: 8, rx: 2 }) : kind === "tri" ? sv("path", { d: "M5 0 L10 9 L0 9 Z" }) : sv("circle", { cx: 5, cy: 5, r: 4 });
+      e.setAttribute("fill", fill); s.appendChild(e); return s;
+    }
+    [["c", "var(--ink-2)", "quiz"], ["sq", "var(--ink-2)", "dig"], ["tri", "var(--critical)", "OUTSIDE"], ["sq", "var(--serious)", "HIGH"]].forEach(function (k) {
+      var key = el("span", { "class": "key" }); key.appendChild(shape(k[0], k[1])); key.appendChild(document.createTextNode(k[2])); legend.appendChild(key);
+    });
+  }
+  function nearestPoint(px) {
+    var best = 0, bd = 1e9;
+    P.forEach(function (p, i) { var d = Math.abs(geo.X(ts(p.t)) - px); if (d < bd) { bd = d; best = i; } });
+    return best;
+  }
+  function showTip(px, py, rows, when) {
+    clear(tip);
+    tip.appendChild(el("div", { "class": "when" }, when));
+    rows.forEach(function (r) {
+      var row = el("div", { "class": "row" });
+      if (r.c) { var i_ = el("i"); i_.style.background = r.c; row.appendChild(i_); }
+      row.appendChild(el("strong", null, r.v)); row.appendChild(el("span", null, r.k));
+      tip.appendChild(row);
+    });
+    tip.style.display = "block";
+    var w = tip.offsetWidth, ww = chart.parentNode.clientWidth;
+    tip.style.left = Math.max(0, Math.min(ww - w, px + 12)) + "px";
+    tip.style.top = Math.max(0, py - 10) + "px";
+  }
+  function pointTip(i, px) {
+    var p = P[i];
+    var rows = devs.map(function (dv, k) { return { c: color(k), v: fmt(indexAt(dv, i)), k: dv }; });
+    rows.push({ v: Math.round(100 * aiShare(p.mass)) + "%", k: "agent share of the mass" });
+    rows.push({ v: String(p.commits), k: "commits" });
+    showTip(px, 10, rows, day(p.t) + " · " + p.sha.slice(0, 8));
+  }
+  function markTip(mk) {
+    if (mk.kind === "evidence") {
+      var r = mk.r;
+      showTip(mk.x, mk.y, [{ c: devColor(r.dev), v: r.verdict || "", k: r.type + " on " + (unitName[r.unit] || r.unit) }, { v: r.dev, k: "" }], day(r.ts));
+    } else if (mk.kind === "risk") {
+      var e = mk.e;
+      showTip(mk.x, mk.y - 70, [{ v: e.level, k: unitName[e.unit.split(" ")[0]] || e.unit }, { v: fmt(e.understanding, 2), k: "understanding then" }, { v: fmt(e.mass, 2), k: "mass landed; weight " + fmt(e.weight, 2) }, { v: e.sha.slice(0, 8), k: e.subject }], day(e.landed));
+    } else {
+      var c = mk.c;
+      showTip(mk.x, mk.y - 70, [{ v: fmt(c.weight, 2), k: "weight, " + c.klass + (c.agent ? " (" + c.agent + ")" : "") }, { v: c.sha.slice(0, 8), k: c.subject }, { v: c.dev || c.author, k: "" }], day(c.landed));
+    }
+  }
+  function pos(ev) { var r = chart.getBoundingClientRect(); return [(ev.clientX - r.left) * (geo.W / r.width), ev.clientY - r.top]; }
+  chart.addEventListener("pointermove", function (ev) {
+    if (!geo) return;
+    var xy = pos(ev), px = xy[0], py = xy[1] * (geo.W / chart.getBoundingClientRect().width);
+    var hit = null, hd = 12;
+    geo.marks.forEach(function (mk) { var d = Math.hypot(mk.x - px, mk.y - py); if (d < hd) { hd = d; hit = mk; } });
+    if (hit) { geo.cross.setAttribute("visibility", "hidden"); markTip(hit); return; }
+    if (py > geo.m.t + geo.ih) { tip.style.display = "none"; geo.cross.setAttribute("visibility", "hidden"); return; }
+    var i = nearestPoint(px), x = geo.X(ts(P[i].t));
+    geo.cross.setAttribute("x1", x); geo.cross.setAttribute("x2", x); geo.cross.setAttribute("visibility", "visible");
+    pointTip(i, x * chart.getBoundingClientRect().width / geo.W);
+  });
+  chart.addEventListener("pointerleave", function () { tip.style.display = "none"; if (geo) geo.cross.setAttribute("visibility", "hidden"); });
+  chart.addEventListener("click", function (ev) {
+    if (!geo) return;
+    var xy = pos(ev), py = xy[1] * (geo.W / chart.getBoundingClientRect().width);
+    if (py > geo.m.t + geo.ih) return;
+    state.sel = nearestPoint(xy[0]); renderChart(); renderBreakdown();
+  });
+  chart.addEventListener("keydown", function (ev) {
+    if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+    ev.preventDefault();
+    state.sel = Math.max(0, Math.min(P.length - 1, state.sel + (ev.key === "ArrowRight" ? 1 : -1)));
+    renderChart(); renderBreakdown();
+    var x = geo.X(ts(P[state.sel].t)); pointTip(state.sel, x * chart.getBoundingClientRect().width / geo.W);
+  });
+
+  // -- per-unit breakdown at the selected point -----------------------------------
+  function renderBreakdown() {
+    var seg = document.getElementById("seg"), sl = document.getElementById("seg-legend"), rk = document.getElementById("ranked");
+    clear(seg); clear(sl); clear(rk);
+    var dev = state.dev, p = P[state.sel];
+    if (!dev || !p) return;
+    var row = p.devs[dev] || { debt: {}, und: {} };
+    var idx = row.index;
+    document.getElementById("bd-title").textContent = "Where " + short(dev) + "'s debt is on " + day(p.t);
+    document.getElementById("bd-sub").textContent = "Debt index " + fmt(idx) + " at " + p.sha.slice(0, 8) +
+      ": each unit's importance x (1 - understanding), as a share of the index. " + Object.keys(p.units).length + " units existed then.";
+    // colours: the units with most debt at the latest point keep one slot each, after the developers' slots
+    var latest = (last.devs[dev] || {}).debt || {};
+    var nColored = Math.max(0, Math.min(5, 8 - devs.length));
+    var colored = Object.keys(latest).sort(function (a, b) { return latest[b] - latest[a]; }).slice(0, nColored);
+    var parts = [], other = 0, total = 0;
+    Object.keys(row.debt).forEach(function (u) { total += row.debt[u]; if (colored.indexOf(u) < 0) other += row.debt[u]; });
+    colored.forEach(function (u, k) { if (row.debt[u]) parts.push({ u: u, v: row.debt[u], c: color(devs.length + k), slot: devs.length + k }); });
+    if (other > 0) parts.push({ u: null, v: other, c: "var(--other)" });
+    seg.setAttribute("aria-label", parts.map(function (q) { return (q.u ? unitName[q.u] : "other units") + " " + fmt(q.v); }).join(", "));
+    var segW = seg.clientWidth || 600;
+    parts.forEach(function (q) {
+      var b = el("div"); b.style.flex = q.v + " 1 0"; b.style.background = q.c;
+      var label = Math.round(100 * q.v / (total || 1)) + "%";
+      if ((q.slot === 3 || q.u === null) && cssVar("color-scheme") !== "dark") b.className = "dark";
+      if (segW * q.v / (total || 1) > 8 * label.length + 14) b.textContent = label;
+      b.title = (q.u ? unitName[q.u] : "Other units") + ": " + fmt(q.v) + " of " + fmt(total);
+      seg.appendChild(b);
+      var key = el("span", { "class": "key" }); var sw = el("b"); sw.style.background = q.c;
+      key.appendChild(sw); key.appendChild(document.createTextNode(q.u ? unitName[q.u] : "other units")); sl.appendChild(key);
+    });
+    var ids = Object.keys(row.und).sort(function (a, b) { return (row.debt[b] || 0) - (row.debt[a] || 0); });
+    var mx = Math.max.apply(null, ids.map(function (u) { return row.debt[u] || 0; }).concat([1]));
+    var mine = D.responsibility[dev] || null, outside = 0;
+    ids.forEach(function (u) {
+      var inIndex = row.debt[u] != null;
+      if (!inIndex && mine && mine.indexOf(u) < 0) outside++;
+      rk.appendChild(el("div", { "class": "name" }, unitName[u] || u));
+      var barBox = el("div"); var bar = el("div", { "class": "bar" });
+      bar.style.width = Math.max(1, 100 * (row.debt[u] || 0) / mx) + "%"; bar.style.background = devColor(dev);
+      if (!inIndex) bar.style.opacity = "0.25";
+      barBox.appendChild(bar); rk.appendChild(barBox);
+      var val = el("div", { "class": "val" });
+      val.appendChild(el("strong", null, inIndex ? fmt(row.debt[u]) : "-"));
+      val.appendChild(document.createTextNode("  und " + fmt(row.und[u], 2)));
+      rk.appendChild(val);
+    });
+    document.getElementById("bd-note").textContent = (outside ? outside + " unit(s) outside " + short(dev) + "'s responsibility set count no debt (bar faded, -). " : "") +
+      "und = understanding then (0-1)" + ((row.quizzed || []).length ? "; quizzed: " + row.quizzed.join(", ") : "; no quiz yet, so it is the own-commit prior") + ".";
+  }
+
+  // -- tables ---------------------------------------------------------------------
+  function table(id, heads, rows) {
+    var t = document.getElementById(id); clear(t);
+    var thead = el("thead"), tr = el("tr");
+    heads.forEach(function (h) { tr.appendChild(el("th", h.num ? { "class": "num" } : null, h.t)); });
+    thead.appendChild(tr); t.appendChild(thead);
+    var tb = el("tbody");
+    rows.forEach(function (r) {
+      var row = el("tr", r.cls ? { "class": r.cls } : null);
+      r.cells.forEach(function (c, i) {
+        var cls = heads[i].num ? "num" : heads[i].wrap ? "wrap" : heads[i].nowrap ? "nowrap" : null;
+        var td = el("td", cls ? { "class": cls } : null);
+        if (c instanceof Node) td.appendChild(c); else td.textContent = c == null ? "-" : c;
+        row.appendChild(td);
+      });
+      tb.appendChild(row);
+    });
+    t.appendChild(tb);
+  }
+  function renderContributors() {
+    table("contributors",
+      [{ t: "Contributor", wrap: true }, { t: "Label", nowrap: true }, { t: "Commits", num: true }, { t: "ai / assisted / human / bot", num: true }, { t: "Active", nowrap: true }],
+      (D.contributors || []).map(function (c) {
+        return { cells: [c.name, c.label, String(c.commits), c.ai + " / " + c.assisted + " / " + c.human + " / " + c.bot, day(c.first) + " to " + day(c.last)] };
+      }));
+  }
+  function renderUnits() {
+    var dev = state.dev, target = D.settings.bus_target;
+    document.getElementById("units-sub").textContent = "Top-level units now; you% and und for " + (dev || "nobody") +
+      "; holders understand the unit at >= " + D.settings.known_threshold + " (bus target " + target + ").";
+    var rows = top.slice().sort(function (a, b) { return (b.importance || 0) - (a.importance || 0); }).map(function (u) {
+      var ok = u.holders.length >= target;
+      var bus = el("span", { "class": "badge" });
+      var s = sv("svg", { width: 10, height: 10, viewBox: "0 0 10 10", "aria-hidden": "true" });
+      var c = sv("circle", { cx: 5, cy: 5, r: 4 }); c.setAttribute("fill", ok ? "var(--good)" : "var(--serious)"); s.appendChild(c);
+      bus.appendChild(s); bus.appendChild(document.createTextNode(u.holders.length + "/" + target + (ok ? "" : " below")));
+      var name = u.name || u.id; if (u.scope !== "architectural") name += " (blackbox)";
+      return { cells: [name, fmt(u.importance, 2), Math.round(100 * u.ai_share) + "%",
+        dev && u.you[dev] != null ? Math.round(100 * u.you[dev]) + "%" : "-",
+        dev && u.understanding[dev] != null ? fmt(u.understanding[dev], 2) : "-", bus,
+        (u.responsible || []).join(", ") || "nobody"] };
+    });
+    table("units", [{ t: "Unit", wrap: true }, { t: "imp", num: true }, { t: "ai%", num: true }, { t: "you%", num: true }, { t: "und", num: true }, { t: "Holders" }, { t: "Responsible", wrap: true }], rows);
+  }
+  function renderRisk() {
+    var ev = strongEvents().slice().sort(function (a, b) { return a.landed < b.landed ? 1 : a.landed > b.landed ? -1 : 0; });
+    if (state.dev) ev = ev.filter(function (e) { return e.dev === state.dev; }).concat(ev.filter(function (e) { return e.dev !== state.dev; }));
+    var more = document.getElementById("risk-more");
+    var shown = state.riskAll ? ev : ev.slice(0, 20);
+    more.hidden = ev.length <= 20 || state.riskAll;
+    more.textContent = "Show all " + ev.length;
+    table("risk", [{ t: "Landed", nowrap: true }, { t: "Level" }, { t: "Unit", wrap: true }, { t: "mass", num: true }, { t: "und then", num: true }, { t: "weight", num: true }, { t: "Developer" }, { t: "Commit", wrap: true }],
+      shown.map(function (e) {
+        var u = e.unit.split(" ")[0];
+        return { cells: [day(e.landed), badge(e.level), (unitName[u] || u) + (e.in_set === false ? " (outside set)" : ""), fmt(e.mass, 2), fmt(e.understanding, 2), fmt(e.weight, 2), e.dev, e.sha.slice(0, 8) + " " + e.subject] };
+      }));
+    if (!shown.length) table("risk", [{ t: "No risk events at this level." }], []);
+  }
+  document.getElementById("risk-more").addEventListener("click", function () { state.riskAll = true; renderRisk(); });
+  function renderSeries() {
+    var heads = [{ t: "Date" }, { t: "sha" }, { t: "commits", num: true }, { t: "agent share", num: true }].concat(devs.map(function (d) { return { t: short(d), num: true }; }));
+    table("series", heads, P.map(function (p, i) {
+      return { cells: [day(p.t), p.sha.slice(0, 8), String(p.commits), Math.round(100 * aiShare(p.mass)) + "%"].concat(devs.map(function (d) { return fmt(indexAt(d, i)); })) };
+    }));
+  }
+  document.getElementById("foot").textContent = "udebt export format v" + D.version + "; " + (D.evidence || []).length +
+    " evidence records, " + (D.risk_events || []).length + " risk events, " + (D.heavy_commits || []).length + " heavy commits.";
+
+  function renderAll() { renderTiles(); renderChart(); renderBreakdown(); renderUnits(); renderRisk(); }
+  renderAll(); renderContributors(); renderSeries();
+  var rt = null;
+  window.addEventListener("resize", function () { clearTimeout(rt); rt = setTimeout(function () { renderChart(); renderBreakdown(); }, 80); });
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    if (mq.addEventListener) mq.addEventListener("change", renderBreakdown);
+  }
+})();
+</script>
+</body>
+</html>
