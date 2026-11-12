@@ -88,6 +88,57 @@ GRADE_SCHEMA: dict[str, Any] = {
 }
 
 
+WEIGH_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "commits": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "sha": {"type": "string"},
+                    "klass": {
+                        "type": "string",
+                        "enum": ["architectural", "behavioural", "refactor", "cosmetic"],
+                    },
+                    "note": {"type": "string"},
+                },
+                "required": ["sha", "klass", "note"],
+            },
+        }
+    },
+    "required": ["commits"],
+}
+
+
+def weigh_prompt(items: list[dict[str, Any]]) -> str:
+    lines = []
+    for it in items:
+        lines.append(
+            f"- sha: {it['sha']}  [{it['klass']}] {it['date']}  {it['subject']}\n"
+            f"  files ({it['n_files']}): {', '.join(it['files'][:10])}\n"
+            f"  +{it['insertions']} -{it['deletions']}; heuristic weight {it['weight']} "
+            f"({'; '.join(it['reasons'])})"
+        )
+    return f"""TASK: weigh
+
+Classify how much a developer must understand after each commit below lands in the
+repository in the current directory. You may use the read-only tools to look at the files a
+commit names (the current version; `git show` is not available). Classes:
+- architectural: adds or swaps a dependency, data store, schema, protocol, framework,
+  concurrency or error model, deployment target, or a module boundary. Someone who does not
+  understand this commit cannot change the area safely.
+- behavioural: changes what the code does within the existing design (features, fixes).
+- refactor: moves or restructures code without changing behaviour.
+- cosmetic: formatting, comments, docs, renames of identifiers, lockfiles.
+
+Return the sha exactly as given and a one-sentence note on why.
+
+Commits:
+{chr(10).join(lines)}
+"""
+
+
 def map_prompt(
     file_list: list[str], max_units: int, history: list[dict[str, Any]], tree: str | None = None
 ) -> str:

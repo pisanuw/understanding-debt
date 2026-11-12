@@ -2,6 +2,7 @@
 
 map.json             shared architectural map (commit this)
 records/<slug>.jsonl one developer's evidence, append-only (commit this for team view)
+commits.json         per-commit weights (heuristic, LLM-refined for the heaviest); commit this
 config.json          optional settings (model, decay)
 """
 
@@ -28,6 +29,7 @@ class Config:
     decay_per_commit: float = 0.9
     evidence_window: int = 5
     known_threshold: float = 0.6
+    refine_top: int = 40  # how many of the heaviest commits `udebt weigh --refine` classifies
     identities: dict[str, list[str]] = field(default_factory=dict)  # primary email -> aliases
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -54,6 +56,7 @@ class Config:
             "decay_per_commit": self.decay_per_commit,
             "evidence_window": self.evidence_window,
             "known_threshold": self.known_threshold,
+            "refine_top": self.refine_top,
             "identities": self.identities,
         }
         d.update(self.extra)
@@ -67,6 +70,7 @@ class Store:
         self.map_path = self.dir / "map.json"
         self.records_dir = self.dir / "records"
         self.config_path = self.dir / "config.json"
+        self.weights_path = self.dir / "commits.json"
 
     # -- lifecycle -----------------------------------------------------------
     def exists(self) -> bool:

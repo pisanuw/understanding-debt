@@ -12,18 +12,23 @@ udebt dig [<id>]           guided walkthrough of the worst unit (or a chosen one
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 from . import __version__, repo, scoring
+from . import risk as risk_mod
+from .contributors import as_dict, contributors, grouped
 from .dig import walkthrough
 from .llm import LLMError, get_llm
-from .mapping import build_map, commits_for
+from .mapping import build_map, commits_for, rescore_map, weights_for
+from .prompts import WEIGH_SCHEMA, weigh_prompt
 from .provenance import summarize, unit_provenance
 from .quiz import ask_interactively, compute_scores, generate_questions, grade, pick_units
 from .quiz import record as record_results
 from .store import Store
+from .weights import apply_refinement, save_cache
 
 
 def _ctx(args) -> tuple[Path, Store]:
@@ -64,6 +69,11 @@ def cmd_init(args) -> int:
 def cmd_map(args) -> int:
     root, store = _ctx(args)
     store.require()
+    if args.rescore:
+        data = rescore_map(root, store)
+        print(f"Rescored {len(data['units'])} units with current commit weights (no LLM call).")
+        _print_units(data["units"])
+        return 0
     llm = _llm(store, args)
     print("Mapping architecture with claude (this reads the code; expect a minute or two)...")
     try:
@@ -149,6 +159,7 @@ def cmd_status(args) -> int:
     by_id = {u["id"]: u for u in units}
     cfg = store.config
     commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
 
     if getattr(args, "team", False):
         per_dev = {}
@@ -185,25 +196,31 @@ def cmd_status(args) -> int:
 
     email = _email(args, root)
     mine = cfg.emails_for(email)
-    scores = compute_scores(root, store, units, email, commits=commits)
+    scores = compute_scores(root, store, units, email, commits=commits, weights=weights)
     print(f"\nUnderstanding debt for {email} at {repo.head(root)[:8]}")
     print(_prov_line(commits, mine))
     print(f"{'unit':<22} {'imp':>5} {'ai%':>4} {'you%':>4} {'und':>5}  {'debt':>5}  {'':<10} note")
     for s_ in sorted(scores, key=lambda s_: -s_.debt):
         u = by_id[s_.unit_id]
-        prov = unit_provenance(commits, u.get("paths", []), mine)
+        prov = unit_provenance(commits, u.get("paths", []), mine, weights)
         if s_.scope != "architectural":
             note = "blackbox (excluded)"
         elif s_.source == "none":
             note = "unmeasured"
         elif s_.source == "prior" and s_.understanding < 0.005:
-            note = f"prior from your commits eroded by {prov.others_since_dev} commits by others"
+            note = (
+                f"prior from your commits eroded by {prov.others_since_dev} commits "
+                f"(mass {prov.others_since_dev_w}) by others"
+            )
         elif s_.source == "prior":
             note = "prior from your commits"
             if prov.others_since_dev:
-                note += f", {prov.others_since_dev} commits by others since"
+                note += (
+                    f", {prov.others_since_dev} commits (mass {prov.others_since_dev_w}) "
+                    f"by others since"
+                )
         elif s_.commits_since:
-            note = f"quiz, decayed from {s_.verified:.2f}"
+            note = f"quiz, decayed from {s_.verified:.2f} by mass {s_.commits_since}"
         else:
             note = "quiz"
         print(
@@ -232,8 +249,10 @@ def cmd_history(args) -> int:
     email = _email(args, root)
     mine = store.config.emails_for(email)
     commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
     scores = {
-        s_.unit_id: s_ for s_ in compute_scores(root, store, m["units"], email, commits=commits)
+        s_.unit_id: s_
+        for s_ in compute_scores(root, store, m["units"], email, commits=commits, weights=weights)
     }
     by_sha: dict[str, dict[str, Any]] = {}
     for u in m["units"]:
@@ -250,9 +269,13 @@ def cmd_history(args) -> int:
         if r["klass"] != "ai" and (r.get("email") or "").lower() in mine:
             who = "you" if r["klass"] == "human" else "you+ai"
         units = ", ".join(f"{uid} ({scores[uid].understanding:.2f})" for uid in r["units"])
-        print(f"{r['date']}  {r['sha']}  {who:<7} {r['subject'][:70]}")
+        w = next((v.weight for k, v in weights.items() if k.startswith(r["sha"])), 0.0)
+        print(f"{r['date']}  {r['sha']}  {who:<7} w={w:<5} {r['subject'][:62]}")
         print(f"{'':<30}-> {units}")
-    print("\nNumbers in parentheses are your current understanding of that unit (0-1).")
+    print(
+        "\nNumbers in parentheses are your current understanding of that unit (0-1); "
+        "w is the commit's weight (0-1)."
+    )
     print("you+ai = you committed it with an AI co-author. ai = an agent authored it.")
     return 0
 
@@ -316,6 +339,162 @@ def cmd_dig(args) -> int:
     return 0
 
 
+def cmd_contributors(args) -> int:
+    root, store = _ctx(args)
+    store.require()
+    cfg = store.config
+    email = _email(args, root)
+    commits = commits_for(root, store)
+    cons = contributors(commits, cfg.identities, cfg.emails_for(email))
+    if args.json:
+        import json as _json
+
+        print(_json.dumps([as_dict(c) for c in cons], indent=2))
+        return 0
+    print(f"\n{_prov_line(commits, cfg.emails_for(email))}\n")
+    for label, group in grouped(cons).items():
+        if not group:
+            continue
+        print(f"## {label}")
+        for c in group:
+            you = "  <- you" if c.is_you else ""
+            print(
+                f"  {c.name:<28} {c.commits:>5} commits  (ai {c.ai}, assisted {c.assisted}, "
+                f"human {c.human})  {c.first}..{c.last}  conf {c.confidence:.2f}{you}"
+            )
+            print(f"  {'':<28} {', '.join(c.emails)}")
+            print(f"  {'':<28} {'; '.join(c.reasons)}")
+        print()
+    print(
+        "Labels other than AI, Bot and Joint are advisory, from commit metadata only. "
+        "Merge identities with `udebt alias`."
+    )
+    return 0
+
+
+def cmd_weigh(args) -> int:
+    root, store = _ctx(args)
+    store.require()
+    commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
+    by_sha = {c.sha: c for c in commits}
+    if args.refine:
+        n = args.refine if args.refine > 0 else store.config.refine_top
+        cands = sorted(
+            (w for w in weights.values() if w.refined is None and w.weight >= 0.3),
+            key=lambda w: -w.weight,
+        )[:n]
+        if not cands:
+            print("Nothing left to refine.")
+        else:
+            llm = _llm(store, args)
+            items = []
+            for w in cands:
+                c = by_sha[w.sha]
+                items.append(
+                    {
+                        "sha": c.short,
+                        "klass": c.klass,
+                        "date": c.date[:10],
+                        "subject": c.subject[:100],
+                        "n_files": len(c.files),
+                        "files": c.files,
+                        "insertions": c.insertions,
+                        "deletions": c.deletions,
+                        "weight": w.weight,
+                        "reasons": w.reasons,
+                    }
+                )
+            print(f"Refining {len(items)} heaviest commits with claude...")
+            try:
+                res = llm.structured(weigh_prompt(items), WEIGH_SCHEMA, cwd=root, read_tools=True)
+            except LLMError as e:
+                raise SystemExit(str(e)) from e
+            changed = apply_refinement(weights, res.get("commits", []))
+            save_cache(store.weights_path, weights)
+            print(f"Refined {changed} commits.")
+    total = sum(w.weight for w in weights.values())
+    print(
+        f"\n{len(weights)} commits, total mass {total:.1f} "
+        f"(mean {total / max(1, len(weights)):.2f}); heaviest first:"
+    )
+    print(f"{'sha':<8} {'w':>5} {'by':<9} {'date':<10} subject / reasons")
+    shown = sorted(weights.values(), key=lambda w: -w.weight)[: args.top]
+    for w in shown:
+        c = by_sha.get(w.sha)
+        if not c:
+            continue
+        tag = f"{'*' if w.refined else ' '}{w.weight:.2f}"
+        print(f"{c.short:<8} {tag:>5} {c.klass:<9} {c.date[:10]:<10} {c.subject[:60]}")
+        print(f"{'':<35} {'; '.join(w.reasons)}")
+    print("\n* = LLM-refined. Weight 0 = cannot create debt (merges, lockfiles, whitespace).")
+    return 0
+
+
+def cmd_risk(args) -> int:
+    root, store = _ctx(args)
+    store.require()
+    m = store.require_map()
+    cfg = store.config
+    email = _email(args, root)
+    commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
+    scores = {
+        s_.unit_id: s_
+        for s_ in compute_scores(root, store, m["units"], email, commits=commits, weights=weights)
+    }
+    if args.staged:
+        c, w = risk_mod.staged_commit(root)
+        changes, wmap = [c], {**weights, c.sha: w}
+        what = f"staged changes ({len(c.files)} files, weight {w.weight})"
+    else:
+        rng = args.range or "@{upstream}..HEAD"
+        changes = risk_mod.commits_in_range(root, rng, commits)
+        wmap = weights
+        what = f"{rng} ({len(changes)} commits)"
+    if not changes or (args.staged and not changes[0].files):
+        print(f"Nothing to assess in {what}.")
+        return 0
+    risks = risk_mod.assess(m["units"], scores, changes, wmap, cfg.known_threshold)
+    level = risk_mod.overall(risks)
+    print(f"\nRisk for {email}: {what}  ->  {level}")
+    if not risks:
+        print("No architectural unit touched.")
+        return 0
+    print(f"{'level':<8} {'unit':<22} {'mass':>5} {'und':>5}  files")
+    for r in risks:
+        print(
+            f"{r.level:<8} {r.unit_id:<22} {r.mass:>5.2f} {r.understanding:>5.2f}  "
+            f"{', '.join(r.files)}"
+        )
+    worst = next((r for r in risks if r.level != "OK"), None)
+    if worst:
+        print(
+            f"\nmass = weight landed in the unit by these changes; und = your understanding "
+            f"({worst.source}). Raise it: `udebt dig {worst.unit_id}` (a few minutes)."
+        )
+    if level == "HIGH" and args.strict:
+        return 1
+    return 0
+
+
+def cmd_hook(args) -> int:
+    root, store = _ctx(args)
+    store.require()
+    hooks_path = subprocess.run(
+        ["git", "config", "core.hooksPath"], cwd=root, capture_output=True, text=True
+    ).stdout.strip()
+    hook_dir = (root / hooks_path) if hooks_path else (root / ".git" / "hooks")
+    hook_dir.mkdir(parents=True, exist_ok=True)
+    target = hook_dir / "pre-push"
+    if target.exists() and "udebt" not in target.read_text(encoding="utf-8"):
+        raise SystemExit(f"{target} exists and is not udebt's. Add `udebt risk` to it by hand.")
+    target.write_text(risk_mod.PRE_PUSH_HOOK, encoding="utf-8")
+    target.chmod(0o755)
+    print(f"Installed warn-only pre-push hook at {target}")
+    return 0
+
+
 # -- parser ------------------------------------------------------------------
 
 
@@ -334,6 +513,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("map", help="extract architectural units")
     s.add_argument("--max-units", type=int, default=12)
+    s.add_argument(
+        "--rescore",
+        action="store_true",
+        help="recompute churn/importance/provenance with current weights, no LLM",
+    )
     s.set_defaults(fn=cmd_map)
 
     sub.add_parser("units", help="list units").set_defaults(fn=cmd_units)
@@ -360,6 +544,32 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("alias", help="record other emails you have committed under")
     s.add_argument("emails", nargs="+")
     s.set_defaults(fn=cmd_alias)
+
+    s = sub.add_parser("contributors", help="who contributed, sorted by kind")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(fn=cmd_contributors)
+
+    s = sub.add_parser("weigh", help="per-commit weights")
+    s.add_argument(
+        "--refine",
+        nargs="?",
+        const=-1,
+        type=int,
+        default=None,
+        help="LLM-refine the N heaviest unrefined commits (default from config)",
+    )
+    s.add_argument("--top", type=int, default=15, help="how many to list")
+    s.set_defaults(fn=cmd_weigh)
+
+    s = sub.add_parser("risk", help="risk of a change against your understanding")
+    s.add_argument("range", nargs="?", help="git revision range (default @{upstream}..HEAD)")
+    s.add_argument("--staged", action="store_true", help="assess the staged diff instead")
+    s.add_argument("--strict", action="store_true", help="exit 1 on HIGH")
+    s.set_defaults(fn=cmd_risk)
+
+    s = sub.add_parser("hook", help="git hooks")
+    s.add_argument("action", choices=["install"])
+    s.set_defaults(fn=cmd_hook)
 
     s = sub.add_parser("dig", help="guided walkthrough of a unit")
     s.add_argument("unit", nargs="?")

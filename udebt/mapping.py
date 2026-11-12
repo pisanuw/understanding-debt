@@ -1,5 +1,5 @@
-"""Build the architectural map: history mining + LLM proposes units; we attach churn,
-importance and provenance."""
+"""Build the architectural map: history mining + LLM proposes units; we attach weighted
+churn, importance and provenance. `rescore_map` redoes the numbers without the LLM."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from .llm import LLM
 from .prompts import MAP_SCHEMA, map_prompt
 from .provenance import Commit, load_commits, load_signatures, summarize, unit_provenance
 from .store import Store, now_iso
+from .weights import CommitWeight, ensure_weights
 
 IGNORED_PREFIXES = (".git/", ".udebt/", "node_modules/", "dist/", "build/", "__pycache__/")
 FILE_LIST_LIMIT = 400
@@ -26,6 +27,58 @@ def commits_for(root: Path, store: Store) -> list[Commit]:
     return load_commits(root, sigs)
 
 
+def weights_for(root: Path, store: Store, commits: list[Commit]) -> dict[str, CommitWeight]:
+    return ensure_weights(root, store.weights_path, commits, rename_shas(root))
+
+
+def unit_mass(commits: list[Commit], paths: list[str], weights: dict[str, CommitWeight]) -> float:
+    """Weighted mass landed on `paths`: each commit's weight times its attribution to the
+    paths (square root of the line share)."""
+    return round(
+        sum(
+            weights[c.sha].weight * c.attribution(paths)
+            for c in commits
+            if c.sha in weights and c.touches(paths)
+        ),
+        3,
+    )
+
+
+def attach_scores(
+    units: list[dict[str, Any]], commits: list[Commit], weights: dict[str, CommitWeight]
+) -> None:
+    for u in units:
+        u["churn"] = unit_mass(commits, u["paths"], weights)
+        prov = unit_provenance(commits, u["paths"], None, weights)
+        u["provenance"] = {
+            "total": prov.total,
+            "ai": prov.ai,
+            "assisted": prov.assisted,
+            "human": prov.human,
+            "ai_share": round(prov.ai_share, 2),
+            "mass": prov.total_w,
+            "first": (prov.first_date or "")[:10],
+            "last": (prov.last_date or "")[:10],
+        }
+    max_churn = max((u["churn"] for u in units), default=0)
+    for u in units:
+        u["importance"] = scoring.importance(u.get("centrality", 3), u["churn"], max_churn)
+
+
+def rescore_map(root: Path, store: Store) -> dict[str, Any]:
+    """Recompute churn, importance and provenance for the existing units with the current
+    commit weights. No LLM call."""
+    data = store.require_map()
+    commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
+    attach_scores(data["units"], commits, weights)
+    data["rescored_at"] = now_iso()
+    data["head"] = repo.head(root)
+    data["repo_provenance"] = summarize(commits)
+    store.save_map(data)
+    return data
+
+
 def build_map(
     root: Path, store: Store, llm: LLM, *, max_units: int = 12, max_history: int = 40
 ) -> dict[str, Any]:
@@ -33,7 +86,9 @@ def build_map(
     if not files:
         raise SystemExit("No tracked files to map. Commit something first.")
     commits = commits_for(root, store)
-    candidates = decision_candidates(commits, rename_shas(root), max_history)
+    renames = rename_shas(root)
+    weights = ensure_weights(root, store.weights_path, commits, renames)
+    candidates = decision_candidates(commits, renames, max_history)
     tree = tree_summary(files) if len(files) > FILE_LIST_LIMIT else None
 
     result = llm.structured(
@@ -51,27 +106,13 @@ def build_map(
     for u in units:
         uid = u["id"] = _unique(u["id"], seen)
         u["paths"] = [p.rstrip("/") for p in u.get("paths", []) if p]
-        u["churn"] = repo.commit_count(root, u["paths"])
         u["scope"] = previous.get(uid, {}).get("scope", "architectural")
         hist = [by_sha[s[:7]] for s in u.pop("shaped_by", []) if s[:7] in by_sha]
         u["history"] = [
             {k: h.get(k) for k in ("sha", "date", "klass", "agent", "author", "email", "subject")}
             for h in hist
         ]
-        prov = unit_provenance(commits, u["paths"], None)
-        u["provenance"] = {
-            "total": prov.total,
-            "ai": prov.ai,
-            "assisted": prov.assisted,
-            "human": prov.human,
-            "ai_share": round(prov.ai_share, 2),
-            "first": (prov.first_date or "")[:10],
-            "last": (prov.last_date or "")[:10],
-        }
-
-    max_churn = max((u["churn"] for u in units), default=0)
-    for u in units:
-        u["importance"] = scoring.importance(u.get("centrality", 3), u["churn"], max_churn)
+    attach_scores(units, commits, weights)
 
     data = {
         "version": 2,

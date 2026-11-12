@@ -37,11 +37,16 @@ on your PATH and logged in.
 cd your-repo
 udebt init                    # creates .udebt/
 udebt alias other@me.org       # other addresses you have committed under (optional)
+udebt contributors             # everyone who committed: AI, joint human-AI, human, bot, "most likely"
+udebt weigh [--refine]         # how much debt each commit can create; --refine asks claude about the heaviest
 udebt map                     # mines history, claude reads the code, writes .udebt/map.json
+udebt map --rescore            # redo churn/importance/provenance with current weights, no LLM
 udebt status                   # debt per unit; ai% and you% show who wrote each unit
 udebt history                  # the decisions that shaped the repo, oldest first, with who made them
 udebt quiz -n 5                # answer five decision questions, get graded
 udebt dig                      # walkthrough of the highest-debt unit, then a check question
+udebt risk [range|--staged]    # weight a change lands in each unit vs your understanding of it
+udebt hook install             # warn-only pre-push hook that runs `udebt risk`
 udebt scope <unit> blackbox    # "I choose not to understand this"; excluded from the index
 udebt status --team            # who holds which unit; bus factor per unit
 ```
@@ -51,15 +56,31 @@ file holds one developer's quiz history, so the team view and bus factor work fo
 
 ## The model
 
+**Commit weight.** Not every commit can create debt. Each commit gets a weight in [0, 1]
+from cheap git signals: whitespace-only changes, pure renames, lockfiles, generated files
+and docs-only commits weigh about 0.05; test-only changes are discounted; size (whitespace-
+ignored lines, log scale), dependency and infrastructure changes, new code files, new
+top-level directories and changes spanning several directories push the weight up; merges
+weigh 0. `udebt weigh --refine` asks the model to classify the heaviest commits as
+architectural, behavioural, refactor or cosmetic and blends that in. Weights are cached in
+`.udebt/commits.json`. When a commit touches several units, each unit receives the commit's
+weight times the square root of the share of changed lines that fell in that unit. The
+square root is deliberate: a unit that got a tenth of a large architectural commit carries
+about a third of its debt, because a new dependency or a changed model spills past the lines
+it touched there. A commit confined to one unit lands its full weight.
+
+Everything below that used to be a commit count is now a sum of weights ("mass").
+
 For each architectural unit `u` and developer `d`:
 
 | quantity | definition |
 |---|---|
 | evidence of one answer | correct 1.0, partial 0.5, wrong 0.0, unknown 0.0, **confidently wrong -0.5** |
 | verified understanding | mean evidence over the last 5 answers on `u`, clamped to [0, 1] |
-| understanding | verified x 0.9^(commits touching `u` since the last answer) |
-| prior (no quiz yet) | 0.5 x your share of the unit's commits x 0.9^(commits by others since your last one) |
-| importance | 0.6 x centrality/5 + 0.4 x churn/max churn, centrality rated 1-5 by the mapper |
+| understanding | verified x 0.9^(mass landed on `u` since the last answer) |
+| prior (no quiz yet) | 0.5 x your weighted share of `u` x 0.9^(mass others landed since your last commit) |
+| importance | 0.6 x centrality/5 + 0.4 x mass/max mass, centrality rated 1-5 by the mapper |
+| risk of a change | per unit touched: mass landed vs your understanding; HIGH if mass >= 0.3 and understanding < 0.3, CAUTION if mass >= 0.1 and understanding < 0.6; the change's verdict is its worst unit |
 | debt(u) | importance x (1 - understanding), architectural units only |
 | debt index | 100 x sum(debt) / sum(importance) |
 
@@ -78,6 +99,15 @@ choices:
 
 Team view takes the maximum understanding across developers per unit and counts how many
 developers clear the known threshold (default 0.6). That count is the unit's bus factor.
+
+## Contributors
+
+`udebt contributors` merges identities (through `.mailmap` and `udebt alias`) and labels
+each one. **AI**, **Bot** and **Joint human-AI** come from explicit signals (agent author
+identities, bot-like names, agent trailers on a material share of commits). **Most likely
+AI** and **Most likely human** come from commit metadata only: burst cadence, long
+bullet-list bodies, uniformly conventional subjects. Those two are advisory and never
+feed the scores.
 
 ## Recognised AI agents
 

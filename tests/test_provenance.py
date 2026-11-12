@@ -62,13 +62,16 @@ def test_unit_provenance_and_prior(mixed_repo):
     # scoring.py: initial (dev1), clamp (ai), float literal (dev2)
     p = unit_provenance(cs, ["udebt/scoring.py"], "dev1@example.com")
     assert (p.total, p.ai, p.human, p.dev_human, p.others_since_dev) == (3, 1, 2, 1, 2)
-    assert abs(p.dev_share - 1 / 3) < 1e-9
-    prior = scoring.prior_understanding(p.dev_share, p.others_since_dev, 0.9)
-    assert abs(prior - 0.5 * (1 / 3) * 0.81) < 1e-9
+    # unweighted (every commit weighs 1) but split by line share: the initial commit put
+    # only part of its lines into scoring.py, the two later ones all of theirs
+    assert p.others_since_dev_w == 2 and 2 < p.total_w < 3
+    assert abs(p.dev_share - p.dev_w / p.total_w) < 1e-9 and 0 < p.dev_share < 1 / 3
+    prior = scoring.prior_understanding(p.dev_share, p.others_since_dev_w, 0.9)
+    assert abs(prior - 0.5 * p.dev_share * 0.81) < 1e-9
     # store.py: initial + 3 changes (dev1 human) + persist (dev1 assisted) -> no one else since
     p2 = unit_provenance(cs, ["udebt/store.py"], "dev1@example.com")
     assert (p2.total, p2.dev_human, p2.dev_assisted, p2.others_since_dev) == (5, 4, 1, 0)
-    assert p2.dev_share == 0.9
+    assert 0.85 < p2.dev_share < 0.95  # the assisted commit counts half
     # a stranger has no prior at all
     p3 = unit_provenance(cs, ["udebt/store.py"], "nobody@example.com")
     assert p3.dev_share == 0.0 and p3.others_since_dev == 5
@@ -102,3 +105,19 @@ def test_identity_aliases(mixed_repo):
     p = unit_provenance(cs, ["udebt/scoring.py"], {"dev1@example.com", "dev2@example.com"})
     assert (p.dev_human, p.others_since_dev) == (2, 0)
     assert summarize(cs, {"dev1@example.com", "dev2@example.com"})["dev"] == 6
+
+
+def test_share_splits_a_commit_across_units(mixed_repo):
+    cs = load_commits(mixed_repo)
+    persist = next(c for c in cs if c.subject == "persist to json")  # touches store.py + toml
+    assert persist.file_lines["pyproject.toml"] == 2
+    assert 0 < persist.share(["udebt/store.py"]) < 1
+    assert abs(persist.share(["udebt/store.py"]) + persist.share(["pyproject.toml"]) - 1) < 1e-9
+    assert persist.share(["nowhere"]) == 0.0
+    only = next(c for c in cs if c.subject == "float literal")
+    assert only.share(["udebt/scoring.py"]) == 1.0 == only.attribution(["udebt/scoring.py"])
+    # attribution is concave: a small line share still carries a visible part of the weight
+    assert persist.attribution(["pyproject.toml"]) > persist.share(["pyproject.toml"])
+    assert (
+        abs(persist.attribution(["pyproject.toml"]) ** 2 - persist.share(["pyproject.toml"])) < 1e-9
+    )

@@ -47,6 +47,18 @@ acceptable.
   Supabase) with the CLI as the local twin, then validity. Authorship stays a decaying
   prior that may be dropped (Wheeler 2026, "Substrate Collapse").
 
+- **Owner answers 2026-11-12**: hosted uses an org API key; repo owners assign
+  visibility roles; gating advisory with opt-in soft block, never hard; responsibility sets
+  seeded then lead-curated; refine the heaviest 40 commits; metadata-only AI heuristics;
+  languages Python, JS/TS, C++, Rust, Java; live dashboard with sync and export.
+
+- **Commit weight (Phase 1)**: heuristic weight in [0, 1] per commit, LLM-refined for the
+  heaviest, cached in `.udebt/commits.json`; split across units by line share. Every former
+  commit count (churn, decay, provenance, prior) is now weighted mass.
+- **Risk is min over units**, advisory; `udebt risk` and a warn-only pre-push hook.
+- **Contributor labels**: explicit (AI, Bot, Joint) feed nothing but display; "most likely"
+  labels are metadata-only and advisory.
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.

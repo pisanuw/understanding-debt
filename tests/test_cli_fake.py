@@ -30,7 +30,12 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
     ids = [u["id"] for u in m["units"]]
     assert ids == ["scoring", "storage"]  # most central first
     storage = next(u for u in m["units"] if u["id"] == "storage")
-    assert storage["churn"] == 4 and storage["importance"] == 0.88  # 0.6*0.8 + 0.4*1.0
+    scoring_u = next(u for u in m["units"] if u["id"] == "scoring")
+    # churn is weighted mass, not a count: four small commits weigh well under 4
+    assert 0.3 < storage["churn"] < 2.0 and storage["provenance"]["total"] == 4
+    assert storage["churn"] > scoring_u["churn"]
+    imp_storage, imp_scoring = storage["importance"], scoring_u["importance"]
+    assert imp_storage == 0.88  # centrality 4 and max churn: 0.6*0.8 + 0.4*1.0
 
     # dev1 authored every commit, so the own-commit prior gives 0.5 understanding everywhere
     rc, out = run(root, "status", capsys=capsys)
@@ -41,7 +46,7 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
     rc, out = run(root, "--as-user", "new@example.com", "status", capsys=capsys)
     assert "Debt index: 100.0" in out and "unmeasured" in out
 
-    # quiz order is by importance: storage (0.88) then scoring (0.70, one commit of churn).
+    # quiz order is by importance: storage (0.88) then scoring (lower churn).
     # first answer correct (contains "default"), second blank (known unknown)
     answers = iter(["returns a default", "", "3", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt="": next(answers))
@@ -50,9 +55,10 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
     assert "[CORRECT ]" in out and "[UNKNOWN ]" in out
     recs = Store(root).load_records("dev1@example.com")
     assert len(recs) == 2 and recs[0]["head"] == repo.head(root)
-    # storage (0.88) is now understood; scoring (0.70) is a known unknown. The quiz answer
-    # replaces the own-commit prior, so admitting ignorance costs the 0.5 prior.
-    assert "Debt index: 44.3" in out  # 0.70 / 1.58
+    # storage is now understood; scoring is a known unknown. The quiz answer replaces the
+    # own-commit prior, so admitting ignorance costs the 0.5 prior.
+    expected = round(100 * imp_scoring / (imp_storage + imp_scoring), 1)
+    assert f"Debt index: {expected}" in out
 
     # a commit touching store.py decays the understanding we just verified
     (root / "udebt" / "store.py").write_text("STATE = {'v': 'final'}\n")
@@ -60,13 +66,15 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
 
     subprocess.run(["git", "commit", "-q", "-am", "tweak"], cwd=root, check=True)
     rc, out = run(root, "status", capsys=capsys)
-    assert "decayed from 1.00" in out and " 0.90 " in out
+    assert "decayed from 1.00 by mass" in out
 
     # blackbox scope removes a unit from the index
     rc, out = run(root, "scope", "scoring", "blackbox", capsys=capsys)
     assert rc == 0
     rc, out = run(root, "status", capsys=capsys)
-    assert "blackbox (excluded)" in out and "Debt index: 10.0" in out  # only storage at 0.90
+    assert "blackbox (excluded)" in out
+    idx = float(out.split("Debt index: ")[1].split(" ")[0])
+    assert 0 < idx < 10  # only storage left, decayed a little by one small commit
 
     # team view sees the recorded developer
     rc, out = run(root, "status", "--team", capsys=capsys)
@@ -131,3 +139,17 @@ def test_alias_and_history(mixed_repo, capsys):
     assert cfg["identities"] == {"dev1@example.com": ["dev2@example.com"]}
     rc, out = run(root, "status", capsys=capsys)
     assert "yours: 6" in out
+
+
+def test_map_rescore_without_llm(fixture_repo, monkeypatch, capsys):
+    root = fixture_repo
+    run(root, "init", capsys=capsys)
+    run(root, "map", capsys=capsys)
+    before = Store(root).load_map()
+    monkeypatch.setenv("UDEBT_LLM", "none-should-not-be-called")
+    rc, out = run(root, "map", "--rescore", capsys=capsys)
+    assert rc == 0 and "no LLM call" in out
+    after = Store(root).load_map()
+    assert "rescored_at" in after and [u["id"] for u in after["units"]] == [
+        u["id"] for u in before["units"]
+    ]

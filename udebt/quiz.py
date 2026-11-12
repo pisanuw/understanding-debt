@@ -7,10 +7,28 @@ from typing import Any
 
 from . import repo, scoring
 from .llm import LLM
-from .mapping import commits_for
+from .mapping import commits_for, weights_for
 from .prompts import GRADE_SCHEMA, QUESTIONS_SCHEMA, grade_prompt, questions_prompt
 from .provenance import Commit, unit_provenance
 from .store import Store
+
+
+def mass_since(
+    commits: list[Commit], weights: dict[str, Any], paths: list[str], since_sha: str | None
+) -> float:
+    """Weighted mass landed on `paths` after commit `since_sha` (all of it if unknown)."""
+    if since_sha is None:
+        return 0.0
+    idx = next((i for i, c in enumerate(commits) if c.sha == since_sha), -1)
+    later = commits[idx + 1 :] if idx >= 0 else commits
+    return round(
+        sum(
+            (weights[c.sha].weight if c.sha in weights else 1.0) * c.attribution(paths)
+            for c in later
+            if c.touches(paths)
+        ),
+        3,
+    )
 
 
 def compute_scores(
@@ -20,27 +38,30 @@ def compute_scores(
     email: str,
     records: list[dict[str, Any]] | None = None,
     commits: list[Commit] | None = None,
+    weights: dict[str, Any] | None = None,
 ) -> list[scoring.UnitScore]:
-    """Score every unit for one developer. `commits` lets callers share one git log parse."""
+    """Score every unit for one developer. `commits`/`weights` let callers share one parse."""
     cfg = store.config
     recs = store.load_records(email) if records is None else records
     if commits is None:
         commits = commits_for(root, store)
+    if weights is None:
+        weights = weights_for(root, store, commits)
     mine = cfg.emails_for(email)
     out = []
     for u in units:
         unit_recs = [r for r in recs if r.get("unit") == u["id"]]
         since = scoring.last_record_head(unit_recs)
-        n_since = repo.commit_count(root, u.get("paths", []), since) if since else 0
-        prov = unit_provenance(commits, u.get("paths", []), mine)
+        m_since = mass_since(commits, weights, u.get("paths", []), since)
+        prov = unit_provenance(commits, u.get("paths", []), mine, weights)
         prior = scoring.prior_understanding(
-            prov.dev_share, prov.others_since_dev, cfg.decay_per_commit
+            prov.dev_share, prov.others_since_dev_w, cfg.decay_per_commit
         )
         out.append(
             scoring.score_unit(
                 u,
                 unit_recs,
-                n_since,
+                m_since,
                 window=cfg.evidence_window,
                 decay=cfg.decay_per_commit,
                 prior=prior,

@@ -157,6 +157,14 @@ class FakeLLM:
                     for u in ids
                 ]
             }
+        if "TASK: weigh" in prompt:
+            shas = [ln.split()[2] for ln in prompt.splitlines() if ln.startswith("- sha:")]
+            return {
+                "commits": [
+                    {"sha": sh, "klass": "architectural" if i == 0 else "cosmetic", "note": "fake"}
+                    for i, sh in enumerate(shas)
+                ]
+            }
         if "TASK: grade" in prompt:
             n = prompt.count("ANSWER:")
             verdicts = []

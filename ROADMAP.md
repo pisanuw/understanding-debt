@@ -199,9 +199,55 @@ on every number.
 - Hosted storage holds metadata, never source code.
 - Python stays the single implementation language for analysis; the web layer is thin.
 
-## Open questions
+## Decisions taken 2026-11-12 (owner answers to the open questions)
 
-Numbered so they can be answered by number.
+1. **Hosted model billing**: yes, an organisation-supplied API key, encrypted in Supabase,
+   for the hosted worker. The CLI stays on the `claude` subscription locally.
+2. **Visibility**: a permission structure. One or more people are **repo owners**; owners
+   assign who sees what (roles below). Default until an owner changes it: owners and leads
+   see everyone, members see themselves plus team aggregates.
+3. **Gating**: advisory by default; a repo owner can opt in to a soft block where a lead's
+   acknowledgement clears it; never a hard block (see "Gating, explained").
+4. **Responsibility sets**: seed from CODEOWNERS and footprint, lead curates, with the
+   option to let developers declare their own later.
+5. **Weight refinement**: LLM-refine only the heaviest commits per run (default 40),
+   cached forever; the count is a setting.
+6. **"Most likely AI" labels**: metadata only to start (cadence, message shape, trailer
+   onset); content stylometry is a later option.
+7. **Languages** for the import graph: Python and JS/TS, then C++ and Rust, then Java.
+8. **Dashboard**: live (recomputed on push through the webhook), with `udebt sync` to pull
+   and check current debt from the CLI, and `udebt export` for full history (CSV, JSON).
+
+### Permission model (Phase 4)
+
+| role | sees | can |
+|---|---|---|
+| owner | everything | assign roles, set visibility rules, opt the repo into soft blocking, curate responsibility sets |
+| lead | every member's debt in their units | curate responsibility sets, acknowledge soft blocks |
+| member | own debt, team aggregates, and what owners choose to open up | quiz, dig, sync |
+| viewer | aggregates only | nothing |
+
+Owners decide per repo whether members can see each other's individual numbers.
+
+### Gating, explained
+
+"Gating" is what happens when a developer with high debt in a unit lands a non-trivial
+change there. Three levels:
+
+- **Advisory.** A pull-request check that always passes and a local pre-push warning. The
+  message says which unit, how much weight the change lands there, the author's
+  understanding, and the fastest way to raise it (`udebt dig <unit>`, three minutes). This
+  builds trust and cannot be gamed because nothing is at stake.
+- **Soft block.** The check fails, but a lead can acknowledge it (a label or a comment) and
+  the acknowledgement is recorded as the lead taking responsibility for review. This creates
+  the conversation the owner described without stopping work.
+- **Hard block.** The check fails until the author's understanding clears the threshold.
+  Rejected: it turns the quiz into a hoop, invites quiz-gaming, and punishes the junior
+  instead of informing the senior.
+
+udebt defaults to advisory and lets a repo owner opt in to soft blocking per repo.
+
+## Open questions (answered above, kept for the record)
 
 1. **Hosted model billing.** The hosted worker cannot use a developer's `claude` CLI
    subscription. Is an organisation-supplied API key (bring your own key, per org, stored
