@@ -1,12 +1,15 @@
 """udebt command line.
 
-udebt init                 create .udebt/ in this repo
-udebt map                  extract architectural units with the claude CLI
-udebt units                list units with scope and importance
-udebt scope <id> <scope>   mark a unit architectural | blackbox
-udebt quiz [-n N]          answer prediction questions, get graded, record evidence
-udebt status [--team]      debt per unit and a 0-100 debt index
-udebt dig [<id>]           guided walkthrough of the worst unit (or a chosen one)
+udebt init                      create .udebt/ in this repo
+udebt clusters                  structural clusters from imports and co-change (no LLM)
+udebt map                       two-level architectural units with the claude CLI
+udebt units                     list units and sub-units with scope and importance
+udebt responsibility [dev]      who is expected to understand which units (seed, add, remove)
+udebt scope <id> <scope>        mark a unit architectural | blackbox, for you or --team
+udebt quiz [-n N] [--deep]      answer prediction questions, get graded, record evidence
+udebt status [unit] [--deep]    debt per unit and a 0-100 debt index (--team: bus target)
+udebt risk [range]              a change's weight per unit against your understanding
+udebt dig [<id>]                guided walkthrough of the worst unit (or a chosen one)
 """
 
 from __future__ import annotations
@@ -17,12 +20,21 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from . import __version__, repo, scoring
+from . import __version__, repo, scoring, structure
+from . import responsibility as resp_mod
 from . import risk as risk_mod
+from . import units as hier
 from .contributors import as_dict, contributors, grouped
 from .dig import walkthrough
 from .llm import LLMError, get_llm
-from .mapping import build_map, commits_for, rescore_map, weights_for
+from .mapping import (
+    build_map,
+    commits_for,
+    discover,
+    mappable_files,
+    rescore_map,
+    weights_for,
+)
 from .prompts import WEIGH_SCHEMA, weigh_prompt
 from .provenance import summarize, unit_provenance
 from .quiz import ask_interactively, compute_scores, generate_questions, grade, pick_units
@@ -55,6 +67,40 @@ def _bar(x: float, width: int = 10) -> str:
     return "#" * n + "." * (width - n)
 
 
+def _known_emails(store: Store, commits) -> set[str]:
+    cfg = store.config
+    known = {c.author_email.lower() for c in commits}
+    for p, aliases in cfg.identities.items():
+        known |= {p.lower(), *(a.lower() for a in aliases)}
+    return known
+
+
+def _dev_key(args, root: Path, store: Store, ref: str | None, commits=None) -> str:
+    """A developer reference (email, alias, CODEOWNERS handle or `me`) -> developer key."""
+    cfg = store.config
+    if ref in (None, "me"):
+        return cfg.primary(_email(args, root))
+    if ref.startswith("@"):
+        known = _known_emails(store, commits if commits is not None else [])
+        emails = resp_mod.owner_emails(ref, cfg, known)
+        if not emails:
+            raise SystemExit(
+                f"{ref} is not mapped to an email yet. Add it under `handles` in "
+                f".udebt/config.json."
+            )
+        return emails[0]
+    return cfg.primary(ref)
+
+
+def _my_set(resp, key: str, units) -> set[str]:
+    """The developer's responsibility set, limited to units the map still has."""
+    return resp.ids(key) & set(hier.index(units))
+
+
+def _width(units_shown, floor: int = 22) -> int:
+    return min(44, max([floor, *(len(u["id"]) + 2 for u, _ in units_shown)]))
+
+
 # -- commands ------------------------------------------------------------------
 
 
@@ -72,16 +118,59 @@ def cmd_map(args) -> int:
     if args.rescore:
         data = rescore_map(root, store)
         print(f"Rescored {len(data['units'])} units with current commit weights (no LLM call).")
+        if data.get("version", 1) < 3:
+            print("This map is flat (version 2 or older): re-run `udebt map` for sub-units.")
         _print_units(data["units"])
         return 0
     llm = _llm(store, args)
     print("Mapping architecture with claude (this reads the code; expect a minute or two)...")
     try:
-        data = build_map(root, store, llm, max_units=args.max_units)
+        data = build_map(root, store, llm, max_units=args.max_units, max_children=args.max_children)
     except LLMError as e:
         raise SystemExit(str(e)) from e
-    print(f"Wrote {len(data['units'])} units to {store.map_path.relative_to(root)}")
+    st = data.get("structure", {})
+    n_kids = sum(len(hier.children_of(u)) for u in data["units"])
+    print(_structure_line(st))
+    print(
+        f"Wrote {len(data['units'])} units ({n_kids} sub-units) to "
+        f"{store.map_path.relative_to(root)}; they cover {int(100 * st.get('coverage', 0))}% "
+        f"of the clustered non-test source files"
+    )
     _print_units(data["units"])
+    return 0
+
+
+def _structure_line(st: dict[str, Any]) -> str:
+    secs = sum(st.get("seconds", {}).values())
+    clusters = st.get("clusters", [])
+    subs = sum(len(c.get("children", [])) for c in clusters)
+    return (
+        f"Structure: {st.get('nodes', 0)} source files, {st.get('edges', 0)} edges "
+        f"({st.get('import_edges', 0)} import, {st.get('cochange_edges', 0)} co-change), "
+        f"{len(clusters)} clusters ({subs} sub-clusters) in {secs:.1f}s"
+    )
+
+
+def cmd_clusters(args) -> int:
+    root, store = _ctx(args)
+    store.require()
+    files = mappable_files(root)
+    commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
+    s = discover(root, store, files, commits, weights)
+    if args.json:
+        import json as _json
+
+        print(_json.dumps(s.summary(), indent=2))
+        return 0
+    print(_structure_line(s.summary()))
+    print(
+        f"Languages parsed for imports: "
+        f"{', '.join(f'{k} {v}' for k, v in s.languages.items()) or 'none'}; "
+        f"timings {s.seconds}\n"
+    )
+    print(structure.prompt_block(s, max_clusters=args.top))
+    print("\nThese are what `udebt map` hands the model to name, merge or split.")
     return 0
 
 
@@ -93,11 +182,14 @@ def cmd_units(args) -> int:
 
 
 def _print_units(units: list[dict[str, Any]]) -> None:
+    shown = hier.rows(units, deep=True)
+    w = _width(shown)
     print()
-    print(f"{'id':<22} {'kind':<9} {'scope':<13} {'imp':>5}  name")
-    for u in units:
+    print(f"{'id':<{w}} {'kind':<9} {'scope':<13} {'imp':>5}  name")
+    for u, depth in shown:
+        uid = ("  " * depth) + u["id"]
         print(
-            f"{u['id']:<22} {u['kind']:<9} {u.get('scope', 'architectural'):<13} "
+            f"{uid:<{w}} {u.get('kind', ''):<9} {u.get('scope', 'architectural'):<13} "
             f"{u.get('importance', 0):>5.2f}  {u['name']}"
         )
 
@@ -106,27 +198,51 @@ def cmd_scope(args) -> int:
     root, store = _ctx(args)
     store.require()
     m = store.require_map()
-    for u in m["units"]:
-        if u["id"] == args.unit:
-            u["scope"] = args.scope
-            store.save_map(m)
-            print(f"{args.unit}: scope set to {args.scope}")
-            return 0
-    raise SystemExit(f"Unknown unit id: {args.unit}")
+    unit = hier.resolve(m["units"], args.unit)
+    if unit is None:
+        raise SystemExit(f"Unknown unit id: {args.unit}")
+    uid = unit["id"]
+    if args.team:
+        unit["scope"] = args.scope
+        store.save_map(m)
+        print(f"{uid}: scope set to {args.scope} team-wide")
+        return 0
+    key = _dev_key(args, root, store, args.for_dev)
+    team_scope = {u["id"]: u.get("scope", "architectural") for u in hier.flat(m["units"])}
+    parent = hier.parent_of(m["units"]).get(uid)
+    team, _ = resp_mod.effective_scope(uid, parent, team_scope, {})
+    resp = resp_mod.load(store)
+    # an override equal to the team's choice is noise; drop it
+    resp.set_scope(key, uid, None if args.scope == team else args.scope)
+    resp.save(store.responsibility_path)
+    print(f"{uid}: {args.scope} for {key} (team-wide: {team}; `--team` changes that)")
+    return 0
 
 
 def cmd_quiz(args) -> int:
     root, store = _ctx(args)
     store.require()
     m = store.require_map()
+    units = m["units"]
     email = _email(args, root)
     llm = _llm(store, args)
-    scores = compute_scores(root, store, m["units"], email)
-    units = pick_units(m["units"], scores, args.num, args.unit or None)
-    print(f"Quizzing {email} on: {', '.join(u['id'] for u in units)}")
+    resp = resp_mod.load(store)
+    scores = compute_scores(root, store, units, email, resp=resp)
+    mine = _my_set(resp, store.config.primary(email), units)
+    within = None
+    if mine and not args.unit:
+        touching = risk_mod.touched_units(
+            hier.level(units, args.deep), risk_mod.working_files(root)
+        )
+        within = hier.at_level(mine, units, args.deep) | touching
+    picked = pick_units(units, scores, args.num, args.unit or None, deep=args.deep, within=within)
+    if not picked:
+        raise SystemExit("Nothing to quiz: every unit in view is blackbox or out of your set.")
+    where = " (from your responsibility set)" if within else ""
+    print(f"Quizzing {email}{where} on: {', '.join(u['id'] for u in picked)}")
     print("Generating questions from the code...")
     try:
-        questions = generate_questions(root, llm, units, per_unit=args.per_unit)
+        questions = generate_questions(root, llm, picked, per_unit=args.per_unit)
         answered = ask_interactively(questions)
         print("\nGrading against the code...")
         results = grade(root, llm, answered)
@@ -138,6 +254,7 @@ def cmd_quiz(args) -> int:
         print(f"[{r['verdict'].upper():<8}] {r['unit_id']}: {r['question']}")
         print(f"           {r['feedback']}")
     print()
+    args.unit_ref = None
     return cmd_status(args)
 
 
@@ -151,94 +268,244 @@ def _prov_line(commits, mine: set[str] | None = None) -> str:
     )
 
 
+def _note(s_, u, prov, by_score) -> str:
+    """The status note for one row: why the understanding is what it is."""
+    if s_.scope != "architectural":
+        who = "for you" if s_.scope_origin == "you" else "team-wide"
+        return f"blackbox {who} (excluded)"
+    pre = ""
+    if s_.scope_origin == "you" and u.get("scope", "architectural") != "architectural":
+        pre = "architectural for you (team: blackbox); "
+    if s_.source == "none":
+        return pre + "unmeasured"
+    if s_.source == "children":
+        return pre + "from its sub-units' quizzes"
+    if s_.source == "parent":
+        p = by_score.get(s_.parent)
+        pv = f" ({p.verified:.2f})" if p and p.verified is not None else ""
+        return pre + f"half of the parent's quiz{pv}"
+    if s_.source == "prior" and s_.understanding < 0.005:
+        return pre + (
+            f"prior from your commits eroded by {prov.others_since_dev} commits "
+            f"(mass {prov.others_since_dev_w}) by others"
+        )
+    if s_.source == "prior":
+        note = "prior from your commits"
+        if prov.others_since_dev:
+            note += (
+                f", {prov.others_since_dev} commits (mass {prov.others_since_dev_w}) "
+                "by others since"
+            )
+        return pre + note
+    if s_.commits_since:
+        return pre + f"quiz, decayed from {s_.verified:.2f} by mass {s_.commits_since}"
+    return pre + "quiz"
+
+
 def cmd_status(args) -> int:
     root, store = _ctx(args)
     store.require()
     m = store.require_map()
     units = m["units"]
-    by_id = {u["id"]: u for u in units}
     cfg = store.config
     commits = commits_for(root, store)
     weights = weights_for(root, store, commits)
+    resp = resp_mod.load(store)
+    focus = None
+    ref = getattr(args, "unit_ref", None)
+    if ref:
+        focus = hier.resolve(units, ref)
+        if focus is None:
+            raise SystemExit(f"Unknown unit id: {ref}")
+    deep = bool(getattr(args, "deep", False) or focus is not None)
 
     if getattr(args, "team", False):
-        per_dev = {}
-        for slug, recs in store.all_records().items():
-            email = next((r.get("dev") for r in recs if r.get("dev")), slug)
-            per_dev[slug] = compute_scores(root, store, units, email, records=recs, commits=commits)
-        if not per_dev:
-            print("No quiz records yet. Run `udebt quiz`.")
-            return 0
-        team = scoring.team_view(per_dev, cfg.known_threshold)
-        print(f"\n{_prov_line(commits)}")
-        print(f"Team view ({len(per_dev)} developer(s)); known threshold {cfg.known_threshold}")
-        print(f"{'unit':<22} {'imp':>5} {'ai%':>4} {'team und':>9} {'bus':>4}  holders")
-        team_scores = []
-        for u in units:
-            t = team.get(u["id"])
-            if not t:
-                continue
-            team_scores.append(
-                scoring.UnitScore(
-                    u["id"], t["importance"], t["understanding"], 0, t["understanding"], t["scope"]
-                )
-            )
-            flag = "" if t["scope"] == "architectural" else " (blackbox)"
-            ai = int(100 * u.get("provenance", {}).get("ai_share", 0))
-            print(
-                f"{u['id']:<22} {t['importance']:>5.2f} {ai:>4} {t['understanding']:>9.2f} "
-                f"{t['bus_factor']:>4}  {', '.join(t['holders']) or '-'}{flag}"
-            )
-        print(f"\nTeam debt index: {scoring.debt_index(team_scores)} / 100")
-        for slug, sc in per_dev.items():
-            print(f"  {slug:<30} {scoring.debt_index(sc)}")
-        return 0
+        return _team_status(root, store, units, commits, weights, resp, deep)
 
     email = _email(args, root)
+    key = cfg.primary(email)
     mine = cfg.emails_for(email)
-    scores = compute_scores(root, store, units, email, commits=commits, weights=weights)
+    scores = compute_scores(root, store, units, email, commits=commits, weights=weights, resp=resp)
+    by_score = {s_.unit_id: s_ for s_ in scores}
+    my_set = _my_set(resp, key, units)
+    touching = risk_mod.touched_units(hier.level(units, deep), risk_mod.working_files(root))
+    parents = hier.parent_of(units)
+    shown = hier.rows(units, deep, also=my_set)
+    if focus is not None:
+        fid = focus["id"]
+        shown = [(u, d) for u, d in shown if fid in (u["id"], parents.get(u["id"]))]
+    w = _width(shown)
     print(f"\nUnderstanding debt for {email} at {repo.head(root)[:8]}")
     print(_prov_line(commits, mine))
-    print(f"{'unit':<22} {'imp':>5} {'ai%':>4} {'you%':>4} {'und':>5}  {'debt':>5}  {'':<10} note")
-    for s_ in sorted(scores, key=lambda s_: -s_.debt):
-        u = by_id[s_.unit_id]
-        prov = unit_provenance(commits, u.get("paths", []), mine, weights)
-        if s_.scope != "architectural":
-            note = "blackbox (excluded)"
-        elif s_.source == "none":
-            note = "unmeasured"
-        elif s_.source == "prior" and s_.understanding < 0.005:
-            note = (
-                f"prior from your commits eroded by {prov.others_since_dev} commits "
-                f"(mass {prov.others_since_dev_w}) by others"
-            )
-        elif s_.source == "prior":
-            note = "prior from your commits"
-            if prov.others_since_dev:
-                note += (
-                    f", {prov.others_since_dev} commits (mass {prov.others_since_dev_w}) "
-                    f"by others since"
-                )
-        elif s_.commits_since:
-            note = f"quiz, decayed from {s_.verified:.2f} by mass {s_.commits_since}"
-        else:
-            note = "quiz"
-        print(
-            f"{s_.unit_id:<22} {s_.importance:>5.2f} {int(100 * prov.ai_share):>4} "
-            f"{int(100 * prov.dev_share):>4} {s_.understanding:>5.2f}  {s_.debt:>5.2f}  "
-            f"{_bar(1 - s_.understanding):<10} {note}  [{u['name']}]"
-        )
     print(
-        f"\nDebt index: {scoring.debt_index(scores)} / 100   (0 = you understand every "
-        f"architectural unit; unmeasured counts as 0)"
+        f"{'unit':<{w}} {'set':>3} {'imp':>5} {'ai%':>4} {'you%':>4} {'und':>5}  {'debt':>5}  "
+        f"{'':<10} note"
     )
+    # sort the top level by debt; sub-units follow their parent, also by debt
+    tops = sorted([u for u, d in shown if d == 0], key=lambda u: -by_score[u["id"]].debt)
+    kids = {u["id"]: [] for u in tops}
+    for u, d in shown:
+        if d == 1:
+            kids.setdefault(parents[u["id"]], []).append(u)
+    ordered = []
+    for u in tops:
+        ordered.append((u, 0))
+        ordered += [
+            (c, 1) for c in sorted(kids.get(u["id"], []), key=lambda c: -by_score[c["id"]].debt)
+        ]
+    if focus is not None and not ordered:
+        ordered = shown
+    for u, depth in ordered:
+        s_ = by_score[u["id"]]
+        prov = unit_provenance(commits, u.get("paths", []), mine, weights)
+        mark = ""
+        if my_set:
+            if hier.covers(my_set, u["id"], units):
+                mark = "*"
+            elif any(c["id"] in my_set for c in hier.children_of(u)):
+                mark = "~"
+        if u["id"] in touching:
+            mark += "t"
+        n_kids = len(hier.children_of(u))
+        extra = f" ({n_kids} sub-units)" if n_kids and not deep else ""
+        label = ("  " * depth) + u["id"]
+        print(
+            f"{label:<{w}} {mark:>3} {s_.importance:>5.2f} {int(100 * prov.ai_share):>4} "
+            f"{int(100 * prov.dev_share):>4} {s_.understanding:>5.2f}  {s_.debt:>5.2f}  "
+            f"{_bar(1 - s_.understanding):<10} {_note(s_, u, prov, by_score)}  "
+            f"[{u['name']}]{extra}"
+        )
+    level_ids = {u["id"] for u in hier.level(units, deep)}
+    all_index = scoring.debt_index(scores, only=level_ids)
+    finer = deep and hier.has_children(units)
+    view = "units, sub-units where they exist" if finer else "architectural units"
+    if my_set:
+        ids = hier.at_level(my_set, units, deep) | touching
+        n_t = len(touching - hier.at_level(my_set, units, deep))
+        t_txt = f" + {n_t} you are touching" if n_t else ""
+        print(
+            f"\nDebt index: {scoring.debt_index(scores, only=ids)} / 100   (your responsibility "
+            f"set: {len(ids) - n_t} units{t_txt}; over all {view}: {all_index})"
+        )
+        print("set: * in your responsibility set, ~ part of it is, t you are touching it now.")
+    else:
+        what = "sub-units where they exist" if finer else "every architectural unit"
+        print(
+            f"\nDebt index: {all_index} / 100   (0 = you understand {what}; unmeasured counts as 0)"
+        )
+        print(
+            "You have no responsibility set, so every unit counts. "
+            "`udebt responsibility seed` proposes one."
+        )
     print(
         "ai% = share of the unit's commits by or with an AI agent. "
         "you% = share you authored (AI-assisted ones count half)."
     )
-    worst = scoring.quiz_priority(scores)
+    if hier.has_children(units) and not deep:
+        print("Sub-units: `udebt status --deep`, or `udebt status <unit>` for one unit.")
+    pool = [
+        s_
+        for s_ in scores
+        if s_.unit_id in (hier.at_level(my_set, units, deep) if my_set else level_ids)
+    ]
+    worst = scoring.quiz_priority(pool)
     if worst:
         print(f"Next: `udebt dig {worst[0].unit_id}` or `udebt quiz`")
+    return 0
+
+
+def _team_members(store: Store, resp, commits) -> dict[str, list[dict[str, Any]]]:
+    """developer key -> their quiz records, for everyone with records or a set."""
+    cfg = store.config
+    by_slug = {repo.slug(e): e for e in _known_emails(store, commits) | set(resp.developers)}
+    out: dict[str, list[dict[str, Any]]] = {}
+    for slug, recs in store.all_records().items():
+        email = next((r["dev"] for r in recs if r.get("dev")), None) or by_slug.get(slug, slug)
+        out.setdefault(cfg.primary(email), []).extend(recs)
+    for dev in resp.developers:
+        if resp.has_set(dev):
+            out.setdefault(dev, [])
+    return dict(sorted(out.items()))
+
+
+def _team_status(root, store, units, commits, weights, resp, deep) -> int:
+    cfg = store.config
+    members = _team_members(store, resp, commits)
+    if not members:
+        print(
+            "No quiz records or responsibility sets yet. "
+            "Run `udebt quiz` or `udebt responsibility seed`."
+        )
+        return 0
+    per_dev = {
+        dev: compute_scores(
+            root, store, units, dev, records=recs, commits=commits, weights=weights, resp=resp
+        )
+        for dev, recs in members.items()
+    }
+    team = scoring.team_view(per_dev, cfg.known_threshold)
+    team_scope = {u["id"]: u.get("scope", "architectural") for u in hier.flat(units)}
+    parents = hier.parent_of(units)
+    for uid, t in team.items():
+        t["scope"] = resp_mod.effective_scope(uid, parents.get(uid), team_scope, {})[0]
+    shown = hier.rows(units, deep)
+    w = _width(shown)
+    target = cfg.bus_target
+    print(f"\n{_prov_line(commits)}")
+    print(
+        f"Team view ({len(per_dev)} developer(s)); known threshold {cfg.known_threshold}, "
+        f"bus target {target}"
+    )
+    print(f"{'unit':<{w}} {'imp':>5} {'ai%':>4} {'team und':>9} {'bus':>5}  holders; responsible")
+    for u, depth in shown:
+        t = team[u["id"]]
+        flag = "" if t["scope"] == "architectural" else "  (blackbox)"
+        ai = int(100 * u.get("provenance", {}).get("ai_share", 0))
+        assigned = resp.holders_of(u["id"], units)
+        label = ("  " * depth) + u["id"]
+        print(
+            f"{label:<{w}} {t['importance']:>5.2f} {ai:>4} {t['understanding']:>9.2f} "
+            f"{t['bus_factor']:>2}/{target:<2}  {', '.join(t['holders']) or '-'}; "
+            f"{', '.join(assigned) or '-'}{flag}"
+        )
+    level_ids = [u["id"] for u in hier.level(units, deep)]
+    team_scores = [
+        scoring.UnitScore(
+            uid,
+            team[uid]["importance"],
+            team[uid]["understanding"],
+            0,
+            team[uid]["understanding"],
+            team[uid]["scope"],
+        )
+        for uid in level_ids
+    ]
+    print(f"\nTeam debt index: {scoring.debt_index(team_scores)} / 100")
+    for dev, sc in per_dev.items():
+        mine = _my_set(resp, dev, units)
+        only = hier.at_level(mine, units, deep) if mine else set(level_ids)
+        what = f"over their set of {len(only)}" if mine else "no set, over all units"
+        print(f"  {dev:<34} {scoring.debt_index(sc, only=only):>5}   ({what})")
+    below = scoring.below_target(team, level_ids, target)
+    arch = [uid for uid in level_ids if team[uid]["scope"] == "architectural"]
+    print(
+        f"\nBus target: {len(arch) - len(below)} of {len(arch)} architectural units have at "
+        f"least {target} holders (understanding >= {cfg.known_threshold})."
+    )
+    if below:
+        print("Below target:")
+        for uid in below:
+            assigned = resp.holders_of(uid, units)
+            need = target - team[uid]["bus_factor"]
+            who = (
+                ", ".join(assigned)
+                if assigned
+                else "nobody (assign one: `udebt responsibility <dev> add " + uid + "`)"
+            )
+            print(f"  {uid:<{w}} needs {need} more; responsible: {who}")
+    unassigned = resp.unassigned(units, arch)
+    if unassigned and resp.developers:
+        print(f"In nobody's responsibility set: {', '.join(unassigned)}")
     return 0
 
 
@@ -255,7 +522,7 @@ def cmd_history(args) -> int:
         for s_ in compute_scores(root, store, m["units"], email, commits=commits, weights=weights)
     }
     by_sha: dict[str, dict[str, Any]] = {}
-    for u in m["units"]:
+    for u in hier.flat(m["units"]):
         for h in u.get("history", []):
             row = by_sha.setdefault(h["sha"], {**h, "units": []})
             row["units"].append(u["id"])
@@ -301,9 +568,14 @@ def cmd_dig(args) -> int:
     m = store.require_map()
     email = _email(args, root)
     llm = _llm(store, args)
-    scores = compute_scores(root, store, m["units"], email)
-    units = pick_units(m["units"], scores, 1, [args.unit] if args.unit else None)
-    unit = units[0]
+    resp = resp_mod.load(store)
+    scores = compute_scores(root, store, m["units"], email, resp=resp)
+    mine = _my_set(resp, store.config.primary(email), m["units"])
+    within = hier.at_level(mine, m["units"], False) if mine else None
+    picked = pick_units(m["units"], scores, 1, [args.unit] if args.unit else None, within=within)
+    if not picked:
+        raise SystemExit("Nothing to dig into: name a unit, e.g. `udebt dig <unit>`.")
+    unit = picked[0]
     print(f"Digging into `{unit['id']}` ({unit['name']})...\n")
     try:
         body, question = walkthrough(root, llm, unit)
@@ -435,13 +707,17 @@ def cmd_risk(args) -> int:
     root, store = _ctx(args)
     store.require()
     m = store.require_map()
+    units = m["units"]
     cfg = store.config
     email = _email(args, root)
     commits = commits_for(root, store)
     weights = weights_for(root, store, commits)
+    resp = resp_mod.load(store)
     scores = {
         s_.unit_id: s_
-        for s_ in compute_scores(root, store, m["units"], email, commits=commits, weights=weights)
+        for s_ in compute_scores(
+            root, store, units, email, commits=commits, weights=weights, resp=resp
+        )
     }
     if args.staged:
         c, w = risk_mod.staged_commit(root)
@@ -455,26 +731,187 @@ def cmd_risk(args) -> int:
     if not changes or (args.staged and not changes[0].files):
         print(f"Nothing to assess in {what}.")
         return 0
-    risks = risk_mod.assess(m["units"], scores, changes, wmap, cfg.known_threshold)
+    my_set = _my_set(resp, cfg.primary(email), units)
+    risks = risk_mod.assess(
+        units,
+        scores,
+        changes,
+        wmap,
+        cfg.known_threshold,
+        responsible=my_set or None,
+        deep=args.deep,
+    )
     level = risk_mod.overall(risks)
     print(f"\nRisk for {email}: {what}  ->  {level}")
     if not risks:
         print("No architectural unit touched.")
         return 0
-    print(f"{'level':<8} {'unit':<22} {'mass':>5} {'und':>5}  files")
+    w = min(44, max([22, *(len(r.unit_id) + 2 for r in risks)]))
+    print(f"{'level':<8} {'unit':<{w}} {'set':<4} {'mass':>5} {'und':>5}  files")
     for r in risks:
+        in_set = {True: "in", False: "OUT", None: "-"}[r.in_set]
+        parts = f"  [sub-units: {', '.join(r.parts)}]" if r.parts else ""
         print(
-            f"{r.level:<8} {r.unit_id:<22} {r.mass:>5.2f} {r.understanding:>5.2f}  "
-            f"{', '.join(r.files)}"
+            f"{r.level:<8} {r.unit_id:<{w}} {in_set:<4} {r.mass:>5.2f} {r.understanding:>5.2f}  "
+            f"{', '.join(r.files)}{parts}"
         )
     worst = next((r for r in risks if r.level != "OK"), None)
-    if worst:
+    if worst and worst.level == "OUTSIDE":
+        assigned = resp.holders_of(worst.unit_id.split()[0], units)
+        ask = ", ".join(assigned) if assigned else "a lead (nobody has it in their set)"
+        print(
+            f"\nOUTSIDE is the strongest signal udebt gives: this change lands mass "
+            f"{worst.mass:.2f} in `{worst.unit_id}`, which is outside your responsibility set, "
+            f"and your understanding of it is {worst.understanding:.2f}. Nobody expects you to "
+            f"know this unit and nothing shows you do. Ask {ask} to review, or learn it: "
+            f"`udebt dig {worst.unit_id.split()[0]}`."
+        )
+    elif worst:
         print(
             f"\nmass = weight landed in the unit by these changes; und = your understanding "
-            f"({worst.source}). Raise it: `udebt dig {worst.unit_id}` (a few minutes)."
+            f"({worst.source}). Raise it: `udebt dig {worst.unit_id.split()[0]}` (a few minutes)."
         )
-    if level == "HIGH" and args.strict:
+    if my_set:
+        ids = hier.at_level(my_set, units, args.deep) | {r.unit_id.split()[0] for r in risks}
+        print(
+            f"Your debt index over your set plus the units this change touches: "
+            f"{scoring.debt_index(list(scores.values()), only=ids)} / 100"
+        )
+    else:
+        print(
+            "You have no responsibility set, so OUTSIDE cannot fire. "
+            "`udebt responsibility seed` proposes one."
+        )
+    if level in ("HIGH", "OUTSIDE") and args.strict:
         return 1
+    return 0
+
+
+def cmd_responsibility(args) -> int:
+    root, store = _ctx(args)
+    store.require()
+    m = store.require_map()
+    units = m["units"]
+    rest = list(args.rest)
+    commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
+    if rest[:1] == ["seed"]:
+        if len(rest) > 1:
+            raise SystemExit("usage: udebt responsibility seed [--force]")
+        rep = resp_mod.seed(
+            root, store, units, commits, weights, mappable_files(root), force=args.force
+        )
+        src = f"{rep.codeowners} and footprint" if rep.codeowners else "footprint (no CODEOWNERS)"
+        print(f"Seeded responsibility sets from {src}.")
+        resp = resp_mod.load(store)
+        for dev in sorted(set(rep.written) | set(rep.kept)):
+            n = len(resp.units(dev))
+            if dev in rep.kept:
+                print(f"  {dev}: kept as curated ({n} units); `--force` re-seeds it")
+            else:
+                origins = sorted(set(resp.units(dev).values()))
+                print(f"  {dev}: {n} unit{'s' if n != 1 else ''} ({', '.join(origins)})")
+        if rep.pending:
+            print("CODEOWNERS handles with no known email (fill them in under `handles` in")
+            print(".udebt/config.json, then run `udebt responsibility seed` again):")
+            for h, us in rep.pending.items():
+                print(f"  {h}: {', '.join(us)}")
+        if rep.unassigned:
+            print(f"In nobody's set: {', '.join(rep.unassigned)}")
+        print(f"Wrote {store.responsibility_path.relative_to(root)}. Commit it.")
+        return 0
+    resp = resp_mod.load(store)
+    if not rest:
+        return _responsibility_overview(root, store, units, commits, weights, resp)
+    key = _dev_key(args, root, store, rest[0], commits)
+    if len(rest) == 1:
+        return _responsibility_detail(root, store, units, commits, weights, resp, key)
+    action, refs = rest[1], rest[2:]
+    if action not in ("add", "remove") or not refs:
+        raise SystemExit("usage: udebt responsibility <dev> add|remove <unit>...")
+    if action == "add":
+        ids = [u["id"] for u in hier.resolve_all(units, refs)]
+        done = resp.add(key, ids)
+    else:
+        ids = [(hier.resolve(units, r) or {"id": r})["id"] for r in refs]
+        done = resp.remove(key, ids)
+    resp.save(store.responsibility_path)
+    verb = "added to" if action == "add" else "removed from"
+    print(
+        f"{', '.join(done) or 'nothing'} {verb} {key}'s responsibility set "
+        f"({len(resp.units(key))} units)"
+    )
+    return 0
+
+
+def _responsibility_overview(root, store, units, commits, weights, resp) -> int:
+    if not resp.developers and not resp.pending:
+        print("No responsibility sets yet. `udebt responsibility seed` proposes them from")
+        print("CODEOWNERS and each developer's contribution footprint.")
+        return 0
+    when = (resp.seeded_at or "never")[:10]
+    print(f"\nResponsibility sets ({store.responsibility_path.relative_to(root)}; seeded {when})")
+    print(f"{'developer':<34} {'units':>5} {'index':>6}  set")
+    for dev in sorted(resp.developers):
+        mine = _my_set(resp, dev, units)
+        if not mine:
+            continue
+        sc = compute_scores(root, store, units, dev, commits=commits, weights=weights, resp=resp)
+        idx = scoring.debt_index(sc, only=hier.at_level(mine, units, False))
+        shown = ", ".join(sorted(mine))
+        print(f"{dev:<34} {len(mine):>5} {idx:>6}  {shown[:90]}{'...' if len(shown) > 90 else ''}")
+    for dev, gone in resp.stale(units).items():
+        print(f"  {dev}: no longer in the map: {', '.join(gone)} (remove them, or seed --force)")
+    if resp.pending:
+        print("Pending CODEOWNERS handles (map them under `handles` in .udebt/config.json):")
+        for h, us in resp.pending.items():
+            print(f"  {h}: {', '.join(us)}")
+    nobody = resp.unassigned(
+        [u for u in units if u.get("scope", "architectural") == "architectural"]
+    )
+    if nobody:
+        print(f"In nobody's set: {', '.join(nobody)}")
+    print(
+        "Details: `udebt responsibility <dev>`. "
+        "Curate: `udebt responsibility <dev> add|remove <unit>`."
+    )
+    return 0
+
+
+def _responsibility_detail(root, store, units, commits, weights, resp, key) -> int:
+    mine = _my_set(resp, key, units)
+    entries = resp.units(key)
+    by_id = hier.index(units)
+    sc = {
+        s_.unit_id: s_
+        for s_ in compute_scores(
+            root, store, units, key, commits=commits, weights=weights, resp=resp
+        )
+    }
+    print(f"\nResponsibility set for {key}: {len(mine)} units")
+    if not mine:
+        print("Empty. `udebt responsibility seed`, or `udebt responsibility <dev> add <unit>`.")
+    w = min(44, max([22, *(len(i) + 2 for i in mine)]))
+    print(f"{'unit':<{w}} {'from':<11} {'imp':>5} {'und':>5} {'debt':>5}  name")
+    for uid in sorted(mine, key=lambda i: -sc[i].debt):
+        s_ = sc[uid]
+        scope = (
+            ""
+            if s_.scope == "architectural"
+            else f"  (blackbox {'for you' if s_.scope_origin == 'you' else 'team-wide'})"
+        )
+        print(
+            f"{uid:<{w}} {entries.get(uid, ''):<11} {s_.importance:>5.2f} {s_.understanding:>5.2f} "
+            f"{s_.debt:>5.2f}  {by_id[uid]['name']}{scope}"
+        )
+    for uid in sorted(set(entries) - mine):
+        print(f"{uid:<{w}} {entries[uid]:<11} (no longer in the map)")
+    scopes = resp.scope(key)
+    if scopes:
+        print("Own scope choices: " + ", ".join(f"{k} {v}" for k, v in sorted(scopes.items())))
+    if mine:
+        idx = scoring.debt_index(list(sc.values()), only=hier.at_level(mine, units, False))
+        print(f"\nDebt index over the set: {idx} / 100")
     return 0
 
 
@@ -511,8 +948,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("init", help="create .udebt/").set_defaults(fn=cmd_init)
 
-    s = sub.add_parser("map", help="extract architectural units")
-    s.add_argument("--max-units", type=int, default=12)
+    s = sub.add_parser("clusters", help="structural clusters from imports and co-change")
+    s.add_argument("--top", type=int, default=30, help="how many clusters to show")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(fn=cmd_clusters)
+
+    s = sub.add_parser("map", help="extract architectural units and sub-units")
+    s.add_argument("--max-units", type=int, default=12, help="top-level units (default 12)")
+    s.add_argument("--max-children", type=int, default=6, help="sub-units per unit (default 6)")
     s.add_argument(
         "--rescore",
         action="store_true",
@@ -522,19 +965,38 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("units", help="list units").set_defaults(fn=cmd_units)
 
-    s = sub.add_parser("scope", help="mark a unit architectural or blackbox")
+    s = sub.add_parser("scope", help="mark a unit architectural or blackbox, for you or the team")
     s.add_argument("unit")
     s.add_argument("scope", choices=["architectural", "blackbox"])
+    who = s.add_mutually_exclusive_group()
+    who.add_argument("--for", dest="for_dev", metavar="DEV", help="for this developer")
+    who.add_argument("--team", action="store_true", help="for everyone (the map's scope)")
     s.set_defaults(fn=cmd_scope)
+
+    s = sub.add_parser(
+        "responsibility",
+        help="who is expected to understand which units",
+        description="udebt responsibility                    every developer's set\n"
+        "udebt responsibility <dev>              one developer's set (dev: email, @handle, me)\n"
+        "udebt responsibility <dev> add|remove <unit>...\n"
+        "udebt responsibility seed [--force]     propose sets from CODEOWNERS and footprint",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    s.add_argument("rest", nargs="*", metavar="ARGS")
+    s.add_argument("--force", action="store_true", help="with seed: re-seed curated sets too")
+    s.set_defaults(fn=cmd_responsibility)
 
     s = sub.add_parser("quiz", help="answer prediction questions")
     s.add_argument("-n", "--num", type=int, default=5, help="units to cover (default 5)")
     s.add_argument("--per-unit", type=int, default=1, help="questions per unit (default 1)")
     s.add_argument("--unit", action="append", help="quiz only this unit id (repeatable)")
+    s.add_argument("--deep", action="store_true", help="pick among sub-units")
     s.set_defaults(fn=cmd_quiz, team=False)
 
     s = sub.add_parser("status", help="show debt")
-    s.add_argument("--team", action="store_true", help="aggregate across all recorded developers")
+    s.add_argument("unit_ref", nargs="?", metavar="unit", help="one unit and its sub-units")
+    s.add_argument("--team", action="store_true", help="every developer; bus target per unit")
+    s.add_argument("--deep", action="store_true", help="show sub-units")
     s.set_defaults(fn=cmd_status)
 
     sub.add_parser("history", help="timeline of decisions and who made them").set_defaults(
@@ -564,7 +1026,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("risk", help="risk of a change against your understanding")
     s.add_argument("range", nargs="?", help="git revision range (default @{upstream}..HEAD)")
     s.add_argument("--staged", action="store_true", help="assess the staged diff instead")
-    s.add_argument("--strict", action="store_true", help="exit 1 on HIGH")
+    s.add_argument("--deep", action="store_true", help="assess sub-units, not top-level units")
+    s.add_argument("--strict", action="store_true", help="exit 1 on HIGH or OUTSIDE")
     s.set_defaults(fn=cmd_risk)
 
     s = sub.add_parser("hook", help="git hooks")

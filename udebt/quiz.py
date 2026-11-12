@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from . import repo, scoring
+from . import units as hier
 from .llm import LLM
 from .mapping import commits_for, weights_for
 from .prompts import GRADE_SCHEMA, QUESTIONS_SCHEMA, grade_prompt, questions_prompt
 from .provenance import Commit, unit_provenance
+from .responsibility import Responsibility, effective_scope
+from .responsibility import load as load_responsibility
 from .store import Store
 
 
@@ -39,35 +43,54 @@ def compute_scores(
     records: list[dict[str, Any]] | None = None,
     commits: list[Commit] | None = None,
     weights: dict[str, Any] | None = None,
+    resp: Responsibility | None = None,
 ) -> list[scoring.UnitScore]:
-    """Score every unit for one developer. `commits`/`weights` let callers share one parse."""
+    """Score every unit of the hierarchy for one developer, parents before their sub-units.
+    Flat (version 1 and 2) maps simply have no sub-units. `commits`/`weights` let callers
+    share one parse. The developer's own scope choices (responsibility.json) override the
+    team-wide scope."""
     cfg = store.config
     recs = store.load_records(email) if records is None else records
     if commits is None:
         commits = commits_for(root, store)
     if weights is None:
         weights = weights_for(root, store, commits)
+    resp = resp if resp is not None else load_responsibility(store)
+    dev_scope = resp.scope(cfg.primary(email))
+    team_scope = {u["id"]: u.get("scope", "architectural") for u in hier.flat(units)}
     mine = cfg.emails_for(email)
-    out = []
-    for u in units:
+    own: dict[str, scoring.UnitScore] = {}
+    for u, parent in hier.walk(units):
+        paths = u.get("paths", [])
         unit_recs = [r for r in recs if r.get("unit") == u["id"]]
         since = scoring.last_record_head(unit_recs)
-        m_since = mass_since(commits, weights, u.get("paths", []), since)
-        prov = unit_provenance(commits, u.get("paths", []), mine, weights)
+        m_since = mass_since(commits, weights, paths, since)
+        prov = unit_provenance(commits, paths, mine, weights)
         prior = scoring.prior_understanding(
             prov.dev_share, prov.others_since_dev_w, cfg.decay_per_commit
         )
-        out.append(
-            scoring.score_unit(
-                u,
-                unit_recs,
-                m_since,
-                window=cfg.evidence_window,
-                decay=cfg.decay_per_commit,
-                prior=prior,
-            )
+        s = scoring.score_unit(
+            u,
+            unit_recs,
+            m_since,
+            window=cfg.evidence_window,
+            decay=cfg.decay_per_commit,
+            prior=prior,
         )
-    return out
+        pid = parent["id"] if parent else None
+        scope, origin = effective_scope(u["id"], pid, team_scope, dev_scope)
+        own[u["id"]] = replace(s, parent=pid, scope=scope, scope_origin=origin)
+    out = dict(own)
+    for u in units:
+        kids = [own[c["id"]] for c in hier.children_of(u)]
+        if not kids:
+            continue
+        p = own[u["id"]]
+        parent_quiz = p.understanding if p.source == "quiz" else None
+        for k in kids:
+            out[k.unit_id] = scoring.inherit(k, parent_quiz)
+        out[u["id"]] = scoring.rollup(p, kids)
+    return [out[u["id"]] for u in hier.flat(units)]
 
 
 def pick_units(
@@ -75,15 +98,25 @@ def pick_units(
     scores: list[scoring.UnitScore],
     n: int,
     only: list[str] | None = None,
+    *,
+    deep: bool = False,
+    within: set[str] | None = None,
 ) -> list[dict[str, Any]]:
-    by_id = {u["id"]: u for u in units}
+    """Units to quiz: the named ones, else the `n` with the most debt at the chosen level
+    (top-level units, or sub-units with `deep`), restricted to `within` when given."""
     if only:
-        missing = [o for o in only if o not in by_id]
-        if missing:
-            raise SystemExit(f"Unknown unit id(s): {', '.join(missing)}")
-        return [by_id[o] for o in only]
-    ranked = scoring.quiz_priority(scores)
-    return [by_id[s.unit_id] for s in ranked[:n]]
+        return [{**u, **_parent_name(units, u["id"])} for u in hier.resolve_all(units, only)]
+    by_id = hier.index(units)
+    pool = {u["id"] for u in hier.level(units, deep)}
+    if within:
+        pool &= within
+    ranked = scoring.quiz_priority([s for s in scores if s.unit_id in pool])
+    return [{**by_id[s.unit_id], **_parent_name(units, s.unit_id)} for s in ranked[:n]]
+
+
+def _parent_name(units: list[dict[str, Any]], uid: str) -> dict[str, str]:
+    pid = hier.parent_of(units).get(uid)
+    return {"parent_name": hier.index(units)[pid]["name"]} if pid else {}
 
 
 def generate_questions(
@@ -156,6 +189,7 @@ def record(store: Store, root: Path, email: str, results: list[dict[str, Any]]) 
             email,
             {
                 "type": "quiz",
+                "dev": email,
                 "unit": r["unit_id"],
                 "head": h,
                 "question": r["question"],

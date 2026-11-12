@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -112,34 +113,13 @@ class FakeLLM:
     def structured(self, prompt, schema, *, cwd, read_tools=True, max_turns=40):
         self.calls.append(prompt)
         if "TASK: map" in prompt:
-            return {
-                "units": [
-                    {
-                        "id": "storage",
-                        "name": "Persistence layer",
-                        "kind": "decision",
-                        "summary": "All state lives in JSON files under a dot-directory.",
-                        "decision": "Plain JSON files instead of a database.",
-                        "alternatives": "SQLite; a hosted database.",
-                        "why": "Zero dependencies and diff-friendly for git.",
-                        "paths": ["udebt/store.py"],
-                        "centrality": 4,
-                        "shaped_by": _fake_shas(prompt),
-                    },
-                    {
-                        "id": "scoring",
-                        "name": "Debt scoring model",
-                        "kind": "module",
-                        "summary": "Pure functions compute understanding and debt.",
-                        "decision": "Importance times (1 - understanding), with commit decay.",
-                        "alternatives": "Provenance-only scoring.",
-                        "why": "Provenance says nothing about architectural understanding.",
-                        "paths": ["udebt/scoring.py"],
-                        "centrality": 5,
-                        "shaped_by": [],
-                    },
-                ]
-            }
+            canned = [u for u in _CANNED_UNITS if any(p in prompt for p in u["paths"])]
+            canned = [
+                {**u, "shaped_by": _fake_shas(prompt) if u["id"] == "storage" else []}
+                for u in canned
+            ]
+            covered = {p for u in canned for p in u["paths"]}
+            return {"units": canned + _units_from_clusters(prompt, covered)}
         if "TASK: questions" in prompt:
             ids = [
                 line.split(":", 1)[1].strip()
@@ -179,6 +159,104 @@ class FakeLLM:
     def text(self, prompt, *, cwd, read_tools=True, max_turns=40):
         self.calls.append(prompt)
         return "# Walkthrough\n\nThis is a fake walkthrough.\n\nCHECK QUESTION: What is 1+1?\n"
+
+
+_CANNED_UNITS: list[dict[str, Any]] = [
+    {
+        "id": "storage",
+        "name": "Persistence layer",
+        "kind": "decision",
+        "summary": "All state lives in JSON files under a dot-directory.",
+        "decision": "Plain JSON files instead of a database.",
+        "alternatives": "SQLite; a hosted database.",
+        "why": "Zero dependencies and diff-friendly for git.",
+        "paths": ["udebt/store.py"],
+        "centrality": 4,
+    },
+    {
+        "id": "scoring",
+        "name": "Debt scoring model",
+        "kind": "module",
+        "summary": "Pure functions compute understanding and debt.",
+        "decision": "Importance times (1 - understanding), with commit decay.",
+        "alternatives": "Provenance-only scoring.",
+        "why": "Provenance says nothing about architectural understanding.",
+        "paths": ["udebt/scoring.py"],
+        "centrality": 5,
+    },
+]
+_CODE = (".py", ".js", ".jsx", ".ts", ".tsx")
+
+
+def _cluster_entries(prompt: str) -> list[dict[str, Any]]:
+    """Parse the structural cluster block of a map prompt: top clusters with sub-clusters."""
+    out: list[dict[str, Any]] = []
+    cur: dict[str, Any] | None = None
+    for ln in prompt.splitlines():
+        m = re.match(r"^(\s*)- (C\d+(?:\.\d+)?) \[([^\]]*)\]", ln)
+        if m:
+            cur = {"id": m.group(2), "label": m.group(3), "files": [], "subs": []}
+            if m.group(1):
+                if out:
+                    out[-1]["subs"].append(cur)
+            else:
+                out.append(cur)
+            continue
+        f = re.match(r"^\s+files: (.*)$", ln)
+        if f and cur is not None:
+            cur["files"] = [
+                x.strip() for x in re.sub(r" \(\+\d+ more\)$", "", f.group(1)).split(",")
+            ]
+    return out
+
+
+def _slug(label: str, fallback: str) -> str:
+    head = label.split()[0].rstrip("/") if label.split() else ""
+    name = head.split("/")[-1] if head and head != "." else ""
+    return re.sub(r"[^a-z0-9]+", "-", (name or fallback).lower()).strip("-") or fallback.lower()
+
+
+def _units_from_clusters(prompt: str, covered: set[str]) -> list[dict[str, Any]]:
+    """One unit per cluster whose code no canned unit covers; children from sub-clusters, or
+    from the cluster's directories when it has no sub-clusters but spans several."""
+    units = []
+    for c in _cluster_entries(prompt):
+        code = [f for f in c["files"] if f.endswith(_CODE)]
+        if not code or all(f in covered for f in code):
+            continue
+        groups = [(_slug(s["label"], s["id"]), s["files"]) for s in c["subs"]]
+        if len(groups) < 2:
+            by_dir: dict[str, list[str]] = {}
+            for f in code:
+                by_dir.setdefault(f.rsplit("/", 1)[0] if "/" in f else ".", []).append(f)
+            groups = [(d.split("/")[-1], fs) for d, fs in sorted(by_dir.items())]
+        uid = _slug(c["label"], c["id"])
+        unit = {
+            "id": uid,
+            "name": f"Cluster {c['label']}",
+            "kind": "module",
+            "summary": f"Files clustered as {c['id']}.",
+            "decision": "fake",
+            "paths": code,
+            "centrality": 3,
+            "shaped_by": [],
+            "clusters": [c["id"]],
+        }
+        if len(groups) >= 2:
+            unit["children"] = [
+                {
+                    "id": name,
+                    "name": f"{uid} {name}",
+                    "kind": "module",
+                    "summary": "fake sub-unit",
+                    "decision": "fake",
+                    "paths": [f for f in fs if f.endswith(_CODE)] or fs,
+                    "centrality": 3,
+                }
+                for name, fs in groups
+            ]
+        units.append(unit)
+    return units
 
 
 def _fake_shas(prompt: str) -> list[str]:

@@ -13,3 +13,8 @@
 2026-11-12 [code] Phase 1: commit weights (heuristic + LLM refine, cached), weighted churn/decay/provenance/prior with per-unit line share, `contributors` with AI/joint/human/bot/most-likely labels, `risk` (min over units, advisory), `hook install`, `map --rescore`.
 2026-11-12 [code] Structural discovery: import graph (Python ast, JS/TS regex; one function per language), co-change graph (<=30-file commits), stdlib Louvain, sub-clusters; docs attach to clusters.
 2026-11-12 [decision] Line share for unit attribution ignores lockfile and generated lines: the June digitalme refactor no longer lands most of its weight in the frontend through package-lock.json.
+2026-11-12 [code] Map v3: clusters feed the prompt; units get up to 6 sub-units (`parent/child`). Sub-units split the parent's importance, inherit half its quiz, roll quizzes up. --deep views.
+2026-11-12 [code] Responsibility sets in .udebt/responsibility.json: seed from CODEOWNERS (handles via config or noreply, else pending) or human footprint; lead curates; index over set + touching.
+2026-11-12 [decision] Scope is per developer by default (`--for <dev>`; `--team` writes the map). Risk adds OUTSIDE (outside your set, mass >= 0.1, und < 0.6) as its strongest level.
+2026-11-12 [decision] Footprint ignores AI-authored commits and counts assisted ones in full: responsibility is human. A unit only agents touched is in nobody's set until a lead assigns it.
+2026-11-12 [decision] Team view checks a bus target per unit (config bus_target, default 2) and lists units below it with who is responsible. Parents roll up sub-unit quizzes only, not their priors.

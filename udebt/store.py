@@ -1,9 +1,10 @@
 """On-disk layout under <repo>/.udebt/.
 
-map.json             shared architectural map (commit this)
+map.json             shared architectural map, two levels of units (commit this)
 records/<slug>.jsonl one developer's evidence, append-only (commit this for team view)
 commits.json         per-commit weights (heuristic, LLM-refined for the heaviest); commit this
-config.json          optional settings (model, decay)
+responsibility.json  each developer's responsibility set and per-developer scope (commit this)
+config.json          settings (model, decay, identities, handles, bus target)
 """
 
 from __future__ import annotations
@@ -30,8 +31,21 @@ class Config:
     evidence_window: int = 5
     known_threshold: float = 0.6
     refine_top: int = 40  # how many of the heaviest commits `udebt weigh --refine` classifies
+    bus_target: int = 2  # holders above known_threshold every architectural unit should have
+    footprint_threshold: float = 0.1  # human share of a unit that seeds responsibility
+    cochange_max_files: int = 30  # commits touching more files are left out of co-change
     identities: dict[str, list[str]] = field(default_factory=dict)  # primary email -> aliases
+    # CODEOWNERS handle -> email (or list of emails); null marks a handle still to be mapped
+    handles: dict[str, Any] = field(default_factory=dict)
     extra: dict[str, Any] = field(default_factory=dict)
+
+    def primary(self, email: str) -> str:
+        """The developer key for `email`: the identity group's primary address, else itself."""
+        e = email.lower()
+        for primary, aliases in self.identities.items():
+            if e == primary.lower() or e in {a.lower() for a in aliases}:
+                return primary.lower()
+        return e
 
     def emails_for(self, email: str) -> set[str]:
         """All addresses that belong to the developer identified by `email`."""
@@ -57,7 +71,11 @@ class Config:
             "evidence_window": self.evidence_window,
             "known_threshold": self.known_threshold,
             "refine_top": self.refine_top,
+            "bus_target": self.bus_target,
+            "footprint_threshold": self.footprint_threshold,
+            "cochange_max_files": self.cochange_max_files,
             "identities": self.identities,
+            "handles": self.handles,
         }
         d.update(self.extra)
         return d
@@ -71,6 +89,7 @@ class Store:
         self.records_dir = self.dir / "records"
         self.config_path = self.dir / "config.json"
         self.weights_path = self.dir / "commits.json"
+        self.responsibility_path = self.dir / "responsibility.json"
 
     # -- lifecycle -----------------------------------------------------------
     def exists(self) -> bool:

@@ -13,13 +13,19 @@ human commits, AI-assisted commits and AI-authored commits, and uses the `claude
    or `ai` (an agent authored it), from signatures in commit trailers and author identities;
 2. **mine** the history for decision-bearing commits: founding commits, dependency and
    infrastructure changes, new top-level directories, renames, big restructurings;
-3. **map** the architectural units of the codebase: the decisions, boundaries and flows a
-   developer must understand, each linked to the commits that shaped it and who made them;
-4. **quiz** a developer with decision-centric questions (why X rather than Y, what breaks if
+3. **map** the architectural units of the codebase in two levels, starting from clusters it
+   finds in the import and co-change graphs: the decisions, boundaries and flows a developer
+   must understand, each linked to the commits that shaped it and who made them;
+4. **assign** each developer a responsibility set, the units they are expected to understand,
+   from CODEOWNERS or their contribution footprint, for a lead to curate;
+5. **quiz** a developer with decision-centric questions (why X rather than Y, what breaks if
    you revert it, what happens when it fails) graded against the code;
-5. **score** debt per unit and as a 0-100 index, for one developer and for the team, with a
-   weak prior from the developer's own commits so the view is useful before the first quiz;
-6. **dig** into the worst unit with a short guided walkthrough that ends in a check question.
+6. **score** debt per unit and as a 0-100 index over a developer's set, and for the team
+   against a bus-factor target, with a weak prior from the developer's own commits so the
+   view is useful before the first quiz;
+7. **flag** changes that land weight in units the author does not understand, most strongly
+   outside their responsibility set;
+8. **dig** into the worst unit with a short guided walkthrough that ends in a check question.
 
 ## Install
 
@@ -39,20 +45,28 @@ udebt init                    # creates .udebt/
 udebt alias other@me.org       # other addresses you have committed under (optional)
 udebt contributors             # everyone who committed: AI, joint human-AI, human, bot, "most likely"
 udebt weigh [--refine]         # how much debt each commit can create; --refine asks claude about the heaviest
-udebt map                     # mines history, claude reads the code, writes .udebt/map.json
+udebt clusters                 # candidate units from imports and co-change, no LLM
+udebt map                      # clusters + history -> claude names units and sub-units -> .udebt/map.json
 udebt map --rescore            # redo churn/importance/provenance with current weights, no LLM
-udebt status                   # debt per unit; ai% and you% show who wrote each unit
+udebt units                    # the hierarchy, with scope and importance
+udebt responsibility seed      # propose each developer's set from CODEOWNERS, else footprint
+udebt responsibility [dev]     # every developer's set, or one (dev: email, @handle, me)
+udebt responsibility <dev> add|remove <unit>...   # a lead curates
+udebt status                   # your debt per top-level unit, index over your set
+udebt status --deep            # the same with sub-units; `udebt status <unit>` for one unit
+udebt status --team            # holders per unit against the bus target; units below it
 udebt history                  # the decisions that shaped the repo, oldest first, with who made them
-udebt quiz -n 5                # answer five decision questions, get graded
-udebt dig                      # walkthrough of the highest-debt unit, then a check question
-udebt risk [range|--staged]    # weight a change lands in each unit vs your understanding of it
+udebt quiz -n 5 [--deep]       # five decision questions from your set (sub-units with --deep)
+udebt dig [unit]               # walkthrough of the highest-debt unit, then a check question
+udebt risk [range|--staged]    # weight a change lands in each unit vs your understanding; --deep per sub-unit
 udebt hook install             # warn-only pre-push hook that runs `udebt risk`
-udebt scope <unit> blackbox    # "I choose not to understand this"; excluded from the index
-udebt status --team            # who holds which unit; bus factor per unit
+udebt scope <unit> blackbox    # "I choose not to understand this", for you (or --for <dev>)
+udebt scope <unit> blackbox --team   # for everyone: stored in the map
 ```
 
-Commit everything under `.udebt/`. The map is shared, and each `records/<developer>.jsonl`
-file holds one developer's quiz history, so the team view and bus factor work for everyone.
+Commit everything under `.udebt/`. The map and `responsibility.json` are shared, and each
+`records/<developer>.jsonl` file holds one developer's quiz history, so the team view and
+bus factor work for everyone.
 
 ## The model
 
@@ -85,9 +99,15 @@ For each architectural unit `u` and developer `d`:
 | co-change edge (a, b) | sum over commits touching both, with at most 30 files, of weight / (files - 1) |
 | import edge (a, b) | 1 per direction in which a imports b; scaled so imports and co-change carry equal total weight |
 | candidate units | Louvain communities of the merged graph (seeded), sub-clusters for those of 8+ files |
-| risk of a change | per unit touched: mass landed vs your understanding; HIGH if mass >= 0.3 and understanding < 0.3, CAUTION if mass >= 0.1 and understanding < 0.6; the change's verdict is its worst unit |
+| sub-unit importance | the parent's importance split among its sub-units in proportion to the same centrality/mass blend among siblings, so they sum to the parent's |
+| sub-unit understanding | its own quiz evidence; without it, max(own-commit prior, 0.5 x the parent's quiz understanding) |
+| parent understanding | max(its own, importance-weighted mean of its sub-units' own understanding), the mean only once a sub-unit has quiz evidence |
 | debt(u) | importance x (1 - understanding), architectural units only |
-| debt index | 100 x sum(debt) / sum(importance) |
+| debt index | 100 x sum(debt) / sum(importance), over top-level units (or over sub-units where they exist, with `--deep`) |
+| responsibility set | CODEOWNERS: units where an owner owns >= 30% of the files; for a developer CODEOWNERS does not name: units where their share of the human-led mass is >= 10% (and >= 0.1), AI-authored commits left out; then curated |
+| your debt index | the debt index over your responsibility set plus the units you are touching now (uncommitted or unpushed changes); over every unit when you have no set |
+| bus target | every architectural unit should have >= `bus_target` (default 2) developers at understanding >= 0.6; the team view lists those below |
+| risk of a change | per unit touched: mass landed vs your understanding; **OUTSIDE** if the unit is outside your set, mass >= 0.1 and understanding < 0.6; HIGH if mass >= 0.3 and understanding < 0.3; CAUTION if mass >= 0.1 and understanding < 0.6; the change's verdict is its worst unit |
 
 Your share of a unit's commits counts AI-assisted commits at half weight. Four deliberate
 choices:
@@ -103,11 +123,53 @@ choices:
   after you last verified it knocks 10 percent off, so debt grows as the AI keeps building.
 
 Team view takes the maximum understanding across developers per unit and counts how many
-developers clear the known threshold (default 0.6). That count is the unit's bus factor.
+developers clear the known threshold (default 0.6). That count is the unit's bus factor, and
+the team view lists every architectural unit whose bus factor is below `bus_target` along
+with who is responsible for it.
+
+## Units and sub-units
+
+`map.json` (version 3) holds up to 12 top-level units; a unit big enough to need it has
+`children`, up to 6 sub-units with their own paths and ids of the form `parent/child`. The
+default views (`status`, `quiz`, `risk`, `dig`) work at the top level; `--deep` or a unit
+argument goes down a level, and a sub-unit's short id works where it is unambiguous. A quiz
+on a parent is evidence about the parent's decision, so its sub-units only inherit half of
+it; quizzes on sub-units roll up to the parent. In `risk --deep`, files under a parent that
+no sub-unit covers appear as `<parent> (rest)`. Version 1 and 2 maps (flat) keep working,
+and `map --rescore` leaves their version alone.
+
+## Responsibility sets
+
+A developer's set is what they are expected to understand. `udebt responsibility seed`
+proposes one per human contributor (agents and bots get none):
+
+- **CODEOWNERS** (`.github/CODEOWNERS`, `CODEOWNERS` or `docs/CODEOWNERS`, last matching
+  rule wins as on GitHub): an owner of at least 30% of a unit's files is responsible for it.
+  Emails map directly; `@handles` map through `handles` in `.udebt/config.json`, or through
+  a GitHub noreply address (`123+handle@users.noreply.github.com`) in history. A handle with
+  no known email is kept as pending, and seeding adds it to `handles` with a null value for
+  the owner to fill in.
+- **Footprint**, for developers CODEOWNERS does not name: units where their share of the
+  human-led work is at least `footprint_threshold` (default 0.1). AI-authored commits count
+  for nobody, so a unit only agents built is in nobody's set until a lead assigns it.
+
+Where a developer does not qualify for a whole unit, seeding tries its sub-units. A lead
+curates with `add` and `remove`; that marks the set as curated, so a later `seed` leaves it
+alone (`seed --force` re-seeds it and keeps the units added by hand).
+
+The same file holds **per-developer scope**. `udebt scope <unit> blackbox` marks a unit out
+of scope for you only; `--for <dev>` for someone else; `--team` for everyone (the map's
+`scope`). A developer's own choice beats the team's, in both directions, and a team-wide
+blackbox parent makes its sub-units blackbox. Status notes say which one applies.
+
+`udebt risk` reads the sets: landing real weight in a unit outside your set that you do not
+understand is **OUTSIDE**, the strongest signal udebt gives, because nobody expected you to
+know that unit and nothing shows you do. The message names who has it in their set.
 
 ## Structural discovery
 
-Before the model sees the repository, `udebt` proposes candidate units from the code itself:
+Before the model sees the repository, `udebt` proposes candidate units from the code itself
+(`udebt clusters` shows them without calling the model):
 
 1. **Import graph.** Python files are parsed with `ast`; JS and TS files by a regex over
    `import`, `export ... from`, `require` and dynamic `import()`. An import that resolves to a

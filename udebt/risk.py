@@ -3,7 +3,12 @@
 The rule is min over units. A change touching several units is as risky as the unit the
 author understands least, and the weight it lands there (the commit's weight times the square
 root of its line share under that unit) says how much that matters.
-Verdicts are advisory; `--strict` turns HIGH into a non-zero exit for teams that opt in.
+
+With responsibility sets, the strongest signal is OUTSIDE: the change lands real weight in a
+unit outside the author's set that they do not understand, so nobody expected them to know it
+and nothing says they do. Levels, strongest first: OUTSIDE, HIGH, CAUTION, OK.
+Verdicts are advisory; `--strict` turns OUTSIDE and HIGH into a non-zero exit for teams that
+opt in.
 """
 
 from __future__ import annotations
@@ -14,7 +19,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .provenance import Commit
+from . import units as hier
+from .provenance import Commit, _under
 from .scoring import UnitScore
 from .weights import CommitWeight, heuristic_weight
 
@@ -29,11 +35,20 @@ class UnitRisk:
     mass: float
     understanding: float
     source: str
-    level: str  # OK | CAUTION | HIGH
+    level: str  # OK | CAUTION | HIGH | OUTSIDE
     files: list[str]
+    in_set: bool | None = None  # None: the developer has no responsibility set
+    parts: list[str] | None = None  # sub-units of a top-level unit that the change touched
 
 
-def verdict(mass: float, understanding: float, known_threshold: float) -> str:
+ORDER = {"OUTSIDE": 0, "HIGH": 1, "CAUTION": 2, "OK": 3}
+
+
+def verdict(
+    mass: float, understanding: float, known_threshold: float, in_set: bool | None = None
+) -> str:
+    if in_set is False and mass >= CAUTION_MASS and understanding < known_threshold:
+        return "OUTSIDE"
     if mass >= HIGH_MASS and understanding < HIGH_UND:
         return "HIGH"
     if mass >= CAUTION_MASS and understanding < known_threshold:
@@ -104,49 +119,92 @@ def assess(
     changes: list[Commit],
     weights: dict[str, CommitWeight],
     known_threshold: float,
+    *,
+    responsible: set[str] | None = None,
+    hierarchy: list[dict[str, Any]] | None = None,
+    deep: bool = False,
 ) -> list[UnitRisk]:
-    out = []
+    """Risk per unit that the changes touch. Top level by default; with `deep`, per sub-unit,
+    plus a `<parent> (rest)` row for files only the parent covers, so nothing drops out of
+    view. `responsible` is the developer's set (None when they have none); `hierarchy` is
+    the whole map, needed to tell whether a unit is in the set through its parent or a
+    touched sub-unit."""
+    hierarchy = hierarchy if hierarchy is not None else units
+    rows: list[tuple[dict[str, Any], list[str]]] = []  # (unit, paths to exclude)
     for u in units:
-        if u.get("scope") != "architectural":
+        kids = hier.children_of(u)
+        if deep and kids:
+            rows += [(k, []) for k in kids]
+            rows.append((u, [p for k in kids for p in k.get("paths", [])]))
+        else:
+            rows.append((u, []))
+    out = []
+    for u, exclude in rows:
+        s = scores[u["id"]]
+        if s.scope != "architectural":
             continue
         paths = u.get("paths", [])
-        touched = [c for c in changes if c.touches(paths)]
-        if not touched:
-            continue
-        mass = round(
-            sum(weights[c.sha].weight * c.attribution(paths) for c in touched if c.sha in weights),
-            3,
-        )
         files = sorted(
             {
                 f
-                for c in touched
+                for c in changes
                 for f in c.files
-                if any(f == p or f.startswith(p.rstrip("/") + "/") for p in paths)
+                if _under(f, paths) and not (exclude and _under(f, exclude))
             }
         )
-        s = scores[u["id"]]
+        if not files:
+            continue
+        touched = [c for c in changes if any(f in files for f in c.files)]
+        mass = round(
+            sum(
+                weights[c.sha].weight * c.attribution(paths, exclude or None)
+                for c in touched
+                if c.sha in weights
+            ),
+            3,
+        )
+        parts = [
+            k for k in hier.children_of(u) if any(c.touches(k.get("paths", [])) for c in touched)
+        ]
+        in_set = None
+        if responsible is not None:
+            in_set = hier.covers(responsible, u["id"], hierarchy) or (
+                not exclude and any(k["id"] in responsible for k in parts)
+            )
         out.append(
             UnitRisk(
-                u["id"],
+                u["id"] + (" (rest)" if exclude else ""),
                 u["name"],
                 mass,
                 s.understanding,
                 s.source,
-                verdict(mass, s.understanding, known_threshold),
+                verdict(mass, s.understanding, known_threshold, in_set),
                 files[:6],
+                in_set,
+                None if exclude else ([k["id"].split("/", 1)[1] for k in parts] or None),
             )
         )
-    order = {"HIGH": 0, "CAUTION": 1, "OK": 2}
-    return sorted(out, key=lambda r: (order[r.level], -r.mass))
+    return sorted(out, key=lambda r: (ORDER[r.level], -r.mass))
 
 
 def overall(risks: list[UnitRisk]) -> str:
-    if any(r.level == "HIGH" for r in risks):
-        return "HIGH"
-    if any(r.level == "CAUTION" for r in risks):
-        return "CAUTION"
-    return "OK"
+    return min((r.level for r in risks), key=ORDER.__getitem__, default="OK")
+
+
+def touched_units(units: list[dict[str, Any]], files: list[str]) -> set[str]:
+    """Ids of the units in `units` whose paths cover any of `files`."""
+    return {u["id"] for u in units if any(_under(f, u.get("paths", [])) for f in files)}
+
+
+def working_files(root: Path) -> list[str]:
+    """Files the developer is touching right now: uncommitted changes (staged or not) and
+    commits not yet on the upstream branch. Empty when git cannot tell."""
+    out: set[str] = set()
+    for args in (["diff", "--name-only", "HEAD"], ["diff", "--name-only", "@{upstream}...HEAD"]):
+        p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
+        if p.returncode == 0:
+            out |= {ln for ln in p.stdout.splitlines() if ln}
+    return sorted(out)
 
 
 PRE_PUSH_HOOK = """#!/bin/sh
