@@ -1581,6 +1581,7 @@ def cmd_experiment(args) -> int:
             revs,
             n_units=args.units,
             per_unit=args.per_unit,
+            level=args.level,
             dev=email,
             resume=Path(args.resume) if args.resume else None,
         )
@@ -1921,6 +1922,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     x.add_argument("--units", type=int, help="the N most important units (default all)")
     x.add_argument("--per-unit", type=int, default=2, help="questions per unit (default 2)")
+    x.add_argument(
+        "--level",
+        type=int,
+        default=3,
+        choices=range(1, ladder.TOP + 1),
+        metavar="N",
+        help="the question ladder level of every question (default 3, consequence across "
+        "units), recorded in the report so runs at one level compare",
+    )
     x.add_argument("--resume", metavar="REPORT", help="finish a report that stopped part way")
     x.set_defaults(fn=cmd_experiment)
 

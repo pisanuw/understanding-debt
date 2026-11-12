@@ -74,7 +74,7 @@ udebt risk [range|--staged]    # weight a change lands in each unit vs your unde
 udebt hook install             # warn-only pre-push hook that runs `udebt risk`
 udebt scope <unit> blackbox    # "I choose not to understand this", for you (or --for <dev>)
 udebt scope <unit> blackbox --team   # for everyone: stored in the map
-udebt experiment synthetic --snapshots <rev>,... [--per-unit 2]   # validation: synthetic developers
+udebt experiment synthetic --snapshots <rev>,... [--per-unit 2] [--level 3]   # validation: synthetic developers
 udebt cache [status|rebuild]   # the parsed-commit cache (gitignored)
 udebt snapshot [--every week|day|mass:N] [--rebuild]   # replay debt at past points -> .udebt/snapshots.json
 udebt timeline [--dev X] [--unit U] [--format table|csv|json]   # the series and its risk events
@@ -298,7 +298,8 @@ unit by unit:
   dashboard's unit table and breakdown, and the export (`depth` per unit and point; each
   answer's `level`, null for one recorded before the ladder).
 - **`udebt quiz --level N`** asks every question at level N, the old flat behaviour at 5, for
-  experiments. `evidence_model: "flat"` in config scores the old way, the mean of the last 5 answers.
+  experiments; the synthetic experiment always passes one (`--level`, default 3), so its runs
+  stay comparable. `evidence_model: "flat"` in config scores the old way, the mean of the last 5 answers.
 
 A quiz run costs one call for the questions, one for the grades and, on units met for the
 first time, one for their orientations.
@@ -586,17 +587,19 @@ is the `claude` CLI taking the quiz with its knowledge frozen at an older snapsh
 udebt experiment synthetic --suggest 10,25,50          # snapshots that much mass before HEAD (no LLM)
 udebt experiment synthetic --suggest mshare:0.3,0.7    # ... where the units' mean mass share since is that
 udebt experiment synthetic --suggest share:0.3,0.7     # ... where their mean share changed is that
-udebt experiment synthetic --snapshots <rev>,<rev>,<rev> [--per-unit 2] [--units N]
+udebt experiment synthetic --snapshots <rev>,<rev>,<rev> [--per-unit 2] [--level 3] [--units N]
 udebt experiment synthetic --at <rev>                  # one snapshot
 udebt experiment synthetic --snapshots ... --resume .udebt/experiments/<report>.json
 ```
 
 1. one question set is written from HEAD for every snapshot (one call), `--per-unit`
-   questions per unit (default 2): the first on the unit's decision (why X rather than Y,
-   what would have to change), the second on its current behaviour (what happens when X
-   fails, which component decides Z). The prompt shows no commit history and forbids
-   questions about what changed, so a unit that has not moved since a snapshot can be
-   answered correctly from it;
+   questions per unit (default 2), every one at one level of the question ladder (`--level`,
+   default 3, consequence across units: what else would change if the decision were
+   reversed), so runs at the same level compare and the question set's mix of levels no
+   longer varies between runs. The prompt shows no commit history and forbids questions
+   about what changed, so a unit that has not moved since a snapshot can be answered
+   correctly from it. Reports before version 3 asked one decision and one behaviour question
+   per unit, roughly levels 2-3 and 4;
 2. per snapshot, the answers come from a temporary `git worktree` at `<rev>` with its `.git`
    link removed, the answerer's only working directory, and the prompt says the code it sees
    is the only code it knows (one call);
@@ -605,7 +608,7 @@ udebt experiment synthetic --snapshots ... --resume .udebt/experiments/<report>.
 So a run costs 1 + 2 x snapshots calls, and the snapshot is the only variable. Its stale
 knowledge should go wrong where the code moved since. The report, in
 `.udebt/experiments/synthetic-<sha>[_<sha>...]-<date>.json` (nothing goes to
-`.udebt/records/`), gives per snapshot and per unit:
+`.udebt/records/`), records the `level` and gives per snapshot and per unit:
 
 - the weighted mass landed since the snapshot (the same attribution as everywhere else),
   its share of the unit's mass, and the files at the snapshot and now;

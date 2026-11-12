@@ -118,7 +118,10 @@ def test_experiment_one_snapshot(fixture_repo, spy, capsys):
     (path,) = (root / ".udebt" / "experiments").glob("synthetic-*.json")
     assert path.name.startswith(f"synthetic-{at[:8]}-")
     rep = json.loads(path.read_text())
-    assert rep["version"] == 2 and rep["llm_calls"] == 3 and rep["per_unit"] == 2
+    assert rep["version"] == 3 and rep["llm_calls"] == 3 and rep["per_unit"] == 2
+    assert rep["level"] == 3 and rep["level_name"] == "consequence across units"
+    assert {q["level"] for q in rep["questions"]} == {3}
+    assert "level 3 of 5: consequence across units" in out
     (snap,) = rep["snapshots"]
     assert snap["at_sha"] == at and snap["commits_since"] == 2 and snap["graded"]
     storage, scoring_ = snap["units"]["storage"], snap["units"]["scoring"]
@@ -220,3 +223,22 @@ def test_experiment_rejects_head(fixture_repo, monkeypatch, capsys):
     cli.main(["--repo", str(fixture_repo), "map"])
     with pytest.raises(SystemExit, match="is HEAD"):
         cli.main(["--repo", str(fixture_repo), "experiment", "synthetic", "--at", "HEAD"])
+
+
+def test_experiment_level_is_explicit_and_a_resume_keeps_it(fixture_repo, spy, capsys):
+    root = fixture_repo
+    _run(root, capsys, "init")
+    _run(root, capsys, "map")
+    spy.log.clear()
+    rc, out = _run(root, capsys, "experiment", "synthetic", "--at", "HEAD~1", "--level", "1")
+    assert rc == 0 and "level 1 of 5: purpose and placement" in out
+    (path,) = (root / ".udebt" / "experiments").glob("synthetic-*.json")
+    rep = json.loads(path.read_text())
+    assert rep["level"] == 1 and {q["level"] for q in rep["questions"]} == {1}
+    # resuming at another level is another question set: nothing is reused
+    spy.log.clear()
+    args = ["experiment", "synthetic", "--at", "HEAD~1", "--resume", str(path), "--level", "2"]
+    rc, out = _run(root, capsys, *args)
+    assert [e["task"] for e in spy.log] == ["TASK: stable-questions", "TASK: answer", "TASK: grade"]
+    rep = json.loads(path.read_text())
+    assert rep["level"] == 2 and {q["level"] for q in rep["questions"]} == {2}

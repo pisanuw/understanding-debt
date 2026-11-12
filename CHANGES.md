@@ -77,3 +77,4 @@
 2026-11-12 [code] Records store `level` (`forced` under quiz --level N); pre-ladder records are level 5 and never move the ladder. quiz --preview prints Markdown, records nothing; status shows depth.
 2026-11-12 [code] Orientation before a unit's first level 1 question: purpose, decision, 2-3 paths, who shaped it; one batched call per quiz, cached on the unit in map.json; dig opens with it.
 2026-11-12 [code] Replayed points carry depth per unit; timeline --dev/--unit, the dashboard unit table and breakdown and the export show it; evidence exports its level. Replay rules 3: rebuild.
+2026-11-12 [decision] experiment synthetic asks every question at one explicit ladder level (--level, default 3) recorded in the report (v3); a resume at another level writes a new question set.

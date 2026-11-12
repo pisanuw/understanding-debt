@@ -9,10 +9,14 @@ That tests decay and unit attribution with no human subjects.
 
 One run can freeze several developers at once, at several snapshots, all answering one
 shared question set written from HEAD, so the snapshot is the only variable. The questions
-ask about each unit's decision and current behaviour, never about what changed, so a unit
-that has not moved since a snapshot can be answered correctly from it. Model calls: one for
-the questions (read tools on HEAD), then per snapshot one for the answers (read tools on
-the snapshot only) and one for the grades (read tools on HEAD): 1 + 2 x snapshots.
+ask about each unit as it stands, never about what changed, so a unit that has not moved
+since a snapshot can be answered correctly from it, and every question is at one explicit
+level of the question ladder (ladder.py; `--level`, default 3, consequence across units),
+recorded in the report, so runs at the same level stay comparable. Reports before version 3
+asked one decision and one behaviour question per unit (roughly levels 2-3 and 4). Model
+calls: one for the questions (read tools on HEAD), then per snapshot one for the answers
+(read tools on the snapshot only) and one for the grades (read tools on HEAD): 1 + 2 x
+snapshots.
 
 Per snapshot and unit the report gives the mass landed since (the same attribution as
 everywhere else), the mean score (correct 1, partial 0.5, wrong and unknown 0), confident
@@ -176,7 +180,9 @@ def lisbon_date() -> str:
         return datetime.now(UTC).date().isoformat()
 
 
-REPORT_VERSION = 2  # 2: several snapshots, N questions per unit, one shared question set
+# 2: several snapshots, N questions per unit, one shared question set; 3: one ladder level
+REPORT_VERSION = 3
+LEVEL = 3  # the ladder level of every question unless --level: consequence across units
 UNCHANGED_MASS = 0.005  # below this a unit has not moved since the snapshot
 MAX_TURNS = {"questions": 100, "answers": 100, "grades": 80}  # room for 2 x 12 questions
 
@@ -497,10 +503,14 @@ def run(
     *,
     n_units: int | None = None,
     per_unit: int = 2,
+    level: int = LEVEL,
     dev: str | None = None,
     resume: Path | None = None,
     out=print,
 ) -> tuple[dict[str, Any], Path]:
+    from . import ladder
+
+    ladder.check(level)
     m = store.require_map()
     head = repo.head(root)
     snaps = resolve_snapshots(root, revs, head)
@@ -527,6 +537,8 @@ def run(
         "date": date,
         "generated_at": now_iso(),
         "per_unit": per_unit,
+        "level": level,
+        "level_name": ladder.LEVELS[level].name,
         "unit_ids": [u["id"] for u in picked],
         "llm_calls": 0,
         "questions": None,
@@ -556,16 +568,27 @@ def run(
         report["llm_calls"] = int(prior.get("llm_calls", 0))
     out(
         f"Synthetic developers frozen at {len(snaps)} snapshot(s), quizzed on HEAD {head[:8]}: "
-        f"{len(picked)} units x {per_unit} questions, one question set for every snapshot"
+        f"{len(picked)} units x {per_unit} questions at {ladder.label(level)}, one question set "
+        "for every snapshot"
     )
     same_units = prior is not None and prior.get("unit_ids") == report["unit_ids"]
-    if same_units and prior.get("questions") and prior.get("per_unit") == per_unit:
+    same_set = prior is not None and (prior.get("per_unit"), prior.get("level")) == (
+        per_unit,
+        level,
+    )
+    if same_units and prior.get("questions") and same_set:
         questions = prior["questions"]
         out("Questions: reused from the report being resumed")
     else:
-        call("questions from HEAD, on each unit's decision and current behaviour")
+        call(f"questions from HEAD, on each unit as it stands, at level {level}")
         questions = generate_questions(
-            root, llm, picked, per_unit, stable=True, max_turns=MAX_TURNS["questions"]
+            root,
+            llm,
+            picked,
+            per_unit,
+            stable=True,
+            level=level,
+            max_turns=MAX_TURNS["questions"],
         )
     report["questions"] = questions
     save()
@@ -573,7 +596,7 @@ def run(
     done = {s["at_sha"]: s for s in (prior or {}).get("snapshots", []) if s.get("graded")}
     for snap in report["snapshots"]:
         at = snap["at_sha"]
-        if same_units and at in done:
+        if same_units and same_set and at in done:
             snap.update(graded=True, units=done[at]["units"], summary=done[at].get("summary"))
             out(f"{at[:8]}: reused from the report being resumed")
             continue
