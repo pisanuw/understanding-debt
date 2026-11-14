@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>udebt</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1 id="repo">udebt</h1>
+    <span class="who" id="who"></span>
+    <span class="stat" id="stat"></span>
+  </div>
+</header>
+<nav class="tabs" aria-label="Sections">
+  <div class="wrap" role="tablist" id="tabs">
+    <a href="#dashboard" data-tab="dashboard" role="tab">Dashboard</a>
+    <a href="#tour" data-tab="tour" role="tab">Tour</a>
+    <a href="#path" data-tab="path" role="tab">Path</a>
+    <a href="#unit" data-tab="unit" role="tab">Unit</a>
+    <a href="#quiz" data-tab="quiz" role="tab">Quiz</a>
+    <a href="#review" data-tab="review" role="tab">Review</a>
+    <a href="#tutor" data-tab="tutor" role="tab">Tutor</a>
+    <a href="#teachback" data-tab="teachback" role="tab">Teach-back</a>
+  </div>
+</nav>
+<main class="wrap" id="main">
+  <section id="tab-dashboard" hidden>
+    <iframe class="dash" id="dash" title="Understanding debt over time"></iframe>
+  </section>
+
+  <section id="tab-tour" hidden>
+    <h2>Architecture tour</h2>
+    <p class="sub">The whole system as one read, before any question: the units in the order to learn them, each after the units it uses.</p>
+    <div id="tour-body" class="card prose"></div>
+  </section>
+
+  <section id="tab-path" hidden>
+    <h2>Learning path</h2>
+    <p class="sub" id="path-sub"></p>
+    <div class="card" id="path-session"></div>
+    <div class="card"><ol class="list" id="path-list"></ol></div>
+    <p class="muted small">Minutes are a rough budget: 1 to read an orientation and 4 for a walkthrough on first contact, 2 per ladder level 1-3 still to pass, 1 per review due, 3 for a re-check.</p>
+  </section>
+
+  <section id="tab-unit" hidden>
+    <div class="row">
+      <label for="unit-pick">Unit</label>
+      <select id="unit-pick" class="grow"></select>
+    </div>
+    <div id="unit-body"></div>
+  </section>
+
+  <section id="tab-quiz" hidden>
+    <h2>Quiz</h2>
+    <p class="sub">Each unit at your level on the question ladder, one fact per question. At levels 1 and 2 a miss shows the answer; it counts as the miss it was, and comes back in review.</p>
+    <div class="card" id="quiz-start">
+      <div class="row">
+        <label for="quiz-n">Questions</label>
+        <select id="quiz-n"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
+        <label for="quiz-unit">Unit</label>
+        <select id="quiz-unit" class="grow"></select>
+        <button class="primary" id="quiz-go" type="button">Start</button>
+      </div>
+      <p class="muted small" id="quiz-note"></p>
+    </div>
+    <div id="quiz-flow"></div>
+  </section>
+
+  <section id="tab-review" hidden>
+    <h2>Review</h2>
+    <p class="sub">The questions you missed come back at growing intervals (1 day, 3 days, then longer), in other words.</p>
+    <div class="card" id="review-start">
+      <div class="row">
+        <button class="primary" id="review-go" type="button">Review what is due</button>
+        <label><input type="checkbox" id="review-all"> include items not yet due</label>
+      </div>
+      <p class="muted small" id="review-note"></p>
+    </div>
+    <div id="review-flow"></div>
+  </section>
+
+  <section id="tab-tutor" hidden>
+    <h2>Tutor</h2>
+    <p class="sub">A conversation about one unit: the tutor reads the code for you and asks back. Say "check me" (or keep going a few turns) for a check question at your level; it is graded and recorded.</p>
+    <div class="card">
+      <div class="row">
+        <label for="tutor-unit">Unit</label>
+        <select id="tutor-unit" class="grow"></select>
+        <span class="timer" id="tutor-timer"></span>
+      </div>
+      <div class="banner" id="tutor-stop" hidden>Ten minutes: a good place to stop. What you answered is recorded; the path says what is next.</div>
+      <div class="chat" id="tutor-log"></div>
+      <div id="tutor-check"></div>
+      <textarea id="tutor-msg" placeholder="What would you like to understand about this unit?"></textarea>
+      <div class="row gap-top">
+        <button class="primary" id="tutor-send" type="button">Send</button>
+        <button id="tutor-checkme" type="button">Check me</button>
+        <button id="tutor-new" type="button">New session</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-teachback" hidden>
+    <h2>Teach-back</h2>
+    <p class="sub">Explain a unit in your own words: what it is for, the decision behind it and what was not chosen. You hear what was right, what was missing and any misconception; it counts as level 2.</p>
+    <div class="card">
+      <div class="row">
+        <label for="tb-unit">Unit</label>
+        <select id="tb-unit" class="grow"></select>
+      </div>
+      <p class="muted small" id="tb-prompt"></p>
+      <textarea id="tb-text" placeholder="It is for ... The decision was ... rather than ..."></textarea>
+      <div class="row gap-top">
+        <span class="conf" id="tb-conf"></span>
+        <button class="primary" id="tb-go" type="button">Check my explanation</button>
+      </div>
+      <div id="tb-result"></div>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

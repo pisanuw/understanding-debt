@@ -971,7 +971,7 @@ tour, walkthrough, teach-back). Tests: 146 after Part 1.
 | 8 `udebt review` (SM-2) | **done**: SM-2 per (unit, level) from the first miss, state stamped on every record; `review` asks a stored variant with its reference, one grading call |
 | 9 `udebt teachback` | **done**: one call, right / missing / misconception, level 2 evidence `type: teachback`, revealed on a miss |
 | 10 `udebt decisions write` | **done**: opt-in, one ADR per top-level unit and an index, no model call; a level 2 pass refreshes "Last confirmed by" |
-| Part 2 `udebt serve` | not started |
+| Part 2 `udebt serve` | **done** (code and offline tests): stdlib server on 127.0.0.1, token, Host check; Dashboard, Tour, Path, Unit, Quiz, Review, Tutor, Teach-back tabs; generation POSTs fill map.json caches; quiz questions pooled per unit and level; screenshots and the tutor smoke test next |
 | validation (8-call budget), README/BRIEFING docs | Part 1 **done**: 4 calls (preview, tour, walkthrough, teach-back), README "Teaching", BRIEFING decisions and open questions; the tutor and screenshots go with Part 2 |
 
 **Orientation root cause.** `cmd_quiz` and `ask_interactively` print it correctly on a unit

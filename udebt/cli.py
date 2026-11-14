@@ -16,6 +16,8 @@ udebt path                      your learning path: order, minutes, next action 
 udebt review                    spaced review of the questions you missed
 udebt teachback <id>            explain a unit in your words; graded as level 2
 udebt decisions [write]         one decision record per top-level unit (opt-in)
+udebt serve [--open]            all of it in the browser: dashboard, tour, path, units, quiz,
+                                review, tutor, teach-back (127.0.0.1, a token per run)
 udebt directed add <session>    count agent commits you directed as your assisted work
 udebt experiment synthetic --snapshots <rev>,...   synthetic developers frozen at old snapshots
 udebt cache [status|rebuild]    the parsed-commit cache under .udebt/ (gitignored)
@@ -65,6 +67,7 @@ from .quiz import (
     levels_for,
     mark_revealed,
     pick_units,
+    pool_add,
     reveal_text,
     revealed_on,
 )
@@ -330,6 +333,7 @@ def cmd_quiz(args) -> int:
                 u["revealed"] = seen
         say("Generating questions from the code...")
         questions = generate_questions(root, llm, picked, per_unit=args.per_unit)
+        pool_add(store, m, questions)
         if args.preview:
             print(_preview(root, email, picked, questions, orients))
             return 0
@@ -1121,6 +1125,16 @@ def cmd_teachback(args) -> int:
     if r.get("revealed"):
         print(reveal_text(r))
     return 0
+
+
+def cmd_serve(args) -> int:
+    from . import serve
+
+    root, store = _ctx(args)
+    store.require()
+    store.require_map()
+    app = serve.App(root, store, _email(args, root), lambda: _llm(store, args))
+    return serve.run(app, args.port, open_browser=args.open, verbose=args.verbose)
 
 
 def cmd_decisions(args) -> int:
@@ -2326,6 +2340,11 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("teachback", help="explain a unit; graded as level 2")
     s.add_argument("unit")
     s.set_defaults(fn=cmd_teachback)
+
+    s = sub.add_parser("serve", help="the teaching surface in your browser, on 127.0.0.1")
+    s.add_argument("--port", type=int, default=0, help="default: a free port")
+    s.add_argument("--open", action="store_true", help="open it in the browser")
+    s.set_defaults(fn=cmd_serve)
 
     s = sub.add_parser(
         "decisions", help="decision records per top-level unit (opt-in: `write` writes them)"

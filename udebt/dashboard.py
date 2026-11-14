@@ -33,6 +33,8 @@ def template() -> str:
     return resources.files("udebt").joinpath("dashboard.html").read_text(encoding="utf-8")
 
 
-def render(data: dict[str, Any]) -> str:
-    title = html.escape(f"Understanding debt: {data.get('repo', '')}")
+def render(data: dict[str, Any] | None, repo: str = "") -> str:
+    """The page with `data` inline; with None, an empty blob, and the page fetches
+    `/api/dashboard` from the local server (`udebt serve`) instead."""
+    title = html.escape(f"Understanding debt: {(data or {}).get('repo', repo)}")
     return template().replace("__TITLE__", title).replace("__DATA__", blob(data))

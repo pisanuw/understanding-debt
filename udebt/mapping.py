@@ -385,14 +385,27 @@ def _units_from(
 
 
 def _keep_orientations(units: list[dict[str, Any]], previous: dict[str, Any]) -> None:
-    """A re-mapped unit keeps its cached orientation when it was written from the same
-    summary, decision, alternatives, why, paths and history (orientation.basis)."""
+    """A re-mapped unit keeps its cached orientation, walkthrough and pooled questions when
+    they were written from the same summary, decision, alternatives, why, paths and history
+    (orientation.basis); a walkthrough still checks its files' contents when used."""
     from .orientation import basis
 
     for u, _parent in hier.walk(units):
-        o = previous.get(u["id"], {}).get("orientation")
-        if isinstance(o, dict) and o.get("basis") == basis(u):
+        prev = previous.get(u["id"], {})
+        b = basis(u)
+        o = prev.get("orientation")
+        if isinstance(o, dict) and o.get("basis") == b:
             u["orientation"] = o
+        w = prev.get("walkthrough")
+        if isinstance(w, dict) and w.get("basis") == b:
+            u["walkthrough"] = w
+        pool = {
+            lv: [q for q in qs if q.get("basis") == b]
+            for lv, qs in (prev.get("questions") or {}).items()
+        }
+        pool = {lv: qs for lv, qs in pool.items() if qs}
+        if pool:
+            u["questions"] = pool
 
 
 def build_map(

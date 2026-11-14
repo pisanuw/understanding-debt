@@ -90,3 +90,5 @@
 2026-11-14 [decision] Learning order is prerequisites-first by priority, not Kahn's: on digitalme Kahn put the two least important isolated units first and chat-flow third.
 2026-11-14 [note] digitalme validation, 4 calls: five one-fact level 1 questions (none compound), tour 12 units 2,255 words, chat-flow walkthrough 5 steps, a half-right teach-back graded.
 2026-11-14 [doc] README Teaching section, BRIEFING Phase 3.3 decisions and open questions, ROADMAP Phase 3.3; samples digitalme-teaching.md and digitalme-tour.md.
+2026-11-14 [code] udebt serve: 127.0.0.1, per-run token, Host check, JSON POSTs; eight tabs over the CLI machinery; tutor turns via claude --session-id, then --resume, read tools only.
+2026-11-14 [decision] Quiz questions pooled in map.json per unit and level; serve asks a stored variant of a missed question, then a pooled one, before a new call.

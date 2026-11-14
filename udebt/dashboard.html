@@ -185,7 +185,17 @@ footer p { margin: 4px 0; }
 <script>
 (function () {
   "use strict";
-  var D = JSON.parse(document.getElementById("udebt-data").textContent);
+  // the blob is the data; `udebt serve` leaves it null and the page asks the local server
+  var raw = document.getElementById("udebt-data").textContent.trim();
+  if (raw && raw !== "null") { start(JSON.parse(raw)); return; }
+  var token = new URLSearchParams(location.search).get("t") || "";
+  document.getElementById("subtitle").textContent = "Loading the replayed history...";
+  fetch("/api/dashboard", { headers: { "X-Udebt-Token": token } })
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(start)
+    .catch(function (e) { document.getElementById("subtitle").textContent = "Could not load the data: " + e.message; });
+
+  function start(D) {
   var SVGNS = "http://www.w3.org/2000/svg";
   var P = D.snapshots || [];
   var devs = D.devs || [];
@@ -685,6 +695,8 @@ footer p { margin: 4px 0; }
   if (window.matchMedia) {
     var mq = window.matchMedia("(prefers-color-scheme: dark)");
     if (mq.addEventListener) mq.addEventListener("change", renderBreakdown);
+  }
+  if (window.parent !== window) window.parent.postMessage({ udebtHeight: document.documentElement.scrollHeight }, location.origin);
   }
 })();
 </script>

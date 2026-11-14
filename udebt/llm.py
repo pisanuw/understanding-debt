@@ -35,6 +35,17 @@ class LLM(Protocol):
         self, prompt: str, *, cwd: Path, read_tools: bool = True, max_turns: int = 40
     ) -> str: ...
 
+    def chat(
+        self,
+        message: str,
+        *,
+        cwd: Path,
+        session_id: str,
+        resume: bool = False,
+        system: str | None = None,
+        max_turns: int = 12,
+    ) -> str: ...
+
 
 class ClaudeCLI:
     READ_TOOLS = ["Read", "Glob", "Grep"]
@@ -103,6 +114,38 @@ class ClaudeCLI:
 
     def text(self, prompt, *, cwd, read_tools=True, max_turns=40):
         data = self._run(prompt, cwd=cwd, read_tools=read_tools, max_turns=max_turns, schema=None)
+        return str(data.get("result", ""))
+
+    def chat(self, message, *, cwd, session_id, resume=False, system=None, max_turns=12):
+        """One turn of a conversation the `claude` CLI keeps (the tutor, udebt serve): the
+        first turn names the session (`--session-id`) and appends the system prompt, later
+        turns `--resume` it, whose snapshot keeps that prompt. Read-only tools only, given
+        both as the tools available and as the tools allowed without asking. The session is
+        persisted by the CLI (no `--no-session-persistence`), or it could not be resumed."""
+        cmd = ["claude", "-p", "--output-format", "json", "--max-turns", str(max_turns)]
+        if self.model:
+            cmd += ["--model", self.model]
+        if resume:
+            cmd += ["--resume", session_id]
+        else:
+            cmd += ["--session-id", session_id]
+            if system:
+                cmd += ["--append-system-prompt", system]
+        cmd += ["--tools", *self.READ_TOOLS, "--allowedTools", *self.READ_TOOLS]
+        if self.verbose:
+            how = "resume" if resume else "new"
+            print(f"[udebt] claude chat turn ({how} {session_id[:8]})", file=sys.stderr)
+        proc = subprocess.run(
+            cmd, input=message, cwd=cwd, capture_output=True, text=True, encoding="utf-8"
+        )
+        if proc.returncode != 0:
+            raise LLMError(f"claude exited {proc.returncode}: {proc.stderr.strip()[:2000]}")
+        try:
+            data = json.loads(proc.stdout)
+        except json.JSONDecodeError as e:
+            raise LLMError(f"claude returned non-JSON output: {proc.stdout[:500]}") from e
+        if data.get("is_error"):
+            raise LLMError(f"claude reported an error: {str(data.get('result', ''))[:2000]}")
         return str(data.get("result", ""))
 
 
@@ -239,6 +282,20 @@ class FakeLLM:
     def text(self, prompt, *, cwd, read_tools=True, max_turns=40):
         self.calls.append(prompt)
         raise LLMError(f"FakeLLM has no canned text for this prompt: {prompt[:80]}")
+
+    chats: list[dict[str, Any]] = []  # every chat turn, across instances (the server makes many)
+
+    def chat(self, message, *, cwd, session_id, resume=False, system=None, max_turns=12):
+        FakeLLM.chats.append(
+            {"session_id": session_id, "resume": resume, "system": system, "message": message}
+        )
+        reply = "Let us look at it together. What do you think it is for?"
+        if "propose the check question now" in message:
+            reply += (
+                "\n\nCHECK QUESTION: What is the unit for?\n"
+                "REFERENCE: It returns a default, by design."
+            )
+        return reply
 
 
 # per level, a unit's first question (the one a single-question quiz gets) and its second;

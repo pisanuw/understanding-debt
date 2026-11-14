@@ -242,6 +242,72 @@ def one_fact(q: dict[str, Any], level: int) -> dict[str, Any]:
     return out
 
 
+POOL_PER_LEVEL = 6  # questions kept per unit and level in map.json (`questions`)
+
+
+def pool_add(store: Store, map_data: dict[str, Any], questions: list[dict[str, Any]]) -> None:
+    """Keep generated questions on their units in map.json, per level, for any later run
+    (`udebt serve` asks a pooled question before it asks the model for a new one). Each
+    entry keeps the unit's basis, so a re-map that changes the unit drops it."""
+    from . import orientation as orient
+
+    by_id = hier.index(map_data["units"])
+    changed = False
+    for q in questions:
+        u = by_id.get(q.get("unit_id"))
+        if u is None or not q.get("question") or q.get("from_pool"):
+            continue
+        pool = u.setdefault("questions", {}).setdefault(str(ladder.level_of(q)), [])
+        if any(p["question"] == q["question"] for p in pool):
+            continue
+        pool.append(
+            {
+                "question": q["question"],
+                "variants": list(q.get("variants") or []),
+                "reference_answer": q.get("reference_answer", ""),
+                "evidence": list(q.get("evidence") or []),
+                "basis": orient.basis(u),
+                "generated_at": now_iso(),
+            }
+        )
+        del pool[:-POOL_PER_LEVEL]
+        changed = True
+    if changed:
+        store.save_map(map_data)
+
+
+def pool_pick(
+    unit: dict[str, Any], level: int, records_on_unit: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """A question for `unit` at `level` with no model call: a stored variant of the question
+    the developer last missed and saw the answer to at that level (the same fact in other
+    words), else a pooled question they have not been asked; None when there is neither."""
+    from . import orientation as orient
+
+    asked = {str(r.get("question")) for r in records_on_unit}
+    at = [r for r in ladder._ordered(records_on_unit) if ladder.level_of(r) == level]
+    for r in reversed(at):
+        if r.get("verdict") == "correct":
+            break
+        if r.get("revealed"):
+            for v in r.get("variants") or []:
+                if v not in asked:
+                    return {
+                        "unit_id": unit["id"],
+                        "level": level,
+                        "question": v,
+                        "variants": [x for x in r["variants"] if x != v],
+                        "reference_answer": r.get("reference") or "(graded against the code)",
+                        "evidence": list(r.get("evidence") or []),
+                        "from_pool": True,
+                    }
+    b = orient.basis(unit)
+    for p in (unit.get("questions") or {}).get(str(level), []):
+        if p.get("basis") == b and p["question"] not in asked:
+            return {"unit_id": unit["id"], "level": level, **p, "from_pool": True}
+    return None
+
+
 def generate_questions(
     root: Path,
     llm: LLM,
