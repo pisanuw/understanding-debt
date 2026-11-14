@@ -445,7 +445,8 @@ should fade with the share changed less steeply than level 5 does).
 
 ### Phase 3.3: the teaching layer
 
-**Status 2026-11-14: Part 1 (the CLI teaching layer) done; Part 2 (`udebt serve`) below.**
+**Status 2026-11-14: done.** Part 1 (the CLI teaching layer) and Part 2 (`udebt serve`),
+seven `claude` CLI calls of the eight budgeted.
 From the owner's level 1 quiz on digitalme: five compound inventory questions, none answered,
 nothing taught on "I don't know", no orientation shown. "The system is currently good at
 quizzing the user, but leaves the programmer frustrated and having to go back to look at the
@@ -472,6 +473,28 @@ units in 2,255 words (about 11 minutes); the `chat-flow` walkthrough traces one 
 through five steps in four files, from the browser's watchdog to the concurrent post-stream
 checks; a half-right teach-back on `auth-rbac` was graded wrong, its purpose credited and its
 misconception (roles in the token) corrected from the code.
+
+**`udebt serve`** (Part 2): Dashboard, Tour, Path, Unit, Quiz, Review, Tutor and Teach-back
+tabs over the same code as the CLI, on 127.0.0.1 with a per-run token. The tutor smoke test
+on digitalme (`auth-rbac`, three calls: two turns and the graded check, 9 s, 9 s and 7 s):
+the first turn ran with `--session-id` and `--append-system-prompt`, the second with
+`--resume` on the same id, both `--tools Read Glob Grep --allowedTools Read Glob Grep`
+without `--no-session-persistence`. Asked where the app decides someone is an admin, the
+tutor read the code, answered with the line ranges of sign-in and the per-request capability
+check, and asked back what happens to a removed role while a token is still valid; on
+"check me" it proposed a level 1 question ("Why does this app work out what a signed-in
+person is allowed to do each time they make a request, instead of recording it once when
+they sign in?"), its reference stripped from the page; the answer was graded correct and
+recorded with `source: tutor`. The validation records were removed from the testbed.
+
+Screenshots (Playwright, every tab at 1280 and 390 px, light and dark, plus a revealed quiz
+answer, a review item and a teach-back result, 52 in all, in the gitignored
+`.udebt/dashboard/serve-*.png`): no horizontal page scroll and no console error anywhere.
+Fixed from them: tutor replies arrived as Markdown and showed raw (now rendered, escaped,
+server-side); the dashboard tab showed digitalme's stale pre-ladder series as it was (now
+replayed in memory); the dashboard inside the app doubled its side padding at 390 px (now
+full-bleed); the tour's italic meta line showed underscores (emphasis cannot span code); the
+unit heading sat tight under its selector. Code excerpts scroll inside their box at 390 px.
 
 ## Phase 4: hosted (Netlify, Render, Supabase) with the CLI as the local twin
 
@@ -514,6 +537,27 @@ for the hosted model calls.
 - Still missing: identity mapping to GitHub users (the export keys developers by primary
   email), the per-repository decay rate the Phase 1.4 runs ask for, and a cap on the
   developers a large team's series carries.
+
+**What Phase 3.3's `udebt serve` leaves for it to reuse** (2026-11-14):
+
+- **The API surface**: `/api/state`, `/api/path`, `/api/unit`, `/api/tour`, `/api/review`,
+  `/api/dashboard` (GETs that only read) and `/api/questions`, `/api/answer`,
+  `/api/walkthrough`, `/api/teachback`, `/api/tutor` (POSTs) are the SPA's endpoints; the
+  Netlify page can start as `udebt/static/` with the token header replaced by a Supabase
+  session, and the Render worker can serve the same handlers (`serve.App`) per repository.
+- **Recording stays in one place**: every answer goes through `quiz.grade`,
+  `quiz.mark_revealed` and `quiz.record`, so the hosted store gets the CLI's record shape
+  (with `revealed`, `variants`, `review`); metadata-only storage drops `answer`, `feedback`
+  and `reference` as the export already does.
+- **Caches that are team state**: the tour, orientations, walkthroughs and pooled questions
+  live on the map; hosted, they are rows keyed by unit and basis, written once per team.
+- **Excerpts**: `excerpts.read` is the only code path that shows source, from a working tree;
+  hosted (no stored code) it reads the worker's transient clone at request time.
+- **The tutor** needs a hosted equivalent of `claude --resume`: an API conversation with the
+  same Socratic system prompt (`tutor.system_prompt`), read-only file tools over the
+  transient clone, and the same check-question protocol (`tutor.split_check`).
+- Still missing for hosted: per-user auth instead of one token, rate limits on the
+  generation POSTs, and persisted tutor sessions.
 
 **Exit** when one team uses the hosted dashboard for a month and the CLI and server agree
 on every number.
@@ -956,8 +1000,9 @@ udebt defaults to advisory and lets a repo owner opt in to soft blocking per rep
 Phase 3.3 (the teaching layer, from the owner's level 1 quiz on digitalme: five "I don't
 know", no orientation shown, compound inventory questions, nothing taught on a miss). The
 first session fixed item 1 and stopped at a session limit (0 calls); the second did items
-2-10 (Part 1, pushed) and then Part 2. **LLM calls used: 4 of 8 after Part 1** (questions,
-tour, walkthrough, teach-back). Tests: 146 after Part 1.
+2-10 (Part 1, pushed) and then Part 2. **LLM calls used: 7 of 8** (questions, tour,
+walkthrough, teach-back; two tutor turns and the tutor's graded check). Tests: 154 (146
+after Part 1).
 
 | item | status |
 |---|---|
@@ -971,8 +1016,8 @@ tour, walkthrough, teach-back). Tests: 146 after Part 1.
 | 8 `udebt review` (SM-2) | **done**: SM-2 per (unit, level) from the first miss, state stamped on every record; `review` asks a stored variant with its reference, one grading call |
 | 9 `udebt teachback` | **done**: one call, right / missing / misconception, level 2 evidence `type: teachback`, revealed on a miss |
 | 10 `udebt decisions write` | **done**: opt-in, one ADR per top-level unit and an index, no model call; a level 2 pass refreshes "Last confirmed by" |
-| Part 2 `udebt serve` | **done** (code and offline tests): stdlib server on 127.0.0.1, token, Host check; Dashboard, Tour, Path, Unit, Quiz, Review, Tutor, Teach-back tabs; generation POSTs fill map.json caches; quiz questions pooled per unit and level; screenshots and the tutor smoke test next |
-| validation (8-call budget), README/BRIEFING docs | Part 1 **done**: 4 calls (preview, tour, walkthrough, teach-back), README "Teaching", BRIEFING decisions and open questions; the tutor and screenshots go with Part 2 |
+| Part 2 `udebt serve` | **done**: stdlib server on 127.0.0.1, token, Host check; Dashboard, Tour, Path, Unit, Quiz, Review, Tutor, Teach-back tabs; generation POSTs fill map.json caches; quiz questions pooled per unit and level; tutor smoke test (3 calls) and 52 screenshots, five layout fixes |
+| validation (8-call budget), README/BRIEFING docs | **done**: 7 calls (preview, tour, walkthrough, teach-back, tutor 2 turns + check); README "Teaching" and `udebt serve`, BRIEFING decisions and open questions, ROADMAP Phase 3.3 and Phase 4 notes |
 
 **Orientation root cause.** `cmd_quiz` and `ask_interactively` print it correctly on a unit
 with no evidence (reproduced offline on a copy of digitalme). Two gaps hid it: (1)
@@ -989,7 +1034,9 @@ him is inferred; (1) fits a second level 1 sitting or an earlier `dig`.
 local equivalents or re-map (one more call). Its five sample units have cached orientations,
 so `quiz --preview` there costs one call.
 
-**Next steps, in order** (design worked out, nothing written):
+**Next steps, in order** (the first session's plan, kept for the record; all done, with the
+departures BRIEFING lists: prerequisites-first order instead of Kahn's, the walkthrough cache
+keyed on file contents instead of `git diff`):
 
 1. *One fact*: `ladder.compound(q)` (more than one `?`, `\band (what|which)\b`, `;\s`; also
    reject "list"/"which other parts" at levels 1-3); reword ladder level 1-4 examples to one

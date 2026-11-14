@@ -99,6 +99,7 @@
     var arg = parts.slice(1).join("/");
     if (tab === "unit") showUnit(arg ? decodeURIComponent(arg) : $("unit-pick").value);
     else if (!loaded[tab]) { loaded[tab] = true; (OPEN[tab] || function () {})(); }
+    if (tab === "tutor" && arg && arg !== tutorSession) attachTutor(decodeURIComponent(arg));
   }
   // keep the token in the page URL when tabs change the hash
   window.addEventListener("hashchange", route);
@@ -387,7 +388,11 @@
     if (!tutorStarted) tutorStarted = Date.now() - 1000 * (v.elapsed_s || 0);
     var log = clear($("tutor-log"));
     add(log, el("div", { "class": "msg check" }, unitName(v.unit) + " · " + v.label));
-    v.turns.forEach(function (t) { add(log, el("div", { "class": "msg " + t.role }, t.text)); });
+    v.turns.forEach(function (t) {
+      var m = el("div", { "class": "msg " + t.role + (t.html ? " md" : "") });
+      if (t.html) m.innerHTML = t.html; else m.textContent = t.text; // html: escaped by the server
+      add(log, m);
+    });
     var ck = clear($("tutor-check"));
     if (v.check) {
       var card = el("div", { "class": "card" });
@@ -415,6 +420,12 @@
     }
     tick();
   }
+  function attachTutor(id) { // a reload keeps the conversation: the session is in the URL
+    api("/api/tutor?session=" + encodeURIComponent(id)).then(function (v) {
+      $("tutor-unit").value = v.unit; $("tutor-unit").disabled = true; tutorStarted = 0;
+      showTutor(v);
+    }).catch(function (e) { toast(e.message); });
+  }
   function sendTutor(text) {
     var b = $("tutor-send");
     if (!text.trim()) { $("tutor-msg").focus(); return; }
@@ -425,6 +436,7 @@
       busy(b, false); $("tutor-checkme").disabled = false; $("tutor-msg").value = "";
       $("tutor-unit").disabled = true;
       showTutor(v);
+      history.replaceState(null, "", location.pathname + location.search + "#tutor/" + v.session);
     }).catch(function (e) { busy(b, false); $("tutor-checkme").disabled = false; toast(e.message); });
   }
   function openTutor() {
@@ -434,6 +446,7 @@
   $("tutor-checkme").addEventListener("click", function () { sendTutor(($("tutor-msg").value.trim() ? $("tutor-msg").value.trim() + " " : "") + "Check me."); });
   $("tutor-new").addEventListener("click", function () {
     tutorSession = null; tutorStarted = 0; $("tutor-unit").disabled = false;
+    history.replaceState(null, "", location.pathname + location.search + "#tutor");
     clear($("tutor-log")); clear($("tutor-check")); $("tutor-stop").hidden = true; tick();
   });
 

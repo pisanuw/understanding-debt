@@ -126,9 +126,9 @@ def markdown(tour: dict[str, Any], map_data: dict[str, Any], graph: UnitGraph, r
     out = [
         f"# Architecture tour: {repo_name}",
         "",
-        f"_Written by `udebt tour` at `{str(tour.get('head', ''))[:8]}` on {when}; "
+        f"Written by `udebt tour` at `{str(tour.get('head', ''))[:8]}` on {when}; "
         f"{len(tour['sections'])} units, about __MINUTES__ minutes to read. Units come in the "
-        "order to learn them: each after the units it uses._",
+        "order to learn them: each after the units it uses.",
         "",
         tour["overview"],
         "",

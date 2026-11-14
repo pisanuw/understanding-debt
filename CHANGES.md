@@ -92,3 +92,6 @@
 2026-11-14 [doc] README Teaching section, BRIEFING Phase 3.3 decisions and open questions, ROADMAP Phase 3.3; samples digitalme-teaching.md and digitalme-tour.md.
 2026-11-14 [code] udebt serve: 127.0.0.1, per-run token, Host check, JSON POSTs; eight tabs over the CLI machinery; tutor turns via claude --session-id, then --resume, read tools only.
 2026-11-14 [decision] Quiz questions pooled in map.json per unit and level; serve asks a stored variant of a missed question, then a pooled one, before a new call.
+2026-11-14 [note] Tutor smoke test on digitalme auth-rbac, 3 calls: --session-id then --resume worked, the tutor read the code and asked back; its check graded and recorded.
+2026-11-14 [code] serve fixes from 52 screenshots: tutor Markdown rendered (escaped), a stale series replayed in memory, full-bleed dashboard tab; tutor reattaches by URL.
+2026-11-14 [doc] README `udebt serve`, BRIEFING serve decisions and open questions, ROADMAP Phase 3.3 done and what Phase 4 reuses from serve; Handoff statuses final.

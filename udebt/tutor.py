@@ -21,6 +21,7 @@ from typing import Any
 
 from . import ladder
 from . import orientation as orient
+from .markdown import to_html
 
 CHECK_AFTER = 4  # developer turns before the tutor is asked for the check question
 SESSION_SECONDS = 600
@@ -104,7 +105,9 @@ class Session:
             "unit": self.unit_id,
             "level": self.level,
             "label": ladder.label(self.level),
-            "turns": self.turns,
+            "turns": [
+                {**t, "html": to_html(t["text"])} if t["role"] == "tutor" else t for t in self.turns
+            ],
             "check": {"question": self.check["question"]} if self.check else None,
             "elapsed_s": self.elapsed,
             "suggest_stop": self.elapsed >= SESSION_SECONDS,

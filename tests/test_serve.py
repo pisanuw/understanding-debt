@@ -210,3 +210,22 @@ def test_tutor_flags_for_the_claude_cli(monkeypatch, tmp_path):
     assert later[later.index("--resume") + 1] == "u-1" and "--session-id" not in later
     for cmd in seen:
         assert "--no-session-persistence" not in cmd and cmd[-8:] == tools
+
+
+def test_a_stale_series_is_replayed_in_memory_and_tutor_markdown_is_escaped(server, capsys):
+    app, store, _ = server
+    cli.main(["--repo", str(store.root), "snapshot"])
+    p = store.dir / "snapshots.json"
+    data = json.loads(p.read_text())
+    data["fingerprint"]["rules"] = 1  # made under older rules
+    p.write_text(json.dumps(data))
+    before = p.read_text()
+    st, d, _ = call(app, "GET", "/api/dashboard")
+    assert st == 200 and d["snapshots"] and p.read_text() == before, "replayed, not written"
+    assert "replays it in memory" in capsys.readouterr().err
+    from udebt import tutor
+
+    s = tutor.Session("storage", 1, "dev1@example.com")
+    s.turns = [{"role": "tutor", "text": "**Sign-in** (`main.py:1-2`) <script>x</script>"}]
+    (t,) = s.view()["turns"]
+    assert "<strong>Sign-in</strong>" in t["html"] and "<script>" not in t["html"]

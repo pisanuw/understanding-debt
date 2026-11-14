@@ -78,6 +78,7 @@ udebt dig [unit] [--refresh]   # one real request traced through the unit's code
 udebt review [-n 5] [--all]    # spaced review of the questions you missed, in other words
 udebt teachback <unit>         # explain a unit; right, missing, misconception; graded as level 2
 udebt decisions [write] [--dir docs/decisions]   # one decision record per top-level unit (opt-in)
+udebt serve [--port N] [--open]   # all of it in the browser on 127.0.0.1, with a tutor
 udebt risk [range|--staged]    # weight a change lands in each unit vs your understanding; --deep per sub-unit
 udebt hook install             # warn-only pre-push hook that runs `udebt risk`
 udebt scope <unit> blackbox    # "I choose not to understand this", for you (or --for <dev>)
@@ -392,6 +393,42 @@ none costs more than one call; what the model writes for the team is cached in `
   line ("Debt index X -> Y: <units> were estimated from your own commits (a prior of at most
   0.5) and now rest on your answers"), since an honest "I don't know" can raise the index the
   prior was holding down.
+
+### In the browser: `udebt serve`
+
+`udebt serve` starts a local server (127.0.0.1, a free port unless `--port`; `--open` opens
+it) and prints a URL with a token that is new each run. Stdlib only (`http.server`), the
+page hand-written under `udebt/static/`, no CDN, light and dark, laid out for 390 px phones.
+Tabs:
+
+- **Dashboard**: the Phase 3 dashboard page, which fetches `/api/dashboard` when its data
+  blob is empty (a stale stored series is replayed in memory; nothing is written).
+- **Tour** and **Path**, as above; the tour is written by a button when the map has none.
+- **Unit**: understanding with its basis (measured or estimated), depth and next level; the
+  orientation and connections; the walkthrough, each step beside its real lines (fetched
+  from `/api/excerpt`, numbered); the decision record; your answers and review items.
+- **Quiz** and **Review**: free text, graded one answer at a time with the CLI's code, the
+  answer shown after a miss at levels 1-2, recorded exactly as the CLI records it. A quiz
+  asks, per unit at your level, a stored variant of a question you just missed, else a
+  question already generated for that unit and level (pooled in `map.json`, `questions`,
+  by the CLI's quizzes too), and only then the model (one call for all new ones).
+- **Tutor**: a conversation about one unit. Each turn is one `claude` CLI call: the first
+  `--session-id <uuid> --append-system-prompt <socratic>`, later ones `--resume <uuid>`, both
+  with `--tools Read Glob Grep --allowedTools Read Glob Grep` and session persistence on (the
+  CLI keeps the transcript in its own store, not the repository). The tutor reads the code for
+  you and explains it, asks back, and after four turns or "check me" proposes a check
+  question at your level, whose reference is stripped from the page; your answer is graded
+  and recorded (`source: tutor`). It shows the elapsed time and suggests stopping at ten
+  minutes. A reload reattaches (`#tutor/<session>`) while the server runs.
+- **Teach-back**, as above.
+
+Generation (tour, walkthrough, questions) is a POST that fills the caches in `map.json`;
+every GET only reads. Security: it binds 127.0.0.1 and refuses any other Host header (no
+DNS rebinding); pages need `?t=<token>` and API calls an `X-Udebt-Token` header, compared in
+constant time (another origin cannot set it without a CORS preflight, which is never
+answered); POST bodies are JSON, at most 1 MB; `/api/excerpt` reads tracked files only;
+every response has a same-origin Content-Security-Policy, `Referrer-Policy: no-referrer`
+(the token is in the URL) and `no-store`; the request log never prints the token.
 
 ## Units and sub-units
 

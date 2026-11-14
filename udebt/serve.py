@@ -233,6 +233,9 @@ class App:
 
         h = replay.load(self.root, self.store)
         res = replay.ensure(h, None, save=False)
+        if res.note:  # a stale stored series: replay it in memory, write nothing
+            print(f"udebt serve: {res.note}; the dashboard replays it in memory.", file=sys.stderr)
+            res = replay.ensure(h, None, rebuild=True, save=False)
         return replay.export_data(h, res)
 
     def get_tour(self, q):

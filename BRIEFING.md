@@ -445,8 +445,26 @@ acceptable.
   - **Decision records**: no model call, from the map; `udebt decisions` alone writes nothing;
     `write` remembers `decisions_dir` in config and from then on a level 2 pass rewrites only
     the Last confirmed by line, so hand edits survive.
+  - **`udebt serve`** (Part 2): stdlib `ThreadingHTTPServer`, hand-written page as package
+    data. The token travels as `?t=` for pages and an `X-Udebt-Token` header for the API (a
+    header, so a cross-origin page cannot forge a call); a Host check stops DNS rebinding.
+    The dashboard tab is the Phase 3 page in an iframe, fetching `/api/dashboard` when its
+    blob is `null`; a stale stored series is replayed in memory rather than shown stale or
+    rewritten. The browser grades one answer per call (immediate feedback), so each answer is
+    its own sitting; the CLI still grades a run in one call.
+  - **Quiz questions are pooled** in map.json per unit and level (at most six, with the
+    unit's basis), by the CLI and the server; the server asks a revealed question's stored
+    variant first, then a pooled question this developer has not answered, then the model.
+    The CLI quiz still asks the model every run and tells it what was revealed.
+  - **The tutor** is one `claude` CLI call per turn with the handoff's flags; after four
+    developer turns or "check me" the server adds an instruction to propose the check
+    question, so the timing does not depend on the model. Its two-line format (`CHECK
+    QUESTION:`, `REFERENCE:`) is parsed and the reference never reaches the page. udebt keeps
+    the turns in memory only (lost on restart; the CLI's session store keeps the transcript);
+    only the graded check answer is recorded. The check question is at the developer's next
+    ladder level for the unit, fixed when the session starts.
   - **Cached generations live in the committed map.json** (orientations already did): the
-    tour, walkthroughs with their check questions and reference answers. A teammate can read
+    tour, walkthroughs with their check questions and reference answers, pooled questions. A teammate can read
     an answer before being asked; the quiz measures understanding, and reading the answer is
     learning, so this is accepted rather than hidden.
 
@@ -557,3 +575,11 @@ acceptable.
 - digitalme's unit graph is dense (one hub file, `backend/main.py`, sits in five units): most
   units use most others even with shared files split. Should the map's paths avoid listing a
   hub file in several units, or should the graph ignore files listed by more than k units?
+- The server keeps tutor sessions in memory: a restart loses the page's transcript (the CLI
+  can still `--resume` it). Persist them under `.udebt/` (gitignored), or is that fine for a
+  local tool?
+- The browser grades each answer in its own call, so a three-question quiz costs three calls
+  where the CLI's costs one. Batch the browser's grading at the end of a quiz instead, at the
+  cost of feedback after every question?
+- Pooled questions and walkthrough checks put reference answers in the committed map.json.
+  Keep that (reading them is learning), or keep generated questions out of git?
