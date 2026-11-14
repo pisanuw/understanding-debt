@@ -15,6 +15,7 @@ from .mapping import commits_for, weights_for
 from .prompts import (
     GRADE_SCHEMA,
     QUESTIONS_SCHEMA,
+    QUIZ_QUESTIONS_SCHEMA,
     grade_prompt,
     questions_prompt,
     stable_questions_prompt,
@@ -194,6 +195,53 @@ def levels_for(
     }
 
 
+def revealed_on(records_on_unit: list[dict[str, Any]], level: int, n: int = 3) -> list[str]:
+    """The questions at `level` the developer missed and was shown the answer to since they
+    last answered that level correctly (at most `n`, newest last): the next sitting asks the
+    same fact in other words."""
+    at = [r for r in ladder._ordered(records_on_unit) if ladder.level_of(r) == level]
+    since = at
+    for i in range(len(at) - 1, -1, -1):
+        if at[i].get("verdict") == "correct":
+            since = at[i + 1 :]
+            break
+    out = [str(r["question"]) for r in since if r.get("revealed") and r.get("question")]
+    return list(dict.fromkeys(out))[-n:]
+
+
+def one_fact(q: dict[str, Any], level: int) -> dict[str, Any]:
+    """The question with one part: its own phrasing if that asks one fact, else the first of
+    its `variants` that does, else its first clause (ladder.first_clause). No extra call:
+    the variants came with the question. What was set aside is kept as `rejected`."""
+    phrasings = [str(q.get("question", ""))] + [str(v) for v in q.get("variants") or []]
+    phrasings = [p for p in phrasings if p.strip()]
+    rejected = []
+    chosen = None
+    for text in phrasings:
+        why = ladder.compound(text, level)
+        if why is None:
+            chosen = text
+            break
+        rejected.append({"question": text, "why": why})
+    trimmed = False
+    if chosen is None:
+        chosen = ladder.first_clause(phrasings[0] if phrasings else "")
+        trimmed = True
+    variants = [p for p in phrasings if p != chosen and ladder.compound(p, level) is None]
+    if len(variants) < 2:
+        variants += [
+            t
+            for t in (ladder.first_clause(p) for p in phrasings)
+            if t != chosen and t not in variants
+        ]
+    out = {**q, "question": chosen, "variants": variants[:2]}
+    if rejected:
+        out["rejected"] = rejected
+    if trimmed:
+        out["trimmed"] = True
+    return out
+
+
 def generate_questions(
     root: Path,
     llm: LLM,
@@ -205,22 +253,28 @@ def generate_questions(
     max_turns: int = 40,
 ) -> list[dict[str, Any]]:
     """Every question of a run in one call. Each unit carries the `level` to ask it at (and,
-    when the developer was just shown one, `shown_orientation`); a question keeps its unit's
-    level whatever the model returns. `stable` asks for questions on each unit as it stands,
-    never on what changed (the synthetic-developer experiment), all at `level`, and keeps
-    at most `per_unit` per unit, in unit order."""
+    when the developer was just shown one, `shown_orientation`; when they missed and saw the
+    answer to one, `revealed`); a question keeps its unit's level whatever the model returns,
+    and asks one fact (one_fact: a compound phrasing is replaced by a variant from the same
+    reply). `stable` asks for questions on each unit as it stands, never on what changed (the
+    synthetic-developer experiment), all at `level`, and keeps at most `per_unit` per unit,
+    in unit order."""
     if stable:
         units = [{**u, "level": ladder.check(level)} for u in units]
         prompt = stable_questions_prompt(units, per_unit, level)
+        schema = QUESTIONS_SCHEMA
     else:
         prompt = questions_prompt(units, per_unit)
-    res = llm.structured(prompt, QUESTIONS_SCHEMA, cwd=root, read_tools=True, max_turns=max_turns)
+        schema = QUIZ_QUESTIONS_SCHEMA
+    res = llm.structured(prompt, schema, cwd=root, read_tools=True, max_turns=max_turns)
     asked = {u["id"]: int(u.get("level", 1)) for u in units}
     qs = [
         {**q, "level": asked[q["unit_id"]]}
         for q in res.get("questions", [])
         if q.get("unit_id") in asked
     ]
+    if not stable:
+        qs = [one_fact(q, q["level"]) for q in qs]
     if stable:
         order = {u["id"]: i for i, u in enumerate(units)}
         kept: dict[str, int] = {}
@@ -235,13 +289,46 @@ def generate_questions(
     return qs
 
 
+def reveals(q: dict[str, Any], verdict: str) -> bool:
+    """A miss at levels 1-2 shows the reference answer: the purpose or the decision is what a
+    developer cannot work out alone, and an "I don't know" that teaches nothing teaches
+    nothing next time either."""
+    return ladder.level_of(q) in ladder.REVEAL and verdict in ("unknown", "wrong")
+
+
+def reveal_text(q: dict[str, Any], width: int = 92) -> str:
+    import textwrap
+
+    ref = " ".join(str(q.get("reference_answer") or q.get("reference") or "").split())
+    if not ref or ref == "(graded against the code)":
+        return ""
+    return "\n".join(
+        textwrap.wrap(f"The answer: {ref}", width, initial_indent="  ", subsequent_indent="  ")
+    )
+
+
+def mark_revealed(results: list[dict[str, Any]], out=None) -> list[dict[str, Any]]:
+    """After grading: a wrong answer at levels 1-2 gets its reference shown (by `out`, when
+    given) and is marked `revealed`; a blank one was marked when it was asked."""
+    for r in results:
+        if r.get("revealed") or not reveals(r, r.get("verdict", "")):
+            continue
+        text = reveal_text(r)
+        if text:
+            r["revealed"] = True
+            if out is not None:
+                out(text)
+    return results
+
+
 def ask_interactively(
     questions: list[dict[str, Any]],
     inp=None,
     out=print,
     orientations: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Collect answers and confidence. Empty answer means 'I don't know' (a known unknown).
+    """Collect answers and confidence. Empty answer means 'I don't know' (a known unknown):
+    at levels 1-2 the reference answer is shown right away and the answer is `revealed`.
     Each question shows its ladder level; `orientations` (unit id -> rendered text) is shown
     before that unit's first question."""
     inp = inp or input  # resolved at call time so tests can patch builtins.input
@@ -269,7 +356,11 @@ def ask_interactively(
                 if c in ("1", "2", "3"):
                     confidence = int(c)
                     break
-        answered.append({**q, "answer": answer, "confidence": confidence})
+        a = {**q, "answer": answer, "confidence": confidence}
+        if not answer and reveals(q, "unknown") and reveal_text(q):
+            out(reveal_text(q))
+            a["revealed"] = True
+        answered.append(a)
     return answered
 
 
@@ -310,19 +401,28 @@ def record(
     source: str = "quiz",
     *,
     forced: bool = False,
-) -> None:
+    prior: list[dict[str, Any]] | None = None,
+    kind: str = "quiz",
+) -> list[dict[str, Any]]:
     """Append graded answers to the developer's evidence, each with the ladder `level` it was
     asked at (`forced` when `quiz --level` chose it). `source` says where the question came
-    from (`quiz`, or `dig` for a walkthrough's check question); both are quiz evidence. One
-    run's answers share one timestamp: on a unit they are one sitting (ladder.py)."""
+    from (`quiz`, `dig` for a walkthrough's check question, `review`, `tutor`, `teachback`);
+    all are quiz evidence. One run's answers share one timestamp: on a unit they are one
+    sitting (ladder.py). A revealed miss is `revealed` and keeps the question's `variants`;
+    each record carries its spaced-review state after it (`review`, review.py), folded from
+    `prior` (the developer's records before this run; read from the store when not given).
+    Returns the records written."""
+    from . import review
+
     h = repo.head(root)
     ts = now_iso()
+    prior = store.load_records(email) if prior is None else prior
+    out = []
     for r in results:
-        store.append_record(
-            email,
+        out.append(
             {
                 "ts": ts,
-                "type": "quiz",
+                "type": kind,
                 "source": source,
                 "dev": email,
                 "unit": r["unit_id"],
@@ -336,5 +436,12 @@ def record(
                 "confidence": r["confidence"],
                 "verdict": r["verdict"],
                 "feedback": r["feedback"],
-            },
+                **({"revealed": True} if r.get("revealed") else {}),
+                **({"variants": list(r["variants"])} if r.get("variants") else {}),
+                **({k: r[k] for k in ("right", "missing", "misconception") if r.get(k)}),
+            }
         )
+    review.stamp(prior, out)
+    for rec in out:
+        store.append_record(email, rec)
+    return out

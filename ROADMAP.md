@@ -930,13 +930,13 @@ started and stopped at a session limit. **LLM calls used: 0.** Tests: 133 (131 +
 | item | status |
 |---|---|
 | 1 orientation bug | **done** (`099a7fc`): root cause and fix below; tests assert the orientation precedes the first question |
-| 2 one question, one fact | not started |
-| 3 reveal on miss (levels 1-2), variant next sitting | not started |
-| 4 estimated vs measured (`status`, `timeline`, export, quiz index line) | not started |
+| 2 one question, one fact | **done**: `ladder.compound`/`first_clause`, ladder examples one part, quiz schema with two `variants` per question, the first one-part phrasing kept (no extra call), the inventory orientation rule dropped, references at levels 1-3 two plain sentences |
+| 3 reveal on miss (levels 1-2), variant next sitting | **done**: blank shows the reference at once, wrong after grading; `revealed: true` and `variants` on the record; the question writer is told to vary revealed questions |
+| 4 estimated vs measured (`status`, `timeline`, export, quiz index line) | **done**: `basis` column and counts in `status`, basis lines and columns in `timeline`, `basis` in the export's units and snapshots CSV (from `quizzed`, no format change), the dashboard's `est.`, the quiz's index-change line |
 | 5 `udebt tour` | not started |
 | 6 `udebt path` | not started |
 | 7 `dig` walkthroughs with code excerpts | not started |
-| 8 `udebt review` (SM-2) | not started |
+| 8 `udebt review` (SM-2) | partial: the fold (`review.py`) and the state written on every new record; the command next |
 | 9 `udebt teachback` | not started |
 | 10 `udebt decisions write` | not started |
 | Part 2 `udebt serve` | not started |

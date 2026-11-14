@@ -386,6 +386,17 @@ def risk_events(h: History, after_step: int = -1) -> list[dict[str, Any]]:
     return out
 
 
+def basis_of(row: dict[str, Any] | None, uid: str) -> str:
+    """What a developer's understanding of a unit rests on at a point, from the point as
+    stored (no format change): `measured` when the unit is in the point's `quizzed`, else
+    `estimated` when the understanding is above zero (the own-commit prior), else `none`."""
+    if not row:
+        return "none"
+    if uid in row.get("quizzed", []):
+        return "measured"
+    return "estimated" if (row.get("und") or {}).get(uid, 0) > 0 else "none"
+
+
 def interesting(events: list[dict[str, Any]], n: int | None = None) -> list[dict[str, Any]]:
     """Strongest first: OUTSIDE, then HIGH, then CAUTION; within a level the mass landed
     times what the developer did not understand."""
@@ -601,6 +612,7 @@ def unit_table(h: History, last: dict[str, Any] | None) -> list[dict[str, Any]]:
         depth = {
             d: row["depth"][u["id"]] for d, row in devs.items() if u["id"] in row.get("depth", {})
         }
+        basis = {d: basis_of(row, u["id"]) for d, row in devs.items() if u["id"] in row["und"]}
         rows.append(
             {
                 "id": u["id"],
@@ -613,6 +625,7 @@ def unit_table(h: History, last: dict[str, Any] | None) -> list[dict[str, Any]]:
                 "you": you,
                 "understanding": und,
                 "depth": depth,
+                "basis": basis,  # measured (quiz) or estimated (own-commit prior) per developer
                 "holders": sorted(d for d, x in und.items() if x >= cfg.known_threshold),
                 "responsible": h.resp.holders_of(u["id"], h.units),
             }

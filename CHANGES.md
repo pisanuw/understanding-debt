@@ -81,3 +81,6 @@
 2026-11-12 [note] digitalme ladder sample (2 calls, 38 s): 5 units at level 1 with orientations; no level 1 question names an identifier (by hand and ladder.identifiers_in). -v logs to stderr.
 2026-11-12 [doc] BRIEFING (Phase 3.2 decisions: confident-wrong drop, cap after fade, window kept for flat, orientation rules; 7 open questions), ROADMAP Phase 3.2 done, question-set variance.
 2026-11-14 [code] Orientation shown before every level 1 question until level 1 passes (an earlier unknown switched it off); a unit the reply misses gets its map entry.
+2026-11-14 [code] One question, one fact: compound questions (two ?, "and what/which", "; ", inventories at 1-3) replaced by a variant from the same reply, else trimmed.
+2026-11-14 [code] Reveal on miss at levels 1-2 (blank at once, wrong after grading), recorded `revealed` with `variants`; the next sitting asks the same fact in other words.
+2026-11-14 [code] Estimated vs measured: `basis` in status, timeline and export (from `quizzed`); quiz prints why the index moved when answers replace the prior.

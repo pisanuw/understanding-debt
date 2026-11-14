@@ -129,8 +129,13 @@ def test_prompts_carry_the_ladder():
     flat = " ".join(p.split())
     assert "levels must not name any function, method, class, variable, constant, file" in flat
     assert "orientation the developer has just read: What it is for" in p
-    assert "must not be answerable by repeating" in flat
-    assert "repeating" not in questions_prompt([unit], 1), "no orientation, no rule for it"
+    assert "must not be answerable by copying a sentence" in flat
+    assert "which other parts of the system rely on" not in flat, "the inventory rule is gone"
+    assert "exactly one part and asks for exactly one fact" in flat
+    assert "at levels 1-3 it is at most two sentences of plain language" in flat
+    assert "copying" not in questions_prompt([unit], 1), "no orientation, no rule for it"
+    again = questions_prompt([{**unit, "revealed": ["What is it for?"]}], 1)
+    assert "revealed after a miss (ask the same fact in other words): What is it for?" in again
     sp = stable_questions_prompt([unit], 2, 3)
     assert "level: 3 (consequence across units)" in sp and "at level 3" in sp
     g = grade_prompt([{**unit, "unit_id": "store", "question": "q", "reference_answer": "a",

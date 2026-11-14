@@ -634,7 +634,7 @@ footer p { margin: 4px 0; }
   function renderUnits() {
     var dev = state.dev, target = D.settings.bus_target;
     document.getElementById("units-sub").textContent = "Top-level units now; you%, und and depth (highest question-ladder level passed, of 5) for " + (dev || "nobody") +
-      "; holders understand the unit at >= " + D.settings.known_threshold + " (bus target " + target + ").";
+      "; est. = estimated from own commits (the prior, at most 0.5), not yet measured by a quiz; holders understand the unit at >= " + D.settings.known_threshold + " (bus target " + target + ").";
     var rows = top.slice().sort(function (a, b) { return (b.importance || 0) - (a.importance || 0); }).map(function (u) {
       var ok = u.holders.length >= target;
       var bus = el("span", { "class": "badge" });
@@ -644,7 +644,7 @@ footer p { margin: 4px 0; }
       var name = u.name || u.id; if (u.scope !== "architectural") name += " (blackbox)";
       return { cells: [name, fmt(u.importance, 2), Math.round(100 * u.ai_share) + "%",
         dev && u.you[dev] != null ? Math.round(100 * u.you[dev]) + "%" : "-",
-        dev && u.understanding[dev] != null ? fmt(u.understanding[dev], 2) : "-",
+        dev && u.understanding[dev] != null ? fmt(u.understanding[dev], 2) + (u.basis && u.basis[dev] === "estimated" ? " est." : "") : "-",
         dev && u.depth && u.depth[dev] != null ? u.depth[dev] + "/5" : "-", bus,
         (u.responsible || []).join(", ") || "nobody"] };
     });

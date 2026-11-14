@@ -212,6 +212,12 @@ class UnitScore:
         return self.source == "quiz"
 
     @property
+    def basis(self) -> str:
+        """What the understanding rests on: `measured` (this unit's quiz answers, or its
+        sub-units'), `estimated` (the own-commit prior, or half the parent's quiz) or `none`."""
+        return BASIS.get(self.source, "none")
+
+    @property
     def debt(self) -> float:
         if self.scope != "architectural":
             return 0.0
@@ -253,6 +259,16 @@ def score_unit(
 
 
 INHERIT = 0.5  # share of a parent's quiz understanding a sub-unit inherits
+BASIS = {"quiz": "measured", "children": "measured", "prior": "estimated", "parent": "estimated"}
+
+
+def basis_counts(scores: list[UnitScore]) -> dict[str, int]:
+    """How many architectural units are measured, estimated and without any basis."""
+    out = {"measured": 0, "estimated": 0, "none": 0}
+    for s in scores:
+        if s.scope == "architectural":
+            out[s.basis] += 1
+    return out
 
 
 def inherit(own: UnitScore, parent_quiz: float | None) -> UnitScore:

@@ -59,7 +59,10 @@ from .quiz import (
     generate_questions,
     grade,
     levels_for,
+    mark_revealed,
     pick_units,
+    reveal_text,
+    revealed_on,
 )
 from .quiz import record as record_results
 from .store import Store
@@ -290,6 +293,14 @@ def cmd_quiz(args) -> int:
         raise SystemExit("Nothing to quiz: every unit in view is blackbox or out of your set.")
     levels = levels_for(picked, records, args.level)
     on_unit = {u["id"]: [r for r in records if r.get("unit") == u["id"]] for u in picked}
+    if not args.preview and not any(s_.basis == "measured" for s_ in scores):
+        tour_hint = (
+            "Read first" if (m.get("tour") or {}).get("markdown") else "Before the questions"
+        )
+        print(
+            f"{tour_hint}: `udebt tour` is a ten-minute overview of the whole architecture "
+            "(written once for the team), and `udebt path` the order to learn it in."
+        )
     need = [u["id"] for u in picked if orient.wanted(on_unit[u["id"]], levels[u["id"]])]
     # a preview prints Markdown on stdout, so its progress goes to stderr
     say = (lambda *a: print(*a, file=sys.stderr)) if args.preview else print
@@ -310,6 +321,9 @@ def cmd_quiz(args) -> int:
             u["level"] = levels[u["id"]]
             if u["id"] in orients:
                 u["shown_orientation"] = orient.text(orients[u["id"]])
+            seen = revealed_on(on_unit[u["id"]], u["level"])
+            if seen:
+                u["revealed"] = seen
         say("Generating questions from the code...")
         questions = generate_questions(root, llm, picked, per_unit=args.per_unit)
         if args.preview:
@@ -318,17 +332,47 @@ def cmd_quiz(args) -> int:
         rendered = {uid: orient.render(o, hier.index(units)[uid]) for uid, o in orients.items()}
         answered = ask_interactively(questions, orientations=rendered)
         print("\nGrading against the code...")
-        results = grade(root, llm, answered)
+        results = mark_revealed(grade(root, llm, answered))
     except LLMError as e:
         raise SystemExit(str(e)) from e
-    record_results(store, root, email, results, forced=args.level is not None)
+    record_results(store, root, email, results, forced=args.level is not None, prior=records)
     print()
     for r in results:
         print(f"[{r['verdict'].upper():<8}] {r['unit_id']} (level {r['level']}): {r['question']}")
         print(f"           {r['feedback']}")
+        if r.get("revealed") and r["answer"]:
+            print(reveal_text(r).replace("  The answer:", "           The answer:", 1))
+    if any(r.get("revealed") for r in results):
+        print(
+            "\nA revealed answer counts as the miss it was; the next quiz asks the same fact in "
+            "other words, and `udebt review` brings it back in a day."
+        )
+    after = compute_scores(root, store, units, email, resp=resp)
+    line = _index_change(scores, after, units, mine, args.deep, within)
+    if line:
+        print("\n" + line)
     print()
     args.unit_ref = None
     return cmd_status(args)
+
+
+def _index_change(before, after, units, mine, deep, within) -> str | None:
+    """One line when a quiz replaced estimates with measurements and moved the index: the
+    own-commit prior (at most 0.5) was what the index stood on until then."""
+    ids = within if within else {u["id"] for u in hier.level(units, deep)}
+    b = {s_.unit_id: s_ for s_ in before}
+    now = [s_ for s_ in after if s_.unit_id in ids]
+    swapped = [s_.unit_id for s_ in now if b[s_.unit_id].basis == "estimated" and s_.measured]
+    if not swapped:
+        return None
+    x0, x1 = scoring.debt_index(before, only=ids), scoring.debt_index(after, only=ids)
+    if x0 == x1:
+        return None
+    names = ", ".join(swapped[:4]) + (f" and {len(swapped) - 4} more" if len(swapped) > 4 else "")
+    return (
+        f"Debt index {x0} -> {x1}: {names} {'was' if len(swapped) == 1 else 'were'} estimated "
+        "from your own commits (a prior of at most 0.5) and now rest on your answers."
+    )
 
 
 def _preview(root: Path, email: str, picked, questions, orients) -> str:
@@ -495,7 +539,7 @@ def cmd_status(args) -> int:
     print(_prov_line(commits, mine))
     print(
         f"{'unit':<{w}} {'set':>3} {'imp':>5} {'ai%':>4} {'you%':>4} {'und':>5} {'depth':>5}  "
-        f"{'debt':>5}  {'':<10} note"
+        f"{'basis':<9} {'debt':>5}  {'':<10} note"
     )
     # sort the top level by debt; sub-units follow their parent, also by debt
     tops = sorted([u for u, d in shown if d == 0], key=lambda u: -by_score[u["id"]].debt)
@@ -528,7 +572,7 @@ def cmd_status(args) -> int:
         print(
             f"{label:<{w}} {mark:>3} {s_.importance:>5.2f} {int(100 * prov.ai_share):>4} "
             f"{int(100 * prov.dev_share):>4} {s_.understanding:>5.2f} {_depth(s_):>5}  "
-            f"{s_.debt:>5.2f}  "
+            f"{s_.basis:<9} {s_.debt:>5.2f}  "
             f"{_bar(1 - s_.understanding):<10} {_note(s_, u, prov, by_score)}  "
             f"[{u['name']}]{extra}"
         )
@@ -554,6 +598,14 @@ def cmd_status(args) -> int:
             "You have no responsibility set, so every unit counts. "
             "`udebt responsibility seed` proposes one."
         )
+    counted = scoring.basis_counts(
+        [s_ for s_ in scores if s_.unit_id in (ids if my_set else level_ids)]
+    )
+    print(
+        f"Basis: {counted['measured']} unit(s) measured by your answers, {counted['estimated']} "
+        f"estimated (the own-commit prior, at most 0.5, or half a parent's quiz), "
+        f"{counted['none']} with neither."
+    )
     print(
         "ai% = weighted share of the unit's mass by an AI agent (assisted counts half). "
         "you% = share you authored (assisted counts half). Bot commits are left out of both."
@@ -1103,10 +1155,12 @@ def cmd_timeline(args) -> int:
             key=lambda uid: -(pts[-1]["devs"].get(dev, {}).get("debt", {}).get(uid, 0.0)),
         )
         cols = ["t", "sha", "index", *top_ids, *(f"{uid} depth" for uid in top_ids)]
+        cols += [f"{uid} basis" for uid in top_ids]
         rows = [
             [p["t"], p["sha"], p["devs"].get(dev, {}).get("index")]
             + [p["devs"].get(dev, {}).get("debt", {}).get(uid, 0.0) for uid in top_ids]
             + [p["devs"].get(dev, {}).get("depth", {}).get(uid) for uid in top_ids]
+            + [replay.basis_of(p["devs"].get(dev), uid) for uid in top_ids]
             for p in pts
         ]
     elif unit:
@@ -1164,14 +1218,39 @@ def cmd_timeline(args) -> int:
             "Depth now (highest level passed on the question ladder, of 5; - no answer): "
             + ", ".join(f"{uid} {now.get(uid, '-')}" for uid in top_ids)
         )
+        print(_basis_line(pts[-1]["devs"].get(dev), top_ids, "Basis now"))
     if unit:
         print("depth = highest level passed on the question ladder (of 5); - = no answer yet.")
+        if pts:
+            last = pts[-1]["devs"]
+            print(
+                "Basis now: "
+                + ", ".join(f"{d} {replay.basis_of(last.get(d), unit)}" for d in h.devs)
+                + " (measured: quiz answers; estimated: the own-commit prior)."
+            )
+    if not args.dev and not unit and pts:
+        ids = sorted(pts[-1]["units"])
+        for d in h.devs:
+            print(_basis_line(pts[-1]["devs"].get(d), ids, f"{_label_dev(d)} now"))
     _print_events(events, 8, args.all)
     print(
         "\nUnits are the current map's, replayed against the past; a point counts the commits "
         "landed on the first-parent line by then and the evidence recorded by then."
     )
     return 0
+
+
+def _basis_line(row, ids, head: str) -> str:
+    from . import replay
+
+    by: dict[str, list[str]] = {"measured": [], "estimated": [], "none": []}
+    for uid in ids:
+        by[replay.basis_of(row, uid)].append(uid)
+    return (
+        f"{head}: {len(by['measured'])} unit(s) measured by quiz answers"
+        + (f" ({', '.join(by['measured'][:6])})" if by["measured"] else "")
+        + f", {len(by['estimated'])} estimated from own commits, {len(by['none'])} with neither."
+    )
 
 
 def _print_events(events, limit: int | None, all_levels: bool = False, since=None) -> None:
@@ -1249,6 +1328,8 @@ def cmd_export(args) -> int:
 
 def _export_tables(data: dict[str, Any]) -> dict[str, tuple[list[str], list[list[Any]]]]:
     """The export as flat tables, one CSV each."""
+    from .replay import basis_of
+
     snaps = [
         [
             p["t"],
@@ -1256,6 +1337,7 @@ def _export_tables(data: dict[str, Any]) -> dict[str, tuple[list[str], list[list
             dev,
             uid,
             row["und"].get(uid),
+            basis_of(row, uid),
             row.get("depth", {}).get(uid),
             row["debt"].get(uid),
             row["index"],
@@ -1306,9 +1388,13 @@ def _export_tables(data: dict[str, Any]) -> dict[str, tuple[list[str], list[list
         u["id"]: ";".join(f"{d}={n}" for d, n in sorted(u.get("depth", {}).items()))
         for u in data["units"]
     }
+    basis_t = {
+        u["id"]: ";".join(f"{d}={b}" for d, b in sorted(u.get("basis", {}).items()))
+        for u in data["units"]
+    }
     return {
         "snapshots": (
-            ["t", "sha", "dev", "unit", "understanding", "depth", "debt", "index"],
+            ["t", "sha", "dev", "unit", "understanding", "basis", "depth", "debt", "index"],
             snaps,
         ),
         "provenance": (["t", "sha", "commits", "ai", "assisted", "human", "bot"], prov),
@@ -1328,10 +1414,15 @@ def _export_tables(data: dict[str, Any]) -> dict[str, tuple[list[str], list[list
             [[c.get(k) for k in con_cols] + [";".join(c["emails"])] for c in data["contributors"]],
         ),
         "units": (
-            [*unit_cols, "holders", "responsible", "depth"],
+            [*unit_cols, "holders", "responsible", "depth", "basis"],
             [
                 [u.get(k) for k in unit_cols]
-                + [";".join(u["holders"]), ";".join(u["responsible"]), depth_of[u["id"]]]
+                + [
+                    ";".join(u["holders"]),
+                    ";".join(u["responsible"]),
+                    depth_of[u["id"]],
+                    basis_t[u["id"]],
+                ]
                 for u in data["units"]
             ],
         ),

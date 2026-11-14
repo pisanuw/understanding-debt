@@ -265,7 +265,9 @@ def test_depth_in_the_series_timeline_export_and_dashboard(fixture_repo, capsys)
     assert exp["settings"]["ladder"]["1"] == "purpose and placement"
     run(root, capsys, "export", "--format", "csv")
     snaps = (root / ".udebt" / "export" / "snapshots.csv").read_text().splitlines()
-    assert snaps[0] == "t,sha,dev,unit,understanding,depth,debt,index"
+    assert snaps[0] == "t,sha,dev,unit,understanding,basis,depth,debt,index"
+    assert snaps[-1].split(",")[5] == "measured", "storage: quizzed at the last point"
+    assert units["storage"]["basis"] == {dev: "measured"}
     rc, out = run(root, capsys, "dashboard")
     page = (root / ".udebt" / "dashboard" / "index.html").read_text()
     assert '{ t: "depth", num: true }' in page and '"depth":{"dev1@example.com":3}' in page

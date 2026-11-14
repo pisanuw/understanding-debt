@@ -133,6 +133,10 @@ class FakeLLM:
                         "level": u["level"],
                         "question": _FAKE_QUESTIONS[u["level"]][k % 2].format(u=u["id"])
                         + (f" ({k + 1})" if k > 1 else ""),
+                        "variants": [
+                            f"In other words, what does the {u['id']} unit do (v{k + 1}a)?",
+                            f"Why does the tool need the {u['id']} unit (v{k + 1}b)?",
+                        ],
                         "reference_answer": f"{u['id']} returns a default.",
                         "evidence": [f"udebt/{u['id']}.py"],
                     }
@@ -196,12 +200,12 @@ class FakeLLM:
 # per level, a unit's first question (the one a single-question quiz gets) and its second;
 # levels 1-3 name no identifier, as the real prompt requires
 _FAKE_QUESTIONS = {
-    1: ["What is the {u} unit for, and what would stop working without it?",
-        "Which other parts of the tool rely on the {u} unit?"],
-    2: ["What was chosen for the {u} unit, and what was rejected?",
+    1: ["What is the {u} unit for?",
+        "What would a user notice first if the {u} unit stopped working?"],
+    2: ["What was chosen for the {u} unit over its alternative?",
         "What constraint forced the choice behind the {u} unit?"],
-    3: ["If the decision behind the {u} unit were reversed, what else would have to change?",
-        "If the {u} unit were replaced, which other units would notice first?"],
+    3: ["If the decision behind the {u} unit were reversed, what would have to change first?",
+        "If the {u} unit were replaced, which unit would notice first?"],
     4: ["What happens in {u} when the input is empty?",
         "What happens in {u} when it is called twice?"],
     5: ["What happens in {u} when the input is empty?",

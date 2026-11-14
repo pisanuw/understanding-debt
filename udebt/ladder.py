@@ -3,7 +3,7 @@ implementation detail only once the developer has shown the levels above.
 
     level  asks                                            identifiers in the question
     1      purpose and placement: what the unit is for,    none: components by role
-           what depends on it, what it depends on
+           or one consequence of its place in the system
     2      decision and alternatives: what was chosen,     none
            what was rejected, what constraint forced it
     3      consequence across units: what else changes     none
@@ -27,6 +27,11 @@ A *sitting* is the answers one quiz run gave on a unit at one level (usually one
   question to n - 1: a misconception about a decision or a consequence says the picture of
   the unit's role may be wrong too, so that is checked again first.
 
+Every question has one part and asks one fact (Phase 3.3): the owner's first level 1 quiz on
+digitalme asked compound inventory questions ("which other parts rely on it ... and what does
+it depend on ...?") and he could answer none. `compound` finds a question that asks more than
+one thing; `first_clause` trims one to its first question.
+
 Records from before the ladder carry no level and count as level 5 (the implementation
 questions the old prompt produced); answers at a forced level (`quiz --level N`) carry the
 level they were asked at. Both count in the score by their level, and since the ladder
@@ -43,6 +48,7 @@ TOP = 5
 ARCHITECTURAL = (1, 2, 3)
 DEPTH = (4, 5)
 LEGACY = 5  # the level of a record written before the ladder
+REVEAL = (1, 2)  # a miss at these levels shows the reference answer at once (Phase 3.3)
 
 
 @dataclass(frozen=True)
@@ -58,10 +64,10 @@ LEVELS: dict[int, Level] = {
     1: Level(
         1,
         "purpose and placement",
-        "what the unit is for, what depends on it and what it depends on",
+        "what the unit is for, or one consequence of its place in the system, answerable in "
+        "a sentence",
         "nothing from the code: components by their role, in plain language",
-        "What is <the part that does X> for, and which other parts of the system would stop "
-        "working without it?",
+        "What job does <the part that does X> do for the rest of the system?",
     ),
     2: Level(
         2,
@@ -76,8 +82,8 @@ LEVELS: dict[int, Level] = {
         "what else in the system would have to change if the decision were reversed or "
         "replaced by an alternative",
         "nothing from the code",
-        "If <the decision> were replaced by <the alternative>, which other parts of the "
-        "system would have to change, and how?",
+        "If <the decision> were replaced by <the alternative>, what is the first other part "
+        "of the system that would have to change?",
     ),
     4: Level(
         4,
@@ -85,8 +91,7 @@ LEVELS: dict[int, Level] = {
         "module-level edge cases and failure modes: what happens when a part fails, times "
         "out, gets empty input or runs twice",
         "a file or a component, but no code (no function, class or variable names)",
-        "What happens when <a component> fails halfway through <an operation>, and what does "
-        "the user see?",
+        "What does the user see when <a component> fails halfway through <an operation>?",
     ),
     5: Level(
         5,
@@ -172,6 +177,53 @@ def next_level(records: list[dict[str, Any]]) -> int:
     if n >= 2 and any(_confidently_wrong(r) for r in sitting):
         return min(nxt, n - 1)
     return nxt
+
+
+# -- one question, one fact --------------------------------------------------------------
+
+_JOINED = re.compile(
+    r",?\s+and\s+(?:what|which|how|why|who|where|when|whether)\b|;\s|\?\s+(?=\S)", re.I
+)
+_INVENTORY = re.compile(
+    r"\blist\b|\benumerate\b|\bwhich other (?:parts|components|units|modules|pieces)\b"
+    r"|\bname (?:the|all|every|each)\b",
+    re.I,
+)
+
+
+def compound(question: str, level: int = 1) -> str | None:
+    """Why a question asks more than one thing, or None when it asks one: more than one
+    question mark, two questions joined by "and what" (which, how, why, ...) or by "; ", and
+    at levels 1-3 an inventory ("list", "which other parts", "name the ..."), which asks for
+    a set of facts rather than one."""
+    q = " ".join(str(question).split())
+    if q.count("?") > 1:
+        return "more than one question mark"
+    m = _JOINED.search(q)
+    if m and m.group(0).strip().startswith(("and", ",", ";")):
+        return f"two questions joined by {m.group(0).strip(' ,')!r}"
+    if "?" in q and q[q.index("?") + 1 :].strip(" )\"'"):
+        return "a second sentence after the question"
+    if level in ARCHITECTURAL:
+        inv = _INVENTORY.search(q)
+        if inv:
+            return f"an inventory ({inv.group(0)!r})"
+    return None
+
+
+def first_clause(question: str) -> str:
+    """The question trimmed to its first part: up to the first question mark, or to where a
+    second question is joined on; it ends in a question mark."""
+    q = " ".join(str(question).split())
+    cut = len(q)
+    i = q.find("?")
+    if i >= 0:
+        cut = i
+    m = _JOINED.search(q)
+    if m and m.start() < cut:
+        cut = m.start()
+    head = q[:cut].rstrip(" ,;:.")
+    return (head or q.rstrip("?")) + "?"
 
 
 # -- the identifier check -----------------------------------------------------------------

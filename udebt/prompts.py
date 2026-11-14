@@ -88,6 +88,35 @@ QUESTIONS_SCHEMA: dict[str, Any] = {
     "required": ["questions"],
 }
 
+# the quiz's own schema: each question comes with two more phrasings of the same fact, so a
+# compound question can be replaced without another call (quiz.generate_questions) and a
+# revealed one asked again in other words (review.py)
+QUIZ_QUESTIONS_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "questions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    **QUESTIONS_SCHEMA["properties"]["questions"]["items"]["properties"],
+                    "variants": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "description": "two other one-part phrasings asking the same fact",
+                    },
+                },
+                "required": [
+                    "unit_id", "level", "question", "variants", "reference_answer", "evidence",
+                ],
+            },
+        }
+    },
+    "required": ["questions"],
+}  # fmt: skip
+
 ORIENTATION_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -312,6 +341,13 @@ def ladder_block() -> str:
     )
 
 
+ONE_FACT = """Every question has exactly one part and asks for exactly one fact: one question
+mark, no second question joined on with "and what", "and which" or a semicolon, no second
+sentence after it, and never a request to list, enumerate or name several things ("which other
+parts ...", "name the ..."). A level 1 question asks what the unit is for, or one consequence of
+its place in the system, and a developer who knows the answer can give it in one sentence. If a
+unit has several things worth asking, ask the most important one."""
+
 NO_IDENTIFIERS = """Levels 1, 2 and 3 test the architecture, not the code. A question at these
 levels must not name any function, method, class, variable, constant, file, directory,
 module, endpoint or configuration key of this repository, and must not quote or paraphrase a
@@ -349,6 +385,8 @@ def _unit_lines(u: dict[str, Any], *, history: bool = True, level: bool = True) 
         lines.append(f"  shaped_by: {shaped or '(unknown)'}")
     if u.get("shown_orientation"):
         lines.append(f"  orientation the developer has just read: {u['shown_orientation']}")
+    for q in u.get("revealed") or []:
+        lines.append(f"  revealed after a miss (ask the same fact in other words): {q}")
     return "\n".join(lines)
 
 
@@ -361,11 +399,20 @@ def questions_prompt(units: list[dict[str, Any]], per_unit: int) -> str:
         """
 Some units carry the orientation the developer has just read: what the unit is for, its
 decision and alternatives, where it lives and who shaped it. A level 1 question on such a
-unit must not be answerable by repeating that text: ask what follows from it, such as which
-other parts of the system rely on the unit and what it relies on, or where it sits in a
-request or a run.
+unit must not be answerable by copying a sentence of that text: ask one consequence that
+follows from it, such as what a user would notice first if the unit stopped working, or why
+it has to run before or after one named step of a request.
 """
         if oriented
+        else ""
+    )
+    revealed_rule = (
+        """
+Some units list questions the developer missed and was then shown the answer to. Ask the
+same fact again in other words: a different phrasing or a different angle on the same
+point, never the same wording.
+"""
+        if any(u.get("revealed") for u in units)
         else ""
     )
     return f"""TASK: questions
@@ -380,15 +427,20 @@ that unit's level, and return that level with each question.
 The ladder:
 {ladder_block()}
 
+{ONE_FACT}
+
 {NO_IDENTIFIERS}
-{orientation_rule}
+{orientation_rule}{revealed_rule}
 Every question must have an answer the code (or the cited commits) determines, so it can be
 graded objectively. Avoid trivia (exact names, line counts, versions) at every level. Use the
 read-only tools to verify every reference answer against the actual code; `git show <sha>` is
-not available, so rely on the code and the commit subjects given. The reference answer is for
-the grader, not the developer: it may name files and functions, and says what a correct
-plain-language answer must contain. Cite the files you relied on in `evidence`. Keep each
-question to two sentences and each reference answer to three.
+not available, so rely on the code and the commit subjects given. Cite the files you relied on
+in `evidence`. The reference answer says what a correct answer must contain, and the developer
+reads it right after a miss, so it teaches: at levels 1-3 it is at most two sentences of plain
+language with no identifiers (the files go in `evidence`); at levels 4-5 at most three
+sentences, and it may name files and functions. With each question give `variants`: two more
+phrasings of the same question, each one part, asking the same fact, so the reference answer
+fits all three.
 
 Units:
 {chr(10).join(_unit_lines(u) for u in units)}
@@ -495,6 +547,9 @@ marked down for lacking them. Verdicts:
   consequence that matters is missing
 - wrong: contradicts how the code works, or asserts something the code does not do
 - unknown: the developer said they do not know, or the answer is empty
+
+Grade only what the QUESTION asks: the reference may cover more than the question does, and an
+answer is not marked down for leaving out what was not asked.
 
 Give two sentences of feedback per item: what was right, and the one thing to look at in the code.
 Return `index` matching the ### number.
