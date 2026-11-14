@@ -49,6 +49,7 @@ class Config:
     history_periods: int = 4  # history mining cuts history into this many equal-mass periods
     history_quota: int = 10  # candidates each period is guaranteed (of 40): slots by mass
     snapshot_every: str = "week"  # replay points: week, day or mass:N (`udebt snapshot`)
+    decisions_dir: str | None = None  # where `udebt decisions write` put the decision records
     identities: dict[str, list[str]] = field(default_factory=dict)  # primary email -> aliases
     # CODEOWNERS handle -> email (or list of emails); null marks a handle still to be mapped
     handles: dict[str, Any] = field(default_factory=dict)
@@ -115,6 +116,8 @@ class Config:
             "handles": self.handles,
             "directed": self.directed,
         }
+        if self.decisions_dir:
+            d["decisions_dir"] = self.decisions_dir
         d.update(self.extra)
         return d
 

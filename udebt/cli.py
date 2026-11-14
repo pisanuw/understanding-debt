@@ -10,7 +10,12 @@ udebt quiz [-n N] [--deep]      questions up the ladder (purpose first), graded,
 udebt status [unit] [--deep]    debt per unit and a 0-100 debt index (--team: bus target)
 udebt risk [range]              a change's weight per unit against your understanding
 udebt history [--candidates]    decisions that shaped the repo (or the commits the mapper sees)
-udebt dig [<id>]                guided walkthrough of the worst unit (or a chosen one)
+udebt dig [<id>]                walkthrough of the worst unit's code (or a chosen one), a check
+udebt tour                      a ten-minute architecture overview, cached for the team
+udebt path                      your learning path: order, minutes, next action per unit
+udebt review                    spaced review of the questions you missed
+udebt teachback <id>            explain a unit in your words; graded as level 2
+udebt decisions [write]         one decision record per top-level unit (opt-in)
 udebt directed add <session>    count agent commits you directed as your assisted work
 udebt experiment synthetic --snapshots <rev>,...   synthetic developers frozen at old snapshots
 udebt cache [status|rebuild]    the parsed-commit cache under .udebt/ (gitignored)
@@ -34,7 +39,6 @@ from . import responsibility as resp_mod
 from . import risk as risk_mod
 from . import units as hier
 from .contributors import as_dict, contributors, grouped
-from .dig import walkthrough
 from .llm import LLMError, get_llm
 from .mapping import (
     build_map,
@@ -387,12 +391,14 @@ def _preview(root: Path, email: str, picked, questions, orients) -> str:
         f"{datetime.now(UTC).date().isoformat()}: {len(questions)} question(s) on "
         f"{len(picked)} unit(s), none answered or recorded. Each unit is asked at the level the "
         "ladder gives this developer (`udebt quiz --level N` forces one); an orientation is "
-        "shown before the first question on a unit they have no level 1-3 answer on.",
+        "shown before every level 1 question until the developer passes level 1 on the unit.",
         "",
         "Levels: " + "; ".join(f"{n} {lv.name}" for n, lv in ladder.LEVELS.items()) + ".",
     ]
     by_unit = {u["id"]: u for u in picked}
     flagged = []
+    replaced = []
+    still = []
     oriented: set[str] = set()
     for i, q in enumerate(questions, 1):
         uid = q["unit_id"]
@@ -404,18 +410,26 @@ def _preview(root: Path, email: str, picked, questions, orients) -> str:
             out += ["**Orientation**", "", orient.markdown(orients[uid]), ""]
         out += [f"**Question.** {q['question']}", ""]
         ev = ", ".join(f"`{e}`" for e in q.get("evidence", []))
+        var = "; ".join(q.get("variants") or []) or "(none)"
         out += [
-            "<details><summary>Reference answer (for the grader)</summary>",
+            "<details><summary>Reference answer (shown after a miss at levels 1-2)</summary>",
             "",
             q.get("reference_answer", ""),
             "",
             f"Evidence: {ev or '(none)'}",
+            "",
+            f"Variants (asked after a miss, in review): {var}",
             "",
             "</details>",
         ]
         ids = ladder.identifiers_in(q["question"]) if n in ladder.ARCHITECTURAL else []
         if ids:
             flagged.append(f"question {i}: {', '.join(ids)}")
+        for rj in q.get("rejected") or []:
+            replaced.append(f'question {i}: "{rj["question"]}" ({rj["why"]})')
+        why = ladder.compound(q["question"], n)
+        if why:
+            still.append(f"question {i} ({why})")
     out += [
         "",
         "## Identifier check",
@@ -425,6 +439,24 @@ def _preview(root: Path, email: str, picked, questions, orients) -> str:
             "These may: " + "; ".join(flagged) + "."
             if flagged
             else "The heuristic check (`ladder.identifiers_in`) found none."
+        ),
+        "",
+        "## One question, one fact",
+        "",
+        "Every question must have one part and ask one fact (`ladder.compound`: one question "
+        'mark, nothing joined on with "and what", "and which" or "; ", no inventory at '
+        "levels 1-3). "
+        + (
+            "Still compound: " + "; ".join(still) + ". "
+            if still
+            else "None of the questions above is compound. "
+        )
+        + (
+            "First phrasings replaced by a variant from the same reply: "
+            + "; ".join(replaced)
+            + "."
+            if replaced
+            else "No first phrasing needed replacing."
         ),
     ]
     return "\n".join(out) + "\n"
@@ -832,6 +864,8 @@ def cmd_alias(args) -> int:
 
 
 def cmd_dig(args) -> int:
+    from . import dig
+
     root, store = _ctx(args)
     store.require()
     m = store.require_map()
@@ -852,37 +886,270 @@ def cmd_dig(args) -> int:
         o = orient.ensure(root, store, llm, m, [unit["id"]]).get(unit["id"])
         if o:
             print(orient.render(o, unit) + "\n")
-        body, question = walkthrough(root, llm, unit, level, orient.text(o) if o else None)
+        if args.refresh or dig.cached(root, hier.index(m["units"])[unit["id"]]) is None:
+            print("Tracing one request through the code (one call, cached for the team)...")
+        w, fresh = dig.ensure(
+            root, store, llm, m, unit["id"], refresh=args.refresh,
+            orientation=orient.text(o) if o else None,
+        )  # fmt: skip
     except LLMError as e:
         raise SystemExit(str(e)) from e
-    print(body)
+    if w["steps"]:
+        print(dig.render(root, w))
+        if not fresh:
+            print(
+                f"\n(The walkthrough written on {w['generated_at'][:10]} at "
+                f"{w['head'][:8]}; the unit's files have not changed since. `--refresh` "
+                "rewrites it.)"
+            )
+    else:
+        print("The walkthrough named no line range in a tracked file, so it was not cached.")
     if args.no_check:
         return 0
-    if not question:
+    q = dig.check_question(w, unit, level)
+    if q is None:
         print(
-            "\n(No check question came back, so nothing was recorded. "
+            f"\n(No check question at level {level} came back, so nothing was recorded. "
             "Run `udebt quiz --unit " + unit["id"] + "` to verify your understanding.)"
         )
         return 0
     print("\n--- Check yourself ---")
-    answered = ask_interactively(
-        [
-            {
-                "unit_id": unit["id"],
-                "level": level,
-                "question": question,
-                "reference_answer": "(graded against the code)",
-                "evidence": unit.get("paths", []),
-            }
-        ]
-    )
+    answered = ask_interactively([q])
     try:
-        results = grade(root, llm, answered)
+        results = mark_revealed(grade(root, llm, answered))
     except LLMError as e:
         raise SystemExit(str(e)) from e
-    record_results(store, root, email, results, source="dig")
+    record_results(store, root, email, results, source="dig", prior=records)
     r = results[0]
     print(f"\n[{r['verdict'].upper()}] {r['feedback']}")
+    if r.get("revealed") and r["answer"]:
+        print(reveal_text(r))
+    return 0
+
+
+def _graph(root: Path, store: Store, m: dict[str, Any], commits=None, weights=None):
+    from . import unitgraph
+
+    commits = commits if commits is not None else commits_for(root, store)
+    weights = weights if weights is not None else weights_for(root, store, commits)
+    return unitgraph.build(
+        root, m["units"], commits, weights, max_files=store.config.cochange_max_files
+    )
+
+
+def cmd_tour(args) -> int:
+    from . import tour
+
+    root, store = _ctx(args)
+    store.require()
+    m = store.require_map()
+    graph = _graph(root, store, m)
+    if args.refresh or tour.cached(m, graph) is None:
+        print(
+            f"Writing the architecture tour of {len(m['units'])} units (one call, cached in "
+            "map.json for the team)...",
+            file=sys.stderr,
+        )
+        llm = _llm(store, args)
+    else:
+        llm = None
+    try:
+        t, _fresh = tour.ensure(root, store, llm, m, graph, refresh=args.refresh)
+    except LLMError as e:
+        raise SystemExit(str(e)) from e
+    md, mins = tour.markdown(t, m, graph, root.name)
+    if args.out:
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(md, encoding="utf-8")
+        print(f"Wrote {out} ({len(md.split())} words, about {mins} minutes to read)")
+    else:
+        print(md)
+    return 0
+
+
+def cmd_path(args) -> int:
+    import json as _json
+
+    from . import learning
+
+    root, store = _ctx(args)
+    store.require()
+    m = store.require_map()
+    units = m["units"]
+    cfg = store.config
+    email = _email(args, root)
+    commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
+    resp = resp_mod.load(store)
+    records = store.load_records(email)
+    scores = compute_scores(
+        root, store, units, email, records=records, commits=commits, weights=weights, resp=resp
+    )
+    graph = _graph(root, store, m, commits, weights)
+    mine = _my_set(resp, cfg.primary(email), units)
+    within = hier.at_level(mine, units, False) if mine and not args.all else None
+    steps = learning.path(
+        units, scores, records, graph, within=within, threshold=cfg.known_threshold
+    )
+    if args.format == "json":
+        print(_json.dumps([s_.as_dict() for s_ in steps], indent=1))
+        return 0
+    scope = "your responsibility set" if within else "every top-level unit"
+    total = sum(s_.minutes for s_ in steps)
+    print(f"\nLearning path for {email} over {scope}: {len(steps)} units, about {total} minutes")
+    print("Each unit comes after the units it uses; among those, the most debt first.")
+    if not any(s_.basis == "measured" for s_ in steps):
+        print("Nothing measured yet: `udebt tour` (about ten minutes) is the map to start with.")
+    print()
+    w = min(30, max([12, *(len(s_.unit) for s_ in steps)]))
+    print(
+        f"{'#':>2}  {'unit':<{w}} {'debt':>5} {'und':>5} {'basis':<9} {'depth':>5} {'min':>4}  next"
+    )
+    for i, s_ in enumerate(steps, 1):
+        depth = "-" if s_.depth is None else f"{s_.depth}/{ladder.TOP}"
+        nxt = s_.action + (f": `{s_.command}`" if s_.command else "")
+        print(
+            f"{i:>2}  {s_.unit:<{w}} {s_.debt:>5.2f} {s_.understanding:>5.2f} {s_.basis:<9} "
+            f"{depth:>5} {s_.minutes:>4}  {nxt}"
+        )
+        if s_.after:
+            print(f"{'':>4}{'':<{w}} uses {', '.join(s_.after)} (earlier in the path)")
+    first = learning.session(steps, args.minutes)
+    if first:
+        mins = sum(s_.minutes for s_ in first)
+        print(
+            f"\nA {args.minutes}-minute session: "
+            + "; then ".join(f"`{s_.command}`" for s_ in first)
+            + f" (about {mins} min)."
+        )
+    else:
+        print("\nNothing to do now: every unit in view is known to level 3 and current.")
+    print(
+        "Minutes are a rough budget: 1 to read an orientation and 4 for a walkthrough on first "
+        "contact, 2 per ladder level 1-3 still to pass, 1 per review due, 3 for a re-check."
+    )
+    return 0
+
+
+def cmd_review(args) -> int:
+    from . import review
+
+    root, store = _ctx(args)
+    store.require()
+    m = store.require_map()
+    email = _email(args, root)
+    records = store.load_records(email)
+    ids = {u["id"] for u in hier.flat(m["units"])}
+    if args.unit:
+        u = hier.resolve(m["units"], args.unit)
+        if u is None:
+            raise SystemExit(f"Unknown unit id: {args.unit}")
+        ids = {u["id"]}
+    items = review.due(records, unit_ids=ids, everything=args.all)[: args.num]
+    if not items:
+        upcoming = review.items(records, ids)
+        if upcoming:
+            nxt = upcoming[0]
+            print(
+                f"Nothing due for {email}. Next: {nxt.unit} at level {nxt.level} on "
+                f"{nxt.state.due[:10]} ({len(upcoming)} item(s) in all; `--all` reviews them now)."
+            )
+        else:
+            print(
+                f"Nothing to review for {email}: a question comes back here once you miss it "
+                "(`udebt quiz`)."
+            )
+        return 0
+    print(
+        f"Review for {email}: {len(items)} missed question(s), about "
+        f"{len(items) * review.MINUTES_PER_ITEM} minutes. Each is asked in other words."
+    )
+    llm = _llm(store, args)
+    answered = ask_interactively([it.question for it in items])
+    print("\nGrading against the code...")
+    try:
+        results = mark_revealed(grade(root, llm, answered))
+    except LLMError as e:
+        raise SystemExit(str(e)) from e
+    written = record_results(store, root, email, results, source="review", prior=records)
+    print()
+    for r, rec in zip(results, written, strict=True):
+        print(f"[{r['verdict'].upper():<8}] {r['unit_id']} (level {r['level']}): {r['question']}")
+        print(f"           {r['feedback']}")
+        if r.get("revealed") and r["answer"]:
+            print(reveal_text(r).replace("  The answer:", "           The answer:", 1))
+        if rec.get("review"):
+            print(f"           Next review: {rec['review']['due'][:10]}")
+    return 0
+
+
+def cmd_teachback(args) -> int:
+    from . import teachback
+    from .quiz import read_confidence, read_lines, reveals
+
+    root, store = _ctx(args)
+    store.require()
+    m = store.require_map()
+    unit = hier.resolve(m["units"], args.unit)
+    if unit is None:
+        raise SystemExit(f"Unknown unit id: {args.unit}")
+    email = _email(args, root)
+    records = store.load_records(email)
+    o = orient.cached(unit)
+    print(f"Teach-back: {unit.get('name', unit['id'])} (`{unit['id']}`), graded as level 2")
+    print(teachback.question(unit))
+    print("(Several lines if you like; an empty line ends it. Blank records nothing.)")
+    explanation = read_lines(input)
+    if not explanation:
+        print("Nothing to grade; nothing recorded.")
+        return 0
+    confidence = read_confidence(input)
+    llm = _llm(store, args)
+    print("\nChecking it against the code...")
+    try:
+        r = teachback.grade(root, llm, unit, explanation, confidence, orient.text(o) if o else None)
+    except LLMError as e:
+        raise SystemExit(str(e)) from e
+    if reveals(r, r["verdict"]) and reveal_text(r):
+        r["revealed"] = True
+    record_results(store, root, email, [r], source="teachback", kind="teachback", prior=records)
+    print(f"\n[{r['verdict'].upper()}] level 2 ({ladder.LEVELS[2].name})")
+    print(f"What was right: {r['right'] or '-'}")
+    print(f"What was missing: {r['missing'] or 'nothing important'}")
+    print(f"Misconception: {r['misconception'] or 'none found'}")
+    if r.get("revealed"):
+        print(reveal_text(r))
+    return 0
+
+
+def cmd_decisions(args) -> int:
+    from . import decisions
+
+    root, store = _ctx(args)
+    store.require()
+    m = store.require_map()
+    rel = args.dir or store.config.decisions_dir or decisions.DEFAULT_DIR
+    note = (
+        "These records describe internal architecture, the alternatives rejected and who made "
+        "each call: check before they go into a public repository."
+    )
+    if args.action == "write":
+        written = decisions.write(root, store, m, rel)
+        print(f"Wrote {len(written)} files to {rel}/ (one record per top-level unit and an index).")
+        print(note)
+        print(
+            "A level 2 pass on a unit now refreshes its Last confirmed by line; commit the "
+            "directory when you are happy with it."
+        )
+        return 0
+    texts = decisions.render_all(root, store, m)
+    print(f"`udebt decisions write` would write {len(texts)} files to {rel}/ (nothing written):")
+    for name in texts:
+        print(f"  {name}")
+    first = next(n for n in texts if n != "README.md")
+    print(f"\n--- {first} ---\n{texts[first]}")
+    print(note)
     return 0
 
 
@@ -2033,10 +2300,39 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("action", choices=["install"])
     s.set_defaults(fn=cmd_hook)
 
-    s = sub.add_parser("dig", help="guided walkthrough of a unit")
+    s = sub.add_parser("dig", help="walkthrough of one unit's code, then a check question")
     s.add_argument("unit", nargs="?")
     s.add_argument("--no-check", action="store_true", help="skip the check question")
+    s.add_argument("--refresh", action="store_true", help="rewrite the cached walkthrough")
     s.set_defaults(fn=cmd_dig)
+
+    s = sub.add_parser("tour", help="a ten-minute architecture overview (one call, cached)")
+    s.add_argument("--refresh", action="store_true", help="write it again")
+    s.add_argument("--out", help="write the Markdown to this file instead of stdout")
+    s.set_defaults(fn=cmd_tour)
+
+    s = sub.add_parser("path", help="your learning path: order, minutes and the next action")
+    s.add_argument("--all", action="store_true", help="every top-level unit, not only your set")
+    s.add_argument("--minutes", type=int, default=10, help="session length (default 10)")
+    s.add_argument("--format", choices=["table", "json"], default="table")
+    s.set_defaults(fn=cmd_path)
+
+    s = sub.add_parser("review", help="spaced review of the questions you missed")
+    s.add_argument("-n", "--num", type=int, default=5, help="at most N items (default 5)")
+    s.add_argument("--all", action="store_true", help="review items not yet due too")
+    s.add_argument("--unit", help="only this unit")
+    s.set_defaults(fn=cmd_review)
+
+    s = sub.add_parser("teachback", help="explain a unit; graded as level 2")
+    s.add_argument("unit")
+    s.set_defaults(fn=cmd_teachback)
+
+    s = sub.add_parser(
+        "decisions", help="decision records per top-level unit (opt-in: `write` writes them)"
+    )
+    s.add_argument("action", nargs="?", choices=["show", "write"], default="show")
+    s.add_argument("--dir", help="where to write them (default docs/decisions)")
+    s.set_defaults(fn=cmd_decisions)
     return p
 
 

@@ -321,6 +321,24 @@ def mark_revealed(results: list[dict[str, Any]], out=None) -> list[dict[str, Any
     return results
 
 
+def read_lines(inp) -> str:
+    """Lines up to an empty one, joined; empty when the first line is."""
+    lines: list[str] = []
+    while True:
+        line = inp("> " if not lines else "  ")
+        if line.strip() == "" and (lines or not line):
+            break
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def read_confidence(inp) -> int:
+    while True:
+        c = inp("Confidence 1 (guess) / 2 (fairly sure) / 3 (certain): ").strip() or "2"
+        if c in ("1", "2", "3"):
+            return int(c)
+
+
 def ask_interactively(
     questions: list[dict[str, Any]],
     inp=None,
@@ -342,20 +360,8 @@ def ask_interactively(
             out(orientations[uid] + "\n")
         out(q["question"])
         out("(Enter on an empty line to finish. Leave blank if you don't know.)")
-        lines = []
-        while True:
-            line = inp("> " if not lines else "  ")
-            if line.strip() == "" and (lines or not line):
-                break
-            lines.append(line)
-        answer = "\n".join(lines).strip()
-        confidence = 1
-        if answer:
-            while True:
-                c = inp("Confidence 1 (guess) / 2 (fairly sure) / 3 (certain): ").strip() or "2"
-                if c in ("1", "2", "3"):
-                    confidence = int(c)
-                    break
+        answer = read_lines(inp)
+        confidence = read_confidence(inp) if answer else 1
         a = {**q, "answer": answer, "confidence": confidence}
         if not answer and reveals(q, "unknown") and reveal_text(q):
             out(reveal_text(q))
@@ -393,6 +399,22 @@ def grade(
     return results
 
 
+def _after(ts: str, prior: list[dict[str, Any]]) -> str:
+    """`ts`, or one second after the developer's latest record when that is not earlier: two
+    runs within a second would otherwise share a timestamp and read as one sitting."""
+    from datetime import timedelta
+
+    from .ledger import parse_ts
+
+    stamps = [r["ts"] for r in prior if r.get("ts")]
+    if not stamps:
+        return ts
+    latest = max(parse_ts(t) for t in stamps)
+    if parse_ts(ts) > latest:
+        return ts
+    return (latest + timedelta(seconds=1)).replace(microsecond=0).isoformat()
+
+
 def record(
     store: Store,
     root: Path,
@@ -415,8 +437,8 @@ def record(
     from . import review
 
     h = repo.head(root)
-    ts = now_iso()
     prior = store.load_records(email) if prior is None else prior
+    ts = _after(now_iso(), prior)
     out = []
     for r in results:
         out.append(
@@ -444,4 +466,9 @@ def record(
     review.stamp(prior, out)
     for rec in out:
         store.append_record(email, rec)
+    passed2 = {r["unit"] for r in out if r["level"] == 2 and r["verdict"] == "correct"}
+    if passed2 and store.config.decisions_dir:
+        from .decisions import refresh_confirmed
+
+        refresh_confirmed(root, store, passed2)
     return out

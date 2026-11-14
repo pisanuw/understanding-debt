@@ -158,6 +158,52 @@ class FakeLLM:
                     for u in _unit_blocks(prompt)
                 ]
             }
+        if "TASK: tour" in prompt:
+            ids = [u["id"] for u in _unit_blocks(prompt)]
+            return {
+                "overview": "A fake tool of " + str(len(ids)) + " units that keep and score state.",
+                "units": [
+                    {"unit_id": uid, "paragraph": f"The {uid} unit is described here (fake)."}
+                    for uid in ids
+                ],
+            }
+        if "TASK: walkthrough" in prompt:
+            unit = json.JSONDecoder().raw_decode(prompt[prompt.index("Unit: ") + 6 :])[0]
+            files = [p for p in unit.get("paths", []) if "." in p.rsplit("/", 1)[-1]]
+            steps = [
+                {"file": f, "start_line": 1, "end_line": 40 if i == 0 else 2,
+                 "narration": f"This is a fake walkthrough step {i + 1} in {f}."}
+                for i, f in enumerate((files or ["no/such/file.py"]) * 3)
+            ][:3]  # fmt: skip
+            steps.append({"file": "no/such/file.py", "start_line": 1, "end_line": 2,
+                          "narration": "An invented file, dropped."})  # fmt: skip
+            uid = unit["id"]
+            return {
+                "flow": f"One call into the {uid} unit.",
+                "steps": steps,
+                "trap": "It looks stateful; it is not.",
+                "checks": [
+                    {
+                        "level": n,
+                        "question": _FAKE_QUESTIONS[n][0].format(u=uid),
+                        "reference_answer": f"{uid} returns a default.",
+                    }
+                    for n in range(1, 6)
+                ],  # fmt: skip
+            }
+        if "TASK: teachback" in prompt:
+            said = prompt.split("THE DEVELOPER'S EXPLANATION:", 1)[1].strip().lower()
+            verdict = (
+                "unknown" if not said else "correct" if "default" in said
+                else "partial" if "half" in said else "wrong"
+            )  # fmt: skip
+            return {
+                "verdict": verdict,
+                "right": "The purpose is right." if verdict != "wrong" else "",
+                "missing": "" if verdict == "correct" else "The decision behind it.",
+                "misconception": "It does not send email." if verdict == "wrong" else "",
+                "reference_answer": "It returns a default, by design.",
+            }
         if "TASK: weigh" in prompt:
             shas = [ln.split()[2] for ln in prompt.splitlines() if ln.startswith("- sha:")]
             return {
@@ -192,9 +238,7 @@ class FakeLLM:
 
     def text(self, prompt, *, cwd, read_tools=True, max_turns=40):
         self.calls.append(prompt)
-        if "TASK: dig" not in prompt:
-            raise LLMError(f"FakeLLM has no canned text for this prompt: {prompt[:80]}")
-        return "# Walkthrough\n\nThis is a fake walkthrough.\n\nCHECK QUESTION: What is 1+1?\n"
+        raise LLMError(f"FakeLLM has no canned text for this prompt: {prompt[:80]}")
 
 
 # per level, a unit's first question (the one a single-question quiz gets) and its second;

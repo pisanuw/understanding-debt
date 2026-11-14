@@ -145,6 +145,70 @@ ORIENTATION_SCHEMA: dict[str, Any] = {
     "required": ["orientations"],
 }
 
+TOUR_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "overview": {"type": "string"},
+        "units": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"unit_id": {"type": "string"}, "paragraph": {"type": "string"}},
+                "required": ["unit_id", "paragraph"],
+            },
+        },
+    },
+    "required": ["overview", "units"],
+}
+
+WALKTHROUGH_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "flow": {"type": "string", "description": "the one request or run traced"},
+        "steps": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 6,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "file": {"type": "string"},
+                    "start_line": {"type": "integer", "minimum": 1},
+                    "end_line": {"type": "integer", "minimum": 1},
+                    "narration": {"type": "string"},
+                },
+                "required": ["file", "start_line", "end_line", "narration"],
+            },
+        },
+        "trap": {"type": "string", "description": "the misconception most likely, corrected"},
+        "checks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "level": {"type": "integer", "minimum": 1, "maximum": ladder.TOP},
+                    "question": {"type": "string"},
+                    "reference_answer": {"type": "string"},
+                },
+                "required": ["level", "question", "reference_answer"],
+            },
+        },
+    },
+    "required": ["flow", "steps", "trap", "checks"],
+}
+
+TEACHBACK_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "verdict": {"type": "string", "enum": ["correct", "partial", "wrong", "unknown"]},
+        "right": {"type": "string"},
+        "missing": {"type": "string"},
+        "misconception": {"type": "string", "description": "empty when there is none"},
+        "reference_answer": {"type": "string"},
+    },
+    "required": ["verdict", "right", "missing", "misconception", "reference_answer"],
+}
+
 GRADE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -581,46 +645,127 @@ Confidence: 1 = a guess, 2 = fairly sure, 3 = certain. Return `index` matching t
 """
 
 
-_DIG_WHERE = """**Where it lives** — the two to four files or functions that embody it, each with
-   one line on what to look for there. Reference them as path:line where you can."""
-_DIG_REST = f"""{_DIG_WHERE}
-{{n}}. **What depends on it** — what breaks or changes if this decision is reversed.
-{{m}}. **The trap** — the one misconception a reader is most likely to form, and the fact
-   that corrects it."""
-
-
-def dig_prompt(unit: dict[str, Any], level: int = 1, orientation: str | None = None) -> str:
-    """The walkthrough of one unit. `orientation` is the unit's orientation (orientation.py),
-    which the developer has just read as the walkthrough's first section; the check question
-    is asked at the developer's ladder `level` for the unit."""
-    lv = ladder.LEVELS[level]
-    data = {k: v for k, v in unit.items() if k not in ("orientation", "shown_orientation")}
-    if orientation:
-        first = f"""The developer has just read this orientation, the walkthrough's first section:
+def walkthrough_prompt(unit: dict[str, Any], orientation: str | None = None) -> str:
+    """The walkthrough of one unit (walkthrough.py): one real request traced through its code
+    in three to six steps, each a file and a line range the developer sees as an excerpt, and
+    one check question per ladder level, so `dig` can ask at whatever level the developer is
+    and a cached walkthrough serves the whole team."""
+    data = {
+        k: v
+        for k, v in unit.items()
+        if k not in ("orientation", "shown_orientation", "walkthrough", "provenance", "questions")
+    }
+    seen = (
+        f"""
+The developer has just read this orientation; do not repeat it, build on it:
 
 {orientation}
+"""
+        if orientation
+        else ""
+    )
+    return f"""TASK: walkthrough
 
-Do not repeat it. Write the rest of the walkthrough in Markdown, at most 350 words, with
-these sections:
-1. """ + _DIG_REST.format(n=2, m=3)
-    else:
-        first = """Write a walkthrough in Markdown, at most 400 words, with these sections:
-1. **The decision** — what was chosen, in one paragraph, and the alternative that was
-   rejected.
-2. """ + _DIG_REST.format(n=3, m=4)
-    return f"""TASK: dig
-
-You are helping a developer who did not write this code understand ONE architectural
-unit well enough to change it safely. Use the read-only tools to look at the actual code first.
+You are helping a developer who did not write this code understand ONE architectural unit
+well enough to change it safely, by tracing one real request (or run, or event) through its
+code. Use the read-only tools to read the actual files first.
 
 Unit: {json.dumps(data, indent=2)}
+{seen}
+- flow: one sentence naming the request you trace, as a user or a caller would start it.
+- steps: three to six steps in the order the request reaches them. Each is one file of the
+  repository (a path relative to the root, as listed under the unit's paths or below them)
+  and a line range of at most 25 lines (`start_line` and `end_line`, 1-based and inclusive,
+  checked against the file as it is now), with two or three sentences of narration: what
+  happens in those lines and why it matters for the unit's decision. The developer sees the
+  lines next to your narration, so explain them rather than repeat them.
+- trap: one sentence on the misconception a reader of this code is most likely to form, and
+  the fact that corrects it.
+- checks: one question for each ladder level, 1 to 5, each with one part and one fact, whose
+  answer the code determines, and its reference answer. Levels 1-3 ask about the
+  architecture in plain language and name no function, variable or file; their reference is
+  at most two plain sentences. Level 4 may name a file or component, level 5 anything.
 
-The unit's `history` lists the commits that shaped it, each marked human, assisted (human with an
-AI co-author) or ai (AI-authored). Mention who made the decision and when if that is known.
+The ladder:
+{ladder_block()}
 
-{first}
+The unit's `history` lists the commits that shaped it, each marked human, assisted (human
+with an AI co-author) or ai (AI-authored); mention in a narration who made the decision and
+when if that helps.
+"""
 
-End with exactly one line beginning `CHECK QUESTION:` followed by one question at level {level}
-of the question ladder ({lv.name}: {lv.asks}), whose answer the code determines. The question
-may name {lv.names}. Do not include the answer.
+
+def teachback_prompt(unit: dict[str, Any], explanation: str, orientation: str | None) -> str:
+    """A teach-back (teachback.py): the developer explains the unit in their own words; the
+    grader says what was right, what was missing and one misconception, graded as level 2
+    (the decision and its alternatives)."""
+    seen = f"\nThe orientation they may have read: {orientation}\n" if orientation else ""
+    return f"""TASK: teachback
+
+A developer is explaining, in their own words, one architectural unit of the repository in the
+current directory: what it is for, the decision behind it and the alternatives it rejected.
+Check the explanation against the code with the read-only tools (trust the code over the unit
+description if they disagree) and reply in plain language, as a colleague would:
+
+- right: one or two sentences on what the explanation got right.
+- missing: one or two sentences on the most important thing it left out.
+- misconception: one sentence on a claim it makes that the code contradicts, and what the
+  code does instead; an empty string when there is none.
+- verdict, on level 2 of the question ladder (decision and alternatives): correct when the
+  purpose and the decision are right, even if worded differently and without any file or
+  function name; partial when the purpose is right but the decision or its main reason is
+  missing or vague; wrong when it contradicts how the code works; unknown when it says
+  nothing about the unit.
+- reference_answer: two plain sentences a correct explanation must contain.
+
+Unit:
+{_unit_lines({**unit, "level": 2})}
+{seen}
+THE DEVELOPER'S EXPLANATION:
+{explanation}
+"""
+
+
+def tour_prompt(units: list[dict[str, Any]], names: dict[str, str]) -> str:
+    """The architecture tour (tour.py), one call for every top-level unit, in learning order,
+    each with its connections (computed from imports and co-change, not by the model)."""
+    blocks = []
+    for u in units:
+        c = u.get("connections") or {}
+        hist = "\n".join(f"    - {_history_line(h, who=True)}" for h in u.get("history") or [])
+        conn = "; ".join(
+            f"{label} {', '.join(names.get(x, x) for x in c.get(key, []))}"
+            for key, label in (("uses", "uses"), ("used_by", "used by"), ("changes_with",
+                                "changes with"))
+            if c.get(key)
+        )  # fmt: skip
+        blocks.append(
+            _unit_lines(u, history=False, level=False)
+            + f"\n  connections: {conn or 'none found'}"
+            + (f"\n  orientation already written: {u['oriented']}" if u.get("oriented") else "")
+            + f"\n  history:\n{hist or '    (none)'}"
+        )
+    return f"""TASK: tour
+
+Write an architecture tour of the repository in the current directory for a capable developer
+who has not built it and is about to learn it: the whole system as a map, before any detail.
+It is read once, in about ten minutes, and shared by the team.
+
+- overview: three to five sentences on what the system does and how its parts divide the
+  work, naming the units below by their names.
+- units: one paragraph per unit below, in the order given (each unit comes after the units it
+  uses), 90 to 140 words, covering in this order: what the unit is for; where it sits, using
+  its connections (the units it uses and that use it, by name); the decision it embodies;
+  the alternative that was not chosen and why; who shaped it and when, from its history:
+  whether a human wrote it alone ([human]), with an AI co-author ([assisted]) or an AI agent
+  authored it ([ai]). Say plainly when the history does not show why.
+
+Plain language throughout: name no function, class, variable or file of the repository
+(external technologies such as a database or a hosting service are fine), and do not quote
+code. Use the read-only tools to check each unit's summary against the code; do not invent
+connections beyond those listed. Keep the whole tour under 1,800 words. Return `unit_id`
+exactly as given.
+
+Units:
+{chr(10).join(blocks)}
 """

@@ -84,3 +84,7 @@
 2026-11-14 [code] One question, one fact: compound questions (two ?, "and what/which", "; ", inventories at 1-3) replaced by a variant from the same reply, else trimmed.
 2026-11-14 [code] Reveal on miss at levels 1-2 (blank at once, wrong after grading), recorded `revealed` with `variants`; the next sitting asks the same fact in other words.
 2026-11-14 [code] Estimated vs measured: `basis` in status, timeline and export (from `quizzed`); quiz prints why the index moved when answers replace the prior.
+2026-11-14 [code] udebt tour (one cached call, order and connections from the unit graph) and udebt path (prerequisites first, then importance x debt; minutes, next action).
+2026-11-14 [code] dig shows the code: TASK: walkthrough steps rendered with real lines (tracked files, 25 max), checks per level; cached on the unit by its files' contents.
+2026-11-14 [code] udebt review (SM-2 per unit and level from the first miss, a stored variant, one call), teachback (level 2, type teachback), decisions write (opt-in ADRs).
+2026-11-14 [decision] Learning order is prerequisites-first by priority, not Kahn's: on digitalme Kahn put the two least important isolated units first and chat-flow third.

@@ -252,7 +252,8 @@ def test_quiz_preview_records_nothing(fixture_repo, fake, capsys):
     assert fake.log == ["TASK: orientation", "TASK: questions"]
     assert cap.out.startswith("# Ladder quiz preview") and "Quizzing" in cap.err
     assert cap.out.count("**Orientation**") == 2 and "level 1 of 5" in cap.out
-    assert "Reference answer (for the grader)" in cap.out
+    assert "Reference answer (shown after a miss at levels 1-2)" in cap.out
+    assert "None of the questions above is compound" in cap.out and "Variants (" in cap.out
     assert "found none" in cap.out, "the fake's level 1 questions name no identifier"
     assert store.load_records("dev1@example.com") == []
     units = json.loads(store.map_path.read_text())["units"]
@@ -271,7 +272,7 @@ def test_dig_opens_with_the_orientation_and_checks_at_the_ladder_level(
     monkeypatch.setattr("builtins.input", lambda _p="": next(answers))
     assert cli.main(["--repo", str(root), "dig", "scoring"]) == 0
     out = capsys.readouterr().out
-    assert fake.log == ["TASK: orientation", "TASK: dig", "TASK: grade"]
+    assert fake.log == ["TASK: orientation", "TASK: walkthrough", "TASK: grade"]
     assert out.index("Orientation: Debt scoring model") < out.index("fake walkthrough")
     assert "level 2 of 5: decision and alternatives" in out
     last = store.load_records("dev1@example.com")[-1]

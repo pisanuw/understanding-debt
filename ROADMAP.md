@@ -933,12 +933,12 @@ started and stopped at a session limit. **LLM calls used: 0.** Tests: 133 (131 +
 | 2 one question, one fact | **done**: `ladder.compound`/`first_clause`, ladder examples one part, quiz schema with two `variants` per question, the first one-part phrasing kept (no extra call), the inventory orientation rule dropped, references at levels 1-3 two plain sentences |
 | 3 reveal on miss (levels 1-2), variant next sitting | **done**: blank shows the reference at once, wrong after grading; `revealed: true` and `variants` on the record; the question writer is told to vary revealed questions |
 | 4 estimated vs measured (`status`, `timeline`, export, quiz index line) | **done**: `basis` column and counts in `status`, basis lines and columns in `timeline`, `basis` in the export's units and snapshots CSV (from `quizzed`, no format change), the dashboard's `est.`, the quiz's index-change line |
-| 5 `udebt tour` | not started |
-| 6 `udebt path` | not started |
-| 7 `dig` walkthroughs with code excerpts | not started |
-| 8 `udebt review` (SM-2) | partial: the fold (`review.py`) and the state written on every new record; the command next |
-| 9 `udebt teachback` | not started |
-| 10 `udebt decisions write` | not started |
+| 5 `udebt tour` | **done**: one `TASK: tour` call, cached in map.json `tour` with a basis hash; order and connections computed locally (`unitgraph.py`); `quiz` and `path` point to it while nothing is measured |
+| 6 `udebt path` | **done**: prerequisites first by the import graph (shared files split), importance x debt as priority; minutes and the next action per unit; a ten-minute session line |
+| 7 `dig` walkthroughs with code excerpts | **done**: `TASK: walkthrough` steps rendered with the real lines (tracked files only, 25 lines), checks for levels 1-5 with references; cached on the unit, invalid when its files' contents change |
+| 8 `udebt review` (SM-2) | **done**: SM-2 per (unit, level) from the first miss, state stamped on every record; `review` asks a stored variant with its reference, one grading call |
+| 9 `udebt teachback` | **done**: one call, right / missing / misconception, level 2 evidence `type: teachback`, revealed on a miss |
+| 10 `udebt decisions write` | **done**: opt-in, one ADR per top-level unit and an index, no model call; a level 2 pass refreshes "Last confirmed by" |
 | Part 2 `udebt serve` | not started |
 | validation (8-call budget), README/BRIEFING docs | not started |
 

@@ -144,8 +144,11 @@ def test_dig_without_check_line_warns(fixture_repo, monkeypatch, capsys):
     from udebt import llm as llm_mod
 
     class NoCheck(llm_mod.FakeLLM):
-        def text(self, prompt, **kw):
-            return "# Walkthrough only\n"
+        def structured(self, prompt, schema, **kw):
+            res = super().structured(prompt, schema, **kw)
+            if "TASK: walkthrough" in prompt:
+                res["checks"] = []
+            return res
 
     monkeypatch.setattr(llm_mod, "FakeLLM", NoCheck)
     run(fixture_repo, "init", capsys=capsys)
