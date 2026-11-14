@@ -46,9 +46,43 @@ def cached(unit: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def wanted(records_on_unit: list[dict[str, Any]], level: int) -> bool:
-    """Before a level 1 question, for a developer with no answer at levels 1-3 on the unit.
-    Answers from before the ladder (level 5) do not count: they were about the code."""
-    return level == 1 and not ladder.architectural(records_on_unit)
+    """Before every level 1 question, until the developer has passed level 1 on the unit.
+
+    Phase 3.2 showed it only to a developer with no level 1-3 answer at all, so an "I don't
+    know" at level 1 (or a dig check, or a forced `--level` answer) switched the orientation
+    off for good while the unit's purpose was still unknown. Answers from before the ladder
+    (level 5) do not count: they were about the code."""
+    if level != 1:
+        return False
+    first = ladder.sittings(ladder.architectural(records_on_unit)).get(1, [])
+    return not ladder.passed(first)
+
+
+def fallback(unit: dict[str, Any]) -> dict[str, Any]:
+    """An orientation from the unit's own map fields, for a unit the model's reply missed.
+    Not cached: the next run asks the model again."""
+    parts = [str(unit.get("decision", "")).strip()]
+    if unit.get("alternatives"):
+        parts.append(f"Not chosen: {str(unit['alternatives']).strip()}")
+    if unit.get("why"):
+        parts.append(f"Why: {str(unit['why']).strip()}")
+    authors: list[str] = []
+    for h in unit.get("history") or []:
+        who = f"{h.get('author') or '?'} [{h.get('klass', '?')}]"
+        if who not in authors:
+            authors.append(who)
+    shaped = (
+        "From its history: " + ", ".join(authors[:4]) + "."
+        if authors
+        else "The history list does not say."
+    )
+    return {
+        "purpose": str(unit.get("summary", "")).strip() or unit.get("name", unit["id"]),
+        "decision": " ".join(p for p in parts if p),
+        "where": [{"path": p, "what": ""} for p in unit.get("paths", [])[:MAX_PATHS]],
+        "shaped_by": shaped,
+        "fallback": True,
+    }
 
 
 def _where(given: list[dict[str, Any]] | None, unit: dict[str, Any], root: Path):
@@ -75,9 +109,13 @@ def ensure(
     unit_ids: list[str],
     *,
     max_turns: int = MAX_TURNS,
+    say=None,
 ) -> dict[str, dict[str, Any]]:
     """unit id -> orientation for each of `unit_ids`, the cached ones as they are and the
-    missing or stale ones written in one call, stored on the units of `map_data` and saved."""
+    missing or stale ones written in one call, stored on the units of `map_data` and saved.
+    A unit the model's reply misses (an unexpected unit_id, an empty purpose) gets a
+    fallback from its map fields, not cached, so no level 1 question goes without one;
+    `say` hears about it."""
     units = map_data["units"]
     by_id = hier.index(units)
     parents = hier.parent_of(units)
@@ -104,6 +142,9 @@ def ensure(
     for u in missing:
         o = got.get(u["id"]) or got.get(u["id"].split("/")[-1])
         if not o or not str(o.get("purpose", "")).strip():
+            if say is not None:
+                say(f"The model wrote no orientation for {u['id']}; showing its map entry.")
+            out[u["id"]] = fallback(u)
             continue
         u["orientation"] = out[u["id"]] = {
             "purpose": str(o["purpose"]).strip(),

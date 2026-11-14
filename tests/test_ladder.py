@@ -291,3 +291,49 @@ def test_status_deep_shows_depth_per_sub_unit(layered_repo, fake, capsys):
     rows = {ln.split()[0]: ln for ln in out.splitlines() if ln.startswith("  " + db["id"])}
     assert " 1.00   3/5 " in rows[first] and " 0.33   1/5 " in rows[second]
     assert any(" -  " in ln or "   - " in ln for ln in out.splitlines()), "no answer: -"
+
+
+def test_quiz_shows_the_orientation_before_the_first_question_until_level_1_passes(
+    fixture_repo, fake, monkeypatch, capsys
+):
+    """The owner's 2026-11-14 quiz showed no orientation. On a unit with no evidence it
+    comes before the first question; an "I don't know" at level 1 no longer switches it off
+    (Phase 3.2 showed it only while the unit had no level 1-3 answer at all)."""
+    root = fixture_repo
+    store = _mapped(root, capsys)
+    monkeypatch.setattr("builtins.input", lambda _p="": "")
+    assert cli.main(["--repo", str(root), "quiz", "-n", "2"]) == 0
+    out = capsys.readouterr().out
+    for name, uid in (("Persistence layer", "storage"), ("Debt scoring model", "scoring")):
+        assert out.index(f"Orientation: {name}") < out.index(f"What is the {uid} unit for")
+    assert [r["verdict"] for r in store.load_records("dev1@example.com")] == ["unknown"] * 2
+    # the second sitting at level 1, after two known unknowns: oriented again, no new call
+    fake.log.clear()
+    assert cli.main(["--repo", str(root), "quiz", "--unit", "storage"]) == 0
+    out = capsys.readouterr().out
+    assert fake.log == ["TASK: questions"], "cached: no orientation call"
+    assert out.index("Orientation: Persistence layer") < out.index("What is the storage unit")
+
+
+def test_a_unit_the_orientation_reply_misses_gets_its_map_entry(
+    fixture_repo, fake, monkeypatch, capsys
+):
+    root = fixture_repo
+    store = _mapped(root, capsys)
+    real = fake.structured
+
+    def no_storage(self, prompt, schema, **kw):
+        res = real(self, prompt, schema, **kw)
+        if "TASK: orientation" in prompt:
+            res["orientations"] = [o for o in res["orientations"] if o["unit_id"] != "storage"]
+        return res
+
+    monkeypatch.setattr(fake, "structured", no_storage)
+    monkeypatch.setattr("builtins.input", lambda _p="": "")
+    assert cli.main(["--repo", str(root), "quiz", "--unit", "storage"]) == 0
+    out = capsys.readouterr().out
+    assert "wrote no orientation for storage" in out
+    assert out.index("Orientation: Persistence layer") < out.index("What is the storage unit")
+    assert "All state lives in JSON files" in out, "the map's summary stands in"
+    saved = {u["id"]: u for u in store.require_map()["units"]}
+    assert "orientation" not in saved["storage"], "a fallback is not cached"

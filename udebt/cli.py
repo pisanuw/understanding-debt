@@ -305,7 +305,7 @@ def cmd_quiz(args) -> int:
             n_new = sum(1 for uid in need if orient.cached(hier.index(units)[uid]) is None)
             if n_new:
                 say(f"Writing the orientation for {n_new} unit(s) you have not been quizzed on...")
-            orients = orient.ensure(root, store, llm, m, need)
+            orients = orient.ensure(root, store, llm, m, need, say=say)
         for u in picked:
             u["level"] = levels[u["id"]]
             if u["id"] in orients:
