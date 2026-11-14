@@ -29,8 +29,11 @@ human commits, AI-assisted commits and AI-authored commits, and uses the `claude
    view is useful before the first quiz;
 7. **flag** changes that land weight in units the author does not understand, most strongly
    outside their responsibility set;
-8. **dig** into the worst unit with a short guided walkthrough, opening with the unit's
-   orientation and ending in a check question at the developer's level on the ladder;
+8. **teach** the architecture, not only test it: a ten-minute tour of the whole system, a
+   learning path in dependency order, walkthroughs that trace one real request through a
+   unit's code, the answer shown after a miss, spaced review of what was missed, teach-back
+   (explain a unit, hear what was right and what was missing), opt-in decision records, and
+   all of it in the browser (`udebt serve`);
 9. **replay** all of it over the history: debt per developer and unit at every week (or N
    units of mass), the risk events of the past, an export for the hosted version and a
    static dashboard.
@@ -69,7 +72,12 @@ udebt history --candidates     # the commits `map` would show the model as decis
 udebt quiz -n 5 [--deep]       # five questions from your set, each at your level on the ladder
 udebt quiz --level N           # force ladder level N (1-5) for every question, for experiments
 udebt quiz --preview           # print the orientations and questions as Markdown; record nothing
-udebt dig [unit]               # walkthrough of the highest-debt unit, then a check question
+udebt tour [--refresh]         # a ten-minute architecture overview, one call, cached for the team
+udebt path [--all]             # your learning path: dependency order, minutes, next action per unit
+udebt dig [unit] [--refresh]   # one real request traced through the unit's code, then a check
+udebt review [-n 5] [--all]    # spaced review of the questions you missed, in other words
+udebt teachback <unit>         # explain a unit; right, missing, misconception; graded as level 2
+udebt decisions [write] [--dir docs/decisions]   # one decision record per top-level unit (opt-in)
 udebt risk [range|--staged]    # weight a change lands in each unit vs your understanding; --deep per sub-unit
 udebt hook install             # warn-only pre-push hook that runs `udebt risk`
 udebt scope <unit> blackbox    # "I choose not to understand this", for you (or --for <dev>)
@@ -191,6 +199,7 @@ For each architectural unit `u` and developer `d`:
 | verified understanding | max(0, (v_1 + v_2 + v_3) / 3 + 0.1 x (v_4 + v_5)): levels 1-3 (the architecture) a third each, levels 4-5 (optional depth) 0.1 each, so at most 1.2 |
 | understanding | min(1, verified x exp(-k x share of `u` changed since the last answer)), k = 1.0 (config `decay_k`, fitted on every recorded synthetic unit-snapshot, ROADMAP Phase 5): 37% is left once a unit's worth of change has landed, half at 69%. Passing levels 1-3 is full understanding; depth above 1 is headroom against the fade (a unit known to level 5 reads 1.0 until 18% of it has changed) and can lift a faded understanding back over the known threshold, but is never needed to reach it |
 | depth | the highest level n with every level 1..n passed (its latest sitting all correct); 0 when level 1 is not |
+| basis | `measured` when the understanding comes from quiz answers on `u` (or on its sub-units), `estimated` when from the own-commit prior or half the parent's quiz, `none` without either; it changes no number |
 | next level on `u` | depth + 1, at most 5; one lower when the latest sitting was confidently wrong at level 2 or more |
 | verified, flat model | mean evidence over the last 5 answers on `u`, clamped to [0, 1], levels ignored: config `evidence_model: "flat"` (`evidence_window`), the rule before the ladder |
 | share of `u` changed since t | weighted changed lines landed under `u` after t / size of `u` in lines; can pass 1 when code is rewritten more than once, though no single commit adds more than the unit's size |
@@ -259,7 +268,7 @@ unit by unit:
 
 | level | asks | the question may name |
 |---|---|---|
-| 1 purpose and placement | what the unit is for, what depends on it, what it depends on | nothing from the code: components by role, in plain language |
+| 1 purpose and placement | what the unit is for, or one consequence of its place in the system, answerable in a sentence | nothing from the code: components by role, in plain language |
 | 2 decision and alternatives | what was chosen, what was rejected, what constraint forced it | nothing from the code |
 | 3 consequence across units | what else changes if the decision were reversed or replaced | nothing from the code |
 | 4 behaviour under failure | module-level edge cases and failure modes | file or component names, no code |
@@ -285,8 +294,22 @@ unit by unit:
   1-3 a correct plain-language answer is correct without any identifier, and partial means the
   role or decision is right but a dependency or a consequence is missing.
   `udebt quiz --preview` checks the questions it prints with a heuristic for code-like tokens.
-- **An orientation comes first.** Before the level 1 question on a unit the developer has no
-  level 1-3 answer on, the quiz prints a short orientation: what the unit is for, the decision
+- **One question, one fact** (Phase 3.3). Every question has one part: one question mark,
+  nothing joined on with "and what", "and which" or "; ", no second sentence after it, and at
+  levels 1-3 no inventory ("list", "which other parts ...", "name the ..."). The owner's first
+  level 1 quiz on digitalme asked five compound inventory questions and he could answer none.
+  The question writer returns two more phrasings of the same fact with each question
+  (`variants`); a compound first phrasing is replaced by the first variant that asks one fact,
+  else trimmed to its first clause, in the same call (`ladder.compound`, `first_clause`).
+  Reference answers at levels 1-3 are at most two plain sentences, because the developer
+  reads them.
+- **A miss teaches.** At levels 1 and 2 a blank answer prints the reference answer at once and
+  a wrong one prints it after grading; the record says `revealed: true` and keeps the
+  question's variants. It counts as the miss it was (unknown or wrong evidence, no penalty for
+  the reveal), the next sitting at that level asks the same fact in other words (the question
+  writer is given the revealed questions), and `udebt review` brings it back the next day.
+- **An orientation comes first.** Before every level 1 question on a unit, until the developer
+  passes level 1 there, the quiz prints a short orientation: what the unit is for, the decision
   with its alternatives and why, the two or three paths to open first, and who shaped it (from
   the unit's `history`). The model writes it once per unit and it is cached on the unit in
   `map.json` (`orientation`, shared by the team, rewritten when `udebt map` changes the unit);
@@ -303,6 +326,72 @@ unit by unit:
 
 A quiz run costs one call for the questions, one for the grades and, on units met for the
 first time, one for their orientations.
+
+## Teaching
+
+The quiz measures; these commands teach. Each shares the quiz's machinery (one-fact
+questions, the answer shown after a miss at levels 1-2, records written the same way) and
+none costs more than one call; what the model writes for the team is cached in `map.json`.
+
+- **`udebt tour`**: the architecture as one ten-minute read, before any question. The units
+  come in learning order (each after the units it uses) with a map of their connections: a
+  unit *uses* another when its files import the other's, and they *change together* by the
+  commits that touch both (`udebt/unitgraph.py`, no model call; a file several units list is
+  split among them, so a hub file every flow passes through does not connect everything). One
+  `TASK: tour` call writes an overview and a paragraph per unit: purpose, placement among its
+  connections, the decision, the alternative not chosen, who shaped it and when. Cached in
+  `map.json` (`tour`) with a basis hash of the units and their order; `--refresh` rewrites it.
+  `udebt quiz` and `udebt path` point to it while nothing of yours is measured. digitalme's:
+  12 units, 2,255 words, about 11 minutes, one call of 31 s.
+- **`udebt path`**: what to learn next. Units are taken by importance x debt and each one's
+  prerequisites (the units it uses) are placed before it, so the foundations of what matters
+  come first and a unit nothing uses comes when its priority says; a cycle is broken where
+  the walk meets it. Per unit: understanding, basis, depth, minutes (1 for the orientation and
+  4 for the walkthrough on first contact, 2 per ladder level 1-3 still to pass, 1 per review
+  due, 3 for a re-check after it faded) and the next action, plus the commands that fit a
+  ten-minute session (`--minutes N`). `--format json` for scripts.
+- **`udebt dig <unit>`** shows the code. One `TASK: walkthrough` call traces one real request
+  through the unit in three to six steps, each a file and a line range with narration; `dig`
+  prints the orientation, then each step's narration beside the actual lines from the working
+  tree, numbered, at most 25 per step (tracked files only: an untracked or ignored file is
+  never read), then the misconception most likely, then a check question at your ladder level
+  from the walkthrough's own checks (one per level, each with a reference). Cached on the unit
+  (`walkthrough`) with the head, the unit's basis and a hash of its files' contents; any change
+  to a file of the unit, committed or not, rewrites it on the next `dig`.
+- **`udebt review`**: about five minutes of the questions you missed, SM-2 style, one item per
+  unit and level, folded from the records (`udebt/review.py`; the state after each answer is
+  also written on the record as `review`). It asks a stored phrasing you were not asked last
+  time, with its stored reference, so a review costs one grading call; a review answer is
+  ordinary evidence, so a correct one passes the level.
+
+  | | |
+  |---|---|
+  | an item starts | on a miss (partial, wrong, unknown, revealed or not) at a unit and level |
+  | quality | correct 5, 4, 3 by confidence 3, 2, 1; partial 2; wrong or unknown 1; confidently wrong 0 |
+  | quality < 3 | repetitions 0, next in 1 day, ease - 0.2 (at least 1.3) |
+  | quality >= 3 | next in 1 day, then 3 days, then the last interval x ease; ease + 0.1 - (5 - q)(0.08 + 0.02(5 - q)), from 2.5 |
+
+- **`udebt teachback <unit>`**: you explain the unit; one call says what was right, what was
+  missing and one misconception if there is one, and grades it as level 2 (decision and
+  alternatives), recorded with `type: teachback`. A miss shows the reference answer.
+- **`udebt decisions write [--dir docs/decisions]`**: opt-in, nothing writes them otherwise.
+  One short decision record per top-level unit (context, decision, alternatives not chosen,
+  the commits that shaped it and who made them, where it lives) and an index, from the map
+  with no model call; `udebt decisions` alone shows what would be written. Each has a **Last
+  confirmed by** line: the developer who most recently passed level 2 on the unit; once the
+  records exist (`decisions_dir` in config), every level 2 pass refreshes that line and leaves
+  the rest of the file alone. **These files describe internal architecture, the alternatives
+  rejected and who made each call: they may not belong in a public repository.**
+- **Estimated or measured.** `udebt status` has a `basis` column (`measured`: your quiz
+  answers, or your sub-units'; `estimated`: the own-commit prior, at most 0.5, or half the
+  parent's quiz; `none`) and counts under the index; `udebt timeline` prints the basis at the
+  latest point (and per point in `--dev` CSV and JSON); the export adds `basis` per developer
+  to each unit and a `basis` column to the snapshots table, derived from each point's
+  `quizzed` units (the stored series is unchanged); the dashboard marks an estimated
+  understanding `est.`. When a quiz replaces estimates with measurements, it says so in one
+  line ("Debt index X -> Y: <units> were estimated from your own commits (a prior of at most
+  0.5) and now rest on your answers"), since an honest "I don't know" can raise the index the
+  prior was holding down.
 
 ## Units and sub-units
 

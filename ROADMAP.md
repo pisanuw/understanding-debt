@@ -443,6 +443,36 @@ depth, so the next synthetic run should measure a smaller spread between questio
 fixed level; it is also the first chance to see how the decay curve differs by level (level 3
 should fade with the share changed less steeply than level 5 does).
 
+### Phase 3.3: the teaching layer
+
+**Status 2026-11-14: Part 1 (the CLI teaching layer) done; Part 2 (`udebt serve`) below.**
+From the owner's level 1 quiz on digitalme: five compound inventory questions, none answered,
+nothing taught on "I don't know", no orientation shown. "The system is currently good at
+quizzing the user, but leaves the programmer frustrated and having to go back to look at the
+code to figure out the answers." Per-item status is in the Handoff section at the end.
+
+| | |
+|---|---|
+| one question, one fact | `ladder.compound` and `first_clause`; variants from the same call; references at levels 1-3 two plain sentences |
+| reveal on miss | levels 1-2; `revealed` and `variants` on the record; the next sitting varies the question |
+| estimated vs measured | `basis` in status, timeline, export and dashboard; the quiz's index-change line |
+| tour | one cached call; order and connections from `unitgraph.py` |
+| path | prerequisites first by importance x debt; minutes and next action; a ten-minute session |
+| dig | 3-6 traced steps shown with their real lines (tracked files, 25 each), checks per level; cached by file contents |
+| review | SM-2 per unit and level from the first miss, stored variant and reference, one call |
+| teach-back | right / missing / misconception, level 2, `type: teachback` |
+| decision records | opt-in ADRs, "Last confirmed by" from level 2 passes |
+
+**Validation on digitalme** (as pisan@uw.edu, four calls of the eight budgeted, 98 s in all;
+`.udebt/samples/digitalme-teaching.md` and `digitalme-tour.md`): the five units of the Phase
+3.2 sample now get one-fact level 1 questions ("Why does a role change for a signed-in user
+take effect on their very next request, even though their login token was issued earlier?"),
+none compound by `ladder.compound` or by hand, none naming an identifier; the tour covers 12
+units in 2,255 words (about 11 minutes); the `chat-flow` walkthrough traces one chat message
+through five steps in four files, from the browser's watchdog to the concurrent post-stream
+checks; a half-right teach-back on `auth-rbac` was graded wrong, its purpose credited and its
+misconception (roles in the token) corrected from the code.
+
 ## Phase 4: hosted (Netlify, Render, Supabase) with the CLI as the local twin
 
 **Adds**
@@ -924,8 +954,10 @@ udebt defaults to advisory and lets a repo owner opt in to soft blocking per rep
 ## Handoff 2026-11-14
 
 Phase 3.3 (the teaching layer, from the owner's level 1 quiz on digitalme: five "I don't
-know", no orientation shown, compound inventory questions, nothing taught on a miss) was
-started and stopped at a session limit. **LLM calls used: 0.** Tests: 133 (131 + 2).
+know", no orientation shown, compound inventory questions, nothing taught on a miss). The
+first session fixed item 1 and stopped at a session limit (0 calls); the second did items
+2-10 (Part 1, pushed) and then Part 2. **LLM calls used: 4 of 8 after Part 1** (questions,
+tour, walkthrough, teach-back). Tests: 146 after Part 1.
 
 | item | status |
 |---|---|
@@ -940,7 +972,7 @@ started and stopped at a session limit. **LLM calls used: 0.** Tests: 133 (131 +
 | 9 `udebt teachback` | **done**: one call, right / missing / misconception, level 2 evidence `type: teachback`, revealed on a miss |
 | 10 `udebt decisions write` | **done**: opt-in, one ADR per top-level unit and an index, no model call; a level 2 pass refreshes "Last confirmed by" |
 | Part 2 `udebt serve` | not started |
-| validation (8-call budget), README/BRIEFING docs | not started |
+| validation (8-call budget), README/BRIEFING docs | Part 1 **done**: 4 calls (preview, tour, walkthrough, teach-back), README "Teaching", BRIEFING decisions and open questions; the tutor and screenshots go with Part 2 |
 
 **Orientation root cause.** `cmd_quiz` and `ask_interactively` print it correctly on a unit
 with no evidence (reproduced offline on a copy of digitalme). Two gaps hid it: (1)

@@ -390,6 +390,66 @@ acceptable.
   - The synthetic experiment asks at one explicit level (`--level`, default 3), recorded in
     its report (version 3). The replay fingerprint adds the evidence model; rules version 3.
 
+- **Phase 3.3, the teaching layer (2026-11-14)**: the owner took the level 1 quiz on
+  digitalme and answered none of five: the questions were compound inventories, an "I don't
+  know" taught nothing and the orientation did not show (fixed first, `099a7fc`). "The system
+  is currently good at quizzing the user, but leaves the programmer frustrated." Owner
+  decisions: level 1 is free text; the teaching surface is a local server in the browser;
+  decision records may be written into the repository, opt-in and flagged as possibly
+  sensitive; a learning session is ten minutes; an interactive tutor through the `claude` CLI
+  is acceptable; a revealed miss is ordinary unknown or wrong evidence (a correct variant at
+  the next sitting passes the level); the server's generation endpoints may be POSTs that only
+  fill the caches in map.json.
+  - **One question, one fact**: a question with more than one question mark, a second
+    question joined by "and what/which/how/why/..." or "; ", a second sentence after the
+    question mark, or (levels 1-3) an inventory ("list", "enumerate", "which other parts",
+    "name the ...") is compound. The quiz schema asks for two `variants` with each question;
+    the first phrasing that asks one fact is kept, else the first clause, so validation costs
+    no call. The synthetic experiment's stable questions are left as they were, so its runs
+    stay comparable with Phase 1-3 runs. The orientation rule that asked for "which other parts
+    rely on it" is replaced by one consequence (what a user would notice, why it runs where it
+    does).
+  - **Reveal at levels 1-2 only**: those are the purpose and the decision, which a developer
+    cannot work out alone; at level 3 and up a miss gets feedback, not the answer, so the
+    consequence and failure questions still measure reasoning. Partial answers are not revealed
+    (their feedback names what was missing). A reveal changes no score.
+  - **Basis is derived, not stored**: `measured` for quiz and children sources, `estimated` for
+    prior and parent, `none`; the export derives it from each point's existing `quizzed`, so
+    `snapshots.json` keeps its format and fingerprint.
+  - **Run timestamps are strictly increasing per developer**: two runs in the same second
+    (a quiz then an immediate review) would otherwise share a timestamp and read as one
+    sitting; `quiz.record` moves a run one second past the developer's latest record.
+  - **The unit graph splits shared files**: an import from a file k units list counts 1/k for
+    each (and 1/k for the imported side), and only edges of at least 0.5 order anything. On
+    digitalme `backend/main.py` is listed by five units; counted whole, every unit used every
+    other.
+  - **Learning order is prerequisites first, by priority**: units taken by importance x debt
+    (the tour, being shared, uses importance), each placed after the units it uses,
+    recursively; a cycle is broken where the walk meets it. Kahn's algorithm, as the handoff
+    planned, put digitalme's two least important isolated units first (nothing held them
+    back) and, in its cycles, the chat flow third, though it uses four units.
+  - **The tour's order and connections are computed, not written by the model**; the model
+    writes the overview and one paragraph per unit. Cached in map.json with a basis of each
+    unit's orientation basis, the order and the uses edges.
+  - **Walkthrough cache by file contents**: valid while the unit's map entry and a hash of its
+    tracked files' contents (working tree) are unchanged. The handoff's `git diff --name-only
+    <head>` would discard a walkthrough written over uncommitted changes as soon as they were
+    committed. Excerpts read tracked files only (no `..`, no absolute path, nothing ignored),
+    at most 25 lines; a step naming an untracked file is dropped.
+  - **Review is SM-2 with the handoff's 1 and 3 days**, starting only on a miss; quality from
+    the verdict and the confidence. It asks a stored phrasing not asked last time, with the
+    stored reference: no generation call. Review, dig, teach-back and tutor answers are all
+    ordinary evidence (`source` says which), so a correct review passes its level.
+  - **Teach-back is level 2**, whatever the developer's place on the ladder: a level 2 pass
+    without level 1 adds to the score but not to depth, as a forced answer does.
+  - **Decision records**: no model call, from the map; `udebt decisions` alone writes nothing;
+    `write` remembers `decisions_dir` in config and from then on a level 2 pass rewrites only
+    the Last confirmed by line, so hand edits survive.
+  - **Cached generations live in the committed map.json** (orientations already did): the
+    tour, walkthroughs with their check questions and reference answers. A teammate can read
+    an answer before being asked; the quiz measures understanding, and reading the answer is
+    learning, so this is accepted rather than hidden.
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.
@@ -484,3 +544,16 @@ acceptable.
   provider). Confirm, or forbid those too?
 - A parent's depth is its own answers only; sub-unit quizzes roll up understanding but not
   depth. Show the sub-units' minimum depth on the parent?
+- Teaching (Phase 3.3): should partial answers at levels 1-2 also reveal the reference? They
+  get feedback naming what was missing, but not the full answer.
+- Should `udebt path` count a unit as learned at depth 3, or keep suggesting level 4 once the
+  architecture is known? Today it says "nothing now" at depth 3 while understanding is above
+  the threshold.
+- The walkthrough's check questions are written once per unit and shared; after a developer
+  has been asked one, `dig` asks the same one again at that level. Rotate to the quiz's
+  questions, or write a second set on demand?
+- Teach-back is always level 2. Grade it at the developer's next level instead (level 1 for a
+  newcomer, 3 for someone who has passed 2)?
+- digitalme's unit graph is dense (one hub file, `backend/main.py`, sits in five units): most
+  units use most others even with shared files split. Should the map's paths avoid listing a
+  hub file in several units, or should the graph ignore files listed by more than k units?

@@ -228,10 +228,10 @@ def test_tour_is_one_cached_call_in_learning_order(layered_repo, spy, capsys):
     assert rc == 0 and spy == ["TASK: tour"]
     assert out.startswith("# Architecture tour: shop") and "## The map" in out
     m = store.require_map()
-    names = {u["id"]: u["name"] for u in m["units"]}
     api = next(u["id"] for u in m["units"] if "shop/api/routes.py" in u["paths"])
     db = next(u["id"] for u in m["units"] if "shop/db/models.py" in u["paths"])
-    assert f"uses {names[db]}" in out.split("## The map")[1], "the api imports the db"
+    api_line = next(ln for ln in out.split("## The map")[1].splitlines() if f"(`{api}`)" in ln)
+    assert f"uses `{db}`" in api_line, "the api imports the db"
     sections = [ln for ln in out.splitlines() if ln.startswith("## ") and "(`" in ln]
     order = [ln.split("(`")[1].rstrip("`)") for ln in sections]
     assert order.index(db) < order.index(api), "what others use comes first"

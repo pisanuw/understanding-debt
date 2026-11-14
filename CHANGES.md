@@ -88,3 +88,5 @@
 2026-11-14 [code] dig shows the code: TASK: walkthrough steps rendered with real lines (tracked files, 25 max), checks per level; cached on the unit by its files' contents.
 2026-11-14 [code] udebt review (SM-2 per unit and level from the first miss, a stored variant, one call), teachback (level 2, type teachback), decisions write (opt-in ADRs).
 2026-11-14 [decision] Learning order is prerequisites-first by priority, not Kahn's: on digitalme Kahn put the two least important isolated units first and chat-flow third.
+2026-11-14 [note] digitalme validation, 4 calls: five one-fact level 1 questions (none compound), tour 12 units 2,255 words, chat-flow walkthrough 5 steps, a half-right teach-back graded.
+2026-11-14 [doc] README Teaching section, BRIEFING Phase 3.3 decisions and open questions, ROADMAP Phase 3.3; samples digitalme-teaching.md and digitalme-tour.md.

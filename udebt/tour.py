@@ -116,33 +116,26 @@ def ensure(
     return tour, True
 
 
-def _names(uids: list[str], names: dict[str, str]) -> str:
-    return ", ".join(names.get(u, u) for u in uids)
-
-
 def markdown(tour: dict[str, Any], map_data: dict[str, Any], graph: UnitGraph, repo_name: str):
     """The tour as Markdown: the overview, the map (every unit in order with its
     connections) and one section per unit."""
     units = map_data["units"]
     by_id = {u["id"]: u for u in units}
     names = {u["id"]: u.get("name", u["id"]) for u in units}
-    words = len(tour["overview"].split()) + sum(
-        len(s["paragraph"].split()) for s in tour["sections"]
-    )
-    mins = max(1, round(words / WORDS_PER_MINUTE))
     when = (tour.get("generated_at") or datetime.now(UTC).isoformat())[:10]
     out = [
         f"# Architecture tour: {repo_name}",
         "",
         f"_Written by `udebt tour` at `{str(tour.get('head', ''))[:8]}` on {when}; "
-        f"{len(tour['sections'])} units, about {mins} minutes to read. Units come in the order "
-        "to learn them: each after the units it uses._",
+        f"{len(tour['sections'])} units, about __MINUTES__ minutes to read. Units come in the "
+        "order to learn them: each after the units it uses._",
         "",
         tour["overview"],
         "",
         "## The map",
         "",
-        "*Uses*: its code imports the other unit's. *Changes with*: commits often touch both.",
+        "*Uses*: its code imports the other unit's (strongest first). *Used by*: how many "
+        "units import it. *Changes with*: the units commits most often touch with it.",
         "",
     ]
     for i, s in enumerate(tour["sections"], 1):
@@ -150,11 +143,11 @@ def markdown(tour: dict[str, Any], map_data: dict[str, Any], graph: UnitGraph, r
         c = connections(uid, graph, names)
         bits = []
         if c["uses"]:
-            bits.append("uses " + _names(c["uses"], names))
+            bits.append("uses " + ", ".join(f"`{u}`" for u in c["uses"]))
         if c["used_by"]:
-            bits.append("used by " + _names(c["used_by"], names))
+            bits.append(f"used by {len(c['used_by'])}")
         if c["changes_with"]:
-            bits.append("changes with " + _names(c["changes_with"], names))
+            bits.append("changes with " + ", ".join(f"`{u}`" for u in c["changes_with"][:2]))
         out.append(f"{i}. **{names[uid]}** (`{uid}`): " + ("; ".join(bits) or "stands alone"))
     for i, s in enumerate(tour["sections"], 1):
         uid = s["unit_id"]
@@ -171,4 +164,6 @@ def markdown(tour: dict[str, Any], map_data: dict[str, Any], graph: UnitGraph, r
         "Next: `udebt path` for the order to learn these in and the time each takes, "
         "`udebt dig <unit>` for a walkthrough of one with its code.",
     ]
-    return "\n".join(out) + "\n", mins
+    text = "\n".join(out) + "\n"
+    mins = max(1, round(len(text.split()) / WORDS_PER_MINUTE))
+    return text.replace("__MINUTES__", str(mins), 1), mins
