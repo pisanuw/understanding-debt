@@ -920,3 +920,76 @@ udebt defaults to advisory and lets a repo owner opt in to soft blocking per rep
    content stylometry on diffs, which is heavier and less transparent?
 7. **Languages first** for the import graph: Python and JS/TS, then Go and Java?
 8. **Dashboard granularity:** weekly snapshots, or per commit with weekly rollups?
+
+## Handoff 2026-11-14
+
+Phase 3.3 (the teaching layer, from the owner's level 1 quiz on digitalme: five "I don't
+know", no orientation shown, compound inventory questions, nothing taught on a miss) was
+started and stopped at a session limit. **LLM calls used: 0.** Tests: 133 (131 + 2).
+
+| item | status |
+|---|---|
+| 1 orientation bug | **done** (`099a7fc`): root cause and fix below; tests assert the orientation precedes the first question |
+| 2 one question, one fact | not started |
+| 3 reveal on miss (levels 1-2), variant next sitting | not started |
+| 4 estimated vs measured (`status`, `timeline`, export, quiz index line) | not started |
+| 5 `udebt tour` | not started |
+| 6 `udebt path` | not started |
+| 7 `dig` walkthroughs with code excerpts | not started |
+| 8 `udebt review` (SM-2) | not started |
+| 9 `udebt teachback` | not started |
+| 10 `udebt decisions write` | not started |
+| Part 2 `udebt serve` | not started |
+| validation (8-call budget), README/BRIEFING docs | not started |
+
+**Orientation root cause.** `cmd_quiz` and `ask_interactively` print it correctly on a unit
+with no evidence (reproduced offline on a copy of digitalme). Two gaps hid it: (1)
+`orientation.wanted` oriented only a developer with *no* level 1-3 answer on the unit, so any
+earlier level 1 record (an "I don't know", a `dig` check, a `--level 1` answer) switched it off
+for good while level 1 was unpassed; (2) `orientation.ensure` dropped silently any unit the
+model's reply missed (a `unit_id` not matching, an empty purpose). Now it orients until the
+latest level 1 sitting passes, and a missed unit gets an orientation from its map fields (not
+cached) with a one-line notice. The owner's export was not available here, so which gap hit
+him is inferred; (1) fits a second level 1 sitting or an earlier `dig`.
+
+**Testbed note.** The local digitalme map has `chat-flow` and `auth-rbac`, not the brief's
+`chat-turn-pipeline` and `auth-rbac-capabilities` (the owner's Mac has a newer map). Use the
+local equivalents or re-map (one more call). Its five sample units have cached orientations,
+so `quiz --preview` there costs one call.
+
+**Next steps, in order** (design worked out, nothing written):
+
+1. *One fact*: `ladder.compound(q)` (more than one `?`, `\band (what|which)\b`, `;\s`; also
+   reject "list"/"which other parts" at levels 1-3); reword ladder level 1-4 examples to one
+   part (3 and 4 are compound today); a quiz-only schema requiring two `variants` per
+   question; `generate_questions` keeps the first phrasing that passes, else trims to the
+   first clause (no extra call); prompt: references at levels 1-3 at most two plain
+   sentences; drop the orientation rule that asks "which other parts rely on it" (it produced
+   the inventory questions).
+2. *Reveal*: blank at levels 1-2 prints the reference right after the answer, wrong after
+   grading; record `revealed: true` and `variants`; `questions_prompt` lists revealed
+   questions per unit with "ask the same fact in other words".
+3. *Estimated vs measured*: a `basis` column in `status` (measured/estimated/none), counts
+   under the index; derive it in the export from each point's existing `quizzed` (no format
+   change); `quiz` compares the index before and after and prints one line when prior units
+   became quiz units.
+4. *Unit graph* (`unitgraph.py`): unit A depends on B when A's files import B's
+   (`imports.scan`), plus co-change between units; `path` orders by Kahn's algorithm with
+   importance x debt as priority (cycles: highest priority first).
+5. *Tour*: one `TASK: tour` call, sections per top-level unit in dependency order, cached in
+   map.json `tour` with a basis hash; `quiz` offers it when no unit is measured.
+6. *Walkthrough*: `TASK: walkthrough` returns `{flow, steps[{file,start_line,end_line,
+   narration}], checks[level 1-5]}`, cached on the unit with the map head, invalid when
+   `git diff --name-only <head> -- <paths>` is non-empty; excerpts from the working tree,
+   tracked files only, 25 lines each.
+7. *Review*: SM-2 state per (unit, level) folded from the records (start on a miss; correct
+   1, 3, interval x ease; ease 2.5, min 1.3), written as `review` on new records; asks a stored
+   variant, graded in one call, `source: review`.
+8. *Teach-back* (level 2, `type: teachback`, one call) and *decisions* (ADR per top-level
+   unit, "Last confirmed by" from depth >= 2, sensitivity note in README).
+9. *Serve*: stdlib `ThreadingHTTPServer` on 127.0.0.1, token in the URL and an
+   `X-Udebt-Token` header on API calls, Host check, POST JSON only; the dashboard page fetches
+   `/api/dashboard` when its blob is empty. Tutor flags (from `claude -p --help`, 2.1.325):
+   first turn `--session-id <uuid> --append-system-prompt <socratic>`, later turns
+   `--resume <uuid>`, both with `--tools Read Glob Grep --allowedTools Read Glob Grep` and
+   *without* `--no-session-persistence`; the system prompt snapshot carries over on resume.
