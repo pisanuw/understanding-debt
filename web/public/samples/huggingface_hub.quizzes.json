@@ -1,0 +1,3155 @@
+{
+ "format": "udebt-advance-quizzes",
+ "version": 1,
+ "repo": "https://github.com/huggingface/huggingface_hub",
+ "name": "huggingface_hub",
+ "sha": "2c61ae8c11eedb1b79e262dd9eb5e68962cac063",
+ "generated_at": "2026-11-15T12:44:21+00:00",
+ "levels": [
+  1,
+  2,
+  3
+ ],
+ "per": 3,
+ "calls": 12,
+ "questions": [
+  {
+   "unit_id": "hf-api",
+   "level": 1,
+   "question": "What would library users notice first if the plain top-level functions that forward to the shared Hub client object were removed?",
+   "variants": [
+    "What breaks for users who import a single Hub operation directly from the package if the forwarding functions are removed?",
+    "If the package stopped offering ready-made top-level functions for Hub operations, what would callers have to do differently?"
+   ],
+   "reference_answer": "Direct imports of operations from the package would fail, so callers would have to create the client object themselves and call methods on it. The functions exist so the common one-line import-and-call usage keeps working.",
+   "evidence": [
+    "src/huggingface_hub/hf_api.py:15510-15551"
+   ],
+   "orientation": {
+    "purpose": "The main Python entry point for talking to the Hub's REST API: repos, files, discussions, Spaces, collections, webhooks and more. Other code and downstream libraries call it rather than making raw HTTP requests.",
+    "decision": "One large HfApi class, with module-level functions that forward to its methods and a generated lazy-import __init__. Per-resource clients, a generated OpenAPI client and pydantic responses were not chosen. The history points to backward compatibility for existing users, and dataclasses replaced ReprMixin for lightweight typed results.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/hf_api.py",
+      "what": "HfApi class and its result dataclasses"
+     },
+     {
+      "path": "src/huggingface_hub/__init__.py",
+      "what": "public exports, auto-generated lazy imports"
+     },
+     {
+      "path": "src/huggingface_hub/_space_api.py",
+      "what": "Space runtime and hardware types"
+     }
+    ],
+    "shaped_by": "Several humans (Mario Šaško, Lucain, Freddy Boulton, Michael) shaped it from 2022 to 2024 [human]; Lucain's 2026 endpoints migration was [assisted]."
+   }
+  },
+  {
+   "unit_id": "hf-api",
+   "level": 1,
+   "question": "Why does the package's top-level entry point resolve exported names only when they are first accessed instead of importing everything up front?",
+   "variants": [
+    "What benefit does the package get from loading its submodules lazily on first attribute access?",
+    "Why does importing the package not immediately load the huge Hub client module?"
+   ],
+   "reference_answer": "It keeps importing the package fast and light, because the large API module and its dependencies are only loaded when a user actually touches a name that needs them.",
+   "evidence": [
+    "src/huggingface_hub/__init__.py:1226-1259"
+   ],
+   "orientation": {
+    "purpose": "The main Python entry point for talking to the Hub's REST API: repos, files, discussions, Spaces, collections, webhooks and more. Other code and downstream libraries call it rather than making raw HTTP requests.",
+    "decision": "One large HfApi class, with module-level functions that forward to its methods and a generated lazy-import __init__. Per-resource clients, a generated OpenAPI client and pydantic responses were not chosen. The history points to backward compatibility for existing users, and dataclasses replaced ReprMixin for lightweight typed results.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/hf_api.py",
+      "what": "HfApi class and its result dataclasses"
+     },
+     {
+      "path": "src/huggingface_hub/__init__.py",
+      "what": "public exports, auto-generated lazy imports"
+     },
+     {
+      "path": "src/huggingface_hub/_space_api.py",
+      "what": "Space runtime and hardware types"
+     }
+    ],
+    "shaped_by": "Several humans (Mario Šaško, Lucain, Freddy Boulton, Michael) shaped it from 2022 to 2024 [human]; Lucain's 2026 endpoints migration was [assisted]."
+   }
+  },
+  {
+   "unit_id": "hf-api",
+   "level": 1,
+   "question": "Why can't repo creation with a Space template just send the user's template name straight to the Hub?",
+   "variants": [
+    "Why does creating a Space from a template make the client query the Hub for the list of templates before sending the creation request?",
+    "What does the client need from the Hub's template list before it can create a Space from a named template?"
+   ],
+   "reference_answer": "It must resolve the user-supplied template name to the actual template repo and learn its SDK and recommended visibility, so the payload is consistent with the template.",
+   "evidence": [
+    "src/huggingface_hub/hf_api.py:4675-4704"
+   ],
+   "orientation": {
+    "purpose": "The main Python entry point for talking to the Hub's REST API: repos, files, discussions, Spaces, collections, webhooks and more. Other code and downstream libraries call it rather than making raw HTTP requests.",
+    "decision": "One large HfApi class, with module-level functions that forward to its methods and a generated lazy-import __init__. Per-resource clients, a generated OpenAPI client and pydantic responses were not chosen. The history points to backward compatibility for existing users, and dataclasses replaced ReprMixin for lightweight typed results.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/hf_api.py",
+      "what": "HfApi class and its result dataclasses"
+     },
+     {
+      "path": "src/huggingface_hub/__init__.py",
+      "what": "public exports, auto-generated lazy imports"
+     },
+     {
+      "path": "src/huggingface_hub/_space_api.py",
+      "what": "Space runtime and hardware types"
+     }
+    ],
+    "shaped_by": "Several humans (Mario Šaško, Lucain, Freddy Boulton, Michael) shaped it from 2022 to 2024 [human]; Lucain's 2026 endpoints migration was [assisted]."
+   }
+  },
+  {
+   "unit_id": "hf-api",
+   "level": 2,
+   "question": "The library exposes nearly every Hub operation through one large client class, with plain top-level functions that delegate to a default instance, instead of splitting into separate clients per resource (repos, spaces, collections). What constraint made the single class the better choice?",
+   "variants": [
+    "Why did the maintainers keep one big client class plus thin top-level function wrappers rather than per-resource clients?",
+    "What constraint favored a single monolithic Hub client with function facades over several resource-specific clients?"
+   ],
+   "reference_answer": "Downstream libraries and users already depend on the single entry point, so keeping one class with function-per-method wrappers preserves backwards compatibility. Splitting it into per-resource clients would break existing imports and call patterns.",
+   "evidence": [
+    "src/huggingface_hub/hf_api.py:15510-15551",
+    "src/huggingface_hub/__init__.py:1226-1259"
+   ]
+  },
+  {
+   "unit_id": "hf-api",
+   "level": 2,
+   "question": "Typed results from Hub API calls were moved from a custom representation mixin to plain dataclasses, rather than adopting pydantic models. What constraint made dataclasses the better choice?",
+   "variants": [
+    "Why were lightweight dataclasses chosen for API return types instead of pydantic response models?",
+    "Replacing the repr mixin with dataclasses rather than pydantic models was preferred because of what constraint?"
+   ],
+   "reference_answer": "The library needs lightweight typed results without adding a heavy validation dependency to a widely embedded package. Dataclasses give typed, readable objects with no extra dependency or strict validation cost.",
+   "evidence": [
+    "src/huggingface_hub/hf_api.py",
+    "src/huggingface_hub/dataclasses.py"
+   ]
+  },
+  {
+   "unit_id": "hf-api",
+   "level": 2,
+   "question": "The package's top-level import surface is a statically generated table of names loaded lazily on first access, instead of eagerly importing the huge API module. What constraint made lazy loading the better choice?",
+   "variants": [
+    "Why does the package defer importing its submodules until an attribute is first accessed rather than importing everything at startup?",
+    "What constraint favors lazy attribute-based imports over eager imports in the package's top-level init?"
+   ],
+   "reference_answer": "Importing the package should stay fast and light even though it re-exports a very large public surface, so submodules load only when a name is actually used. A static table keeps the public names discoverable and complete without paying the import cost up front.",
+   "evidence": [
+    "src/huggingface_hub/__init__.py:1226-1259"
+   ]
+  },
+  {
+   "unit_id": "hf-api",
+   "level": 3,
+   "question": "If the single large Hub client were split into separate per-resource clients (repos, spaces, collections), what would be the first other part of the system that has to change so existing users' imports keep working?",
+   "variants": [
+    "If the one big Hub client were broken into per-resource clients, which other part of the system would first need rework to keep current imports working?",
+    "What is the first other component that must change if the Hub's single client class were divided into one client per resource, without breaking existing user imports?"
+   ],
+   "reference_answer": "The top-level package's lazy public-name table and the module-level shortcut functions bound to one default client would have to be regenerated and re-pointed at the new clients. Downstream libraries import those top-level names, so they must keep resolving.",
+   "evidence": [
+    "src/huggingface_hub/__init__.py:1226-1259",
+    "src/huggingface_hub/hf_api.py:15510-15551"
+   ]
+  },
+  {
+   "unit_id": "hf-api",
+   "level": 3,
+   "question": "If the package's top-level shortcut functions were removed so users had to instantiate the client themselves, which existing consumers would break first?",
+   "variants": [
+    "If the Hub library stopped offering ready-made top-level functions bound to a default client, who would be the first to break?",
+    "What would break first for downstream code if users could only reach Hub operations by creating the client object themselves?"
+   ],
+   "reference_answer": "Downstream libraries and user scripts that call operations directly from the package's top level would break first. The shortcuts are a thin facade over a default client instance, and that backwards-compatible entry point is why the design was kept.",
+   "evidence": [
+    "src/huggingface_hub/hf_api.py:15510-15551",
+    "src/huggingface_hub/__init__.py:1226-1259"
+   ]
+  },
+  {
+   "unit_id": "hf-api",
+   "level": 3,
+   "question": "If the hand-written Hub client were replaced by a client generated from an OpenAPI specification, what client-side behaviour currently embedded in repo creation would have to be relocated?",
+   "variants": [
+    "If an OpenAPI-generated client replaced the hand-written Hub client, which logic that repo creation does before calling the server would need a new home?",
+    "What convenience logic in repo creation would have to move elsewhere if the Hub client were auto-generated from an API spec?"
+   ],
+   "reference_answer": "The client-side argument handling and resolution, such as looking up a Space template by name, checking its SDK and visibility defaults, and warning about ignored Space options. A generated client would only mirror the raw endpoint, so this logic would need a wrapper layer.",
+   "evidence": [
+    "src/huggingface_hub/hf_api.py:4666-4704",
+    "src/huggingface_hub/hf_api.py:4726-4753"
+   ]
+  },
+  {
+   "unit_id": "download-cache",
+   "level": 1,
+   "question": "Why does whole-repo download reuse a saved on-disk file listing for a given commit instead of always asking the Hub for the listing?",
+   "variants": [
+    "What property of a commit makes it safe to cache its file listing on disk during a snapshot download?",
+    "Why is the repo tree listing stored locally keyed by commit?"
+   ],
+   "reference_answer": "A commit's contents never change, so its listing can be reused safely, saving repeated listing calls to the Hub on later downloads.",
+   "evidence": [
+    "src/huggingface_hub/_snapshot_download.py:277-298"
+   ],
+   "orientation": {
+    "purpose": "Downloads single files or whole repos from the Hub and stores them in a local cache. Revisions are deduplicated, offline use works, and repeated downloads are cheap.",
+    "decision": "A git-like cache of content-addressed blobs with snapshot symlinks, a fallback for systems without symlinks, and a metadata mode for local directories. Later work added on-disk tree-listing caching and a cross-repo shared blob store. Flat caches, git clones and external services were not used. The layout is relied on by downstream libraries.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/file_download.py",
+      "what": "hf_hub_download, ETag resolution, cache layout"
+     },
+     {
+      "path": "src/huggingface_hub/_snapshot_download.py",
+      "what": "whole-repo download"
+     },
+     {
+      "path": "src/huggingface_hub/_tree_cache.py",
+      "what": "tree listing cache"
+     }
+    ],
+    "shaped_by": "Julien Chaumond and Lucain designed the layout in 2022 [human]; Lucain and célina added the tree cache and shared blob store in 2026 [assisted]."
+   }
+  },
+  {
+   "unit_id": "download-cache",
+   "level": 1,
+   "question": "Why does the single-file download return early when the cached snapshot entry already exists, without trying to write anything to the cache?",
+   "variants": [
+    "What situation is the early return for an already-present cached file designed to tolerate?",
+    "Why must a download of an already-cached file avoid writing to the cache folder?"
+   ],
+   "reference_answer": "The cache may be mounted read-only, so a file that is already present should be returned without any write attempts; updating the ref is only best-effort.",
+   "evidence": [
+    "src/huggingface_hub/file_download.py:1224-1231"
+   ],
+   "orientation": {
+    "purpose": "Downloads single files or whole repos from the Hub and stores them in a local cache. Revisions are deduplicated, offline use works, and repeated downloads are cheap.",
+    "decision": "A git-like cache of content-addressed blobs with snapshot symlinks, a fallback for systems without symlinks, and a metadata mode for local directories. Later work added on-disk tree-listing caching and a cross-repo shared blob store. Flat caches, git clones and external services were not used. The layout is relied on by downstream libraries.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/file_download.py",
+      "what": "hf_hub_download, ETag resolution, cache layout"
+     },
+     {
+      "path": "src/huggingface_hub/_snapshot_download.py",
+      "what": "whole-repo download"
+     },
+     {
+      "path": "src/huggingface_hub/_tree_cache.py",
+      "what": "tree listing cache"
+     }
+    ],
+    "shaped_by": "Julien Chaumond and Lucain designed the layout in 2022 [human]; Lucain and célina added the tree cache and shared blob store in 2026 [assisted]."
+   }
+  },
+  {
+   "unit_id": "download-cache",
+   "level": 1,
+   "question": "What does the cross-repo shared blob store save a user from when downloading a file whose content was already fetched for a different repository?",
+   "variants": [
+    "Why is the shared blob store checked before starting a network transfer of a file?",
+    "What cost is avoided when an identical file from another repo is found in the shared store?"
+   ],
+   "reference_answer": "It avoids re-downloading identical content: the existing blob is linked into the new repo's cache instead of being transferred again.",
+   "evidence": [
+    "src/huggingface_hub/file_download.py:1273-1297"
+   ],
+   "orientation": {
+    "purpose": "Downloads single files or whole repos from the Hub and stores them in a local cache. Revisions are deduplicated, offline use works, and repeated downloads are cheap.",
+    "decision": "A git-like cache of content-addressed blobs with snapshot symlinks, a fallback for systems without symlinks, and a metadata mode for local directories. Later work added on-disk tree-listing caching and a cross-repo shared blob store. Flat caches, git clones and external services were not used. The layout is relied on by downstream libraries.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/file_download.py",
+      "what": "hf_hub_download, ETag resolution, cache layout"
+     },
+     {
+      "path": "src/huggingface_hub/_snapshot_download.py",
+      "what": "whole-repo download"
+     },
+     {
+      "path": "src/huggingface_hub/_tree_cache.py",
+      "what": "tree listing cache"
+     }
+    ],
+    "shaped_by": "Julien Chaumond and Lucain designed the layout in 2022 [human]; Lucain and célina added the tree cache and shared blob store in 2026 [assisted]."
+   }
+  },
+  {
+   "unit_id": "download-cache",
+   "level": 2,
+   "question": "The download cache stores each file's content once and exposes revisions through links to it, rather than keeping a flat copy of files per revision. What constraint made this layout the better choice?",
+   "variants": [
+    "Why was a content-addressed layout with per-revision links chosen over a flat per-revision file cache?",
+    "What constraint favored deduplicated shared blobs plus revision pointers over copying files per revision?"
+   ],
+   "reference_answer": "Different revisions of a repo often share identical files, so storing content once avoids duplicate downloads and disk use, and supports offline use of any cached revision. Downstream libraries also rely on this layout.",
+   "evidence": [
+    "src/huggingface_hub/file_download.py:1224-1242",
+    "src/huggingface_hub/file_download.py:1273-1297"
+   ]
+  },
+  {
+   "unit_id": "download-cache",
+   "level": 2,
+   "question": "The cache layout is built around a git-like blob and snapshot structure, but the library does not actually clone repositories with git to fetch files. What constraint made per-file HTTP downloads better than git clone?",
+   "variants": [
+    "Why does file fetching use per-file HTTP downloads into a git-like cache rather than git clone?",
+    "Git clone was rejected in favor of individual file downloads for what reason?"
+   ],
+   "reference_answer": "Users usually need only specific files or filtered subsets, and large files are served through LFS or Xet, so cloning the whole repo history would be wasteful. Per-file downloads let the cache fetch only what is needed and resume transfers.",
+   "evidence": [
+    "src/huggingface_hub/_snapshot_download.py:277-298",
+    "src/huggingface_hub/file_download.py:1273-1297"
+   ]
+  },
+  {
+   "unit_id": "download-cache",
+   "level": 2,
+   "question": "Snapshot downloads now store repo tree listings on disk keyed by commit, instead of always asking the server for the listing. What constraint makes this caching safe and useful?",
+   "variants": [
+    "Why can a tree listing be cached on disk per commit without going stale?",
+    "What property of a commit makes disk-caching its file listing a better choice than always re-listing from the server?"
+   ],
+   "reference_answer": "A commit hash is immutable, so the listing for it never changes and can be reused indefinitely. This saves a potentially expensive recursive listing request on repeat downloads.",
+   "evidence": [
+    "src/huggingface_hub/_snapshot_download.py:277-298",
+    "src/huggingface_hub/file_download.py:1905-1929"
+   ]
+  },
+  {
+   "unit_id": "download-cache",
+   "level": 3,
+   "question": "If the symlink-based, content-addressed cache layout were replaced by a flat file cache, which other tool in the system, one that inspects and cleans the cache, would first have to change?",
+   "variants": [
+    "If downloads were stored in a flat cache rather than the blob/snapshot symlink layout, what cache-inspection component would need changing first?",
+    "Which other component would first have to be rewritten if the git-like cache layout became a flat file cache?"
+   ],
+   "reference_answer": "The cache scanning and deletion tooling would have to change. It understands the layout of blobs, snapshots and refs to compute sizes and revision relationships, and downstream libraries relying on the layout would also be affected.",
+   "evidence": [
+    "src/huggingface_hub/utils/_cache_manager.py",
+    "src/huggingface_hub/file_download.py:1224-1242"
+   ]
+  },
+  {
+   "unit_id": "download-cache",
+   "level": 3,
+   "question": "If the on-disk cache of repository tree listings were removed, what per-file step in the download path would have to go back to talking to the server?",
+   "variants": [
+    "Without the on-disk tree-listing cache, which per-file metadata step would need to hit the server again?",
+    "If tree listings were no longer cached on disk, what does the download of each file have to do against the server that it currently avoids?"
+   ],
+   "reference_answer": "Per-file metadata resolution (size, ETag, Xet info) would again require a metadata request to the server for each file. Today it is synthesized from the cached tree entry, mirroring what the server would answer.",
+   "evidence": [
+    "src/huggingface_hub/file_download.py:1905-1929",
+    "src/huggingface_hub/_snapshot_download.py:277-298"
+   ]
+  },
+  {
+   "unit_id": "download-cache",
+   "level": 3,
+   "question": "If the cross-repo shared blob store were dropped, what step in the single-file download path would no longer be needed?",
+   "variants": [
+    "Removing the shared blob store would make which step in file downloading unnecessary?",
+    "If blobs were no longer shared between repos, which pre-download step in the file download flow would disappear?"
+   ],
+   "reference_answer": "The check, done before fetching, that tries to link an existing identical blob from the shared store into the repo's cache. Every missing blob would always be fetched over the network, and the post-download step that registers it in the store would go too.",
+   "evidence": [
+    "src/huggingface_hub/file_download.py:1273-1297"
+   ]
+  },
+  {
+   "unit_id": "http-auth-config",
+   "level": 1,
+   "question": "Why does the header builder check whether implicit token use is disabled before looking up the stored token?",
+   "variants": [
+    "What unwanted side effect is avoided by checking the implicit-token opt-out before resolving the saved token?",
+    "Why is the environment switch that forbids automatic tokens evaluated ahead of the token lookup?"
+   ],
+   "reference_answer": "Resolving the stored token may refresh an OAuth token, which involves a network call and file writes, and that work is pointless when the token would not be sent anyway.",
+   "evidence": [
+    "src/huggingface_hub/utils/_headers.py:147-154"
+   ],
+   "orientation": {
+    "purpose": "The shared foundation for network access: HTTP client creation with retries, request headers, token lookup, login flows, error types and environment-driven settings.",
+    "decision": "Retry helpers, header building and every configuration constant sit in one place, instead of each module having its own HTTP client. Auth supports multiple stored tokens and browser OAuth login. Keyring-only auth and config files were not chosen. The aim is uniform retry, error and user-agent behaviour, plus convenience.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/utils/_http.py",
+      "what": "client factory and backoff helpers"
+     },
+     {
+      "path": "src/huggingface_hub/_login.py",
+      "what": "login, logout and token storage"
+     },
+     {
+      "path": "src/huggingface_hub/constants.py",
+      "what": "environment-variable constants"
+     }
+    ],
+    "shaped_by": "Celina Hanouti (2024) and célina (2026) wrote the multi-token and OAuth commits alone [human]."
+   }
+  },
+  {
+   "unit_id": "http-auth-config",
+   "level": 1,
+   "question": "Why does the token lookup consult workflow-identity and environment-variable credentials before the token saved by a previous login?",
+   "variants": [
+    "What does ordering environment-provided credentials ahead of the saved login token let users do?",
+    "Why does a saved login not take priority over credentials supplied by the environment?"
+   ],
+   "reference_answer": "Credentials supplied explicitly by the runtime environment (CI identity or an environment variable) override the persisted login, so a session can use a specific token without altering stored login state.",
+   "evidence": [
+    "src/huggingface_hub/utils/_auth.py:81-86"
+   ],
+   "orientation": {
+    "purpose": "The shared foundation for network access: HTTP client creation with retries, request headers, token lookup, login flows, error types and environment-driven settings.",
+    "decision": "Retry helpers, header building and every configuration constant sit in one place, instead of each module having its own HTTP client. Auth supports multiple stored tokens and browser OAuth login. Keyring-only auth and config files were not chosen. The aim is uniform retry, error and user-agent behaviour, plus convenience.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/utils/_http.py",
+      "what": "client factory and backoff helpers"
+     },
+     {
+      "path": "src/huggingface_hub/_login.py",
+      "what": "login, logout and token storage"
+     },
+     {
+      "path": "src/huggingface_hub/constants.py",
+      "what": "environment-variable constants"
+     }
+    ],
+    "shaped_by": "Celina Hanouti (2024) and célina (2026) wrote the multi-token and OAuth commits alone [human]."
+   }
+  },
+  {
+   "unit_id": "http-auth-config",
+   "level": 1,
+   "question": "Why does refreshing an expiring OAuth access token take a lock shared across processes?",
+   "variants": [
+    "What goes wrong if two processes refresh the same OAuth login at once without a shared lock?",
+    "Why must concurrent processes serialize OAuth token refreshes?"
+   ],
+   "reference_answer": "The server may rotate refresh tokens, so two processes refreshing at once would invalidate each other's refresh token; the lock lets the second adopt the first one's result.",
+   "evidence": [
+    "src/huggingface_hub/utils/_auth.py:289-313"
+   ],
+   "orientation": {
+    "purpose": "The shared foundation for network access: HTTP client creation with retries, request headers, token lookup, login flows, error types and environment-driven settings.",
+    "decision": "Retry helpers, header building and every configuration constant sit in one place, instead of each module having its own HTTP client. Auth supports multiple stored tokens and browser OAuth login. Keyring-only auth and config files were not chosen. The aim is uniform retry, error and user-agent behaviour, plus convenience.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/utils/_http.py",
+      "what": "client factory and backoff helpers"
+     },
+     {
+      "path": "src/huggingface_hub/_login.py",
+      "what": "login, logout and token storage"
+     },
+     {
+      "path": "src/huggingface_hub/constants.py",
+      "what": "environment-variable constants"
+     }
+    ],
+    "shaped_by": "Celina Hanouti (2024) and célina (2026) wrote the multi-token and OAuth commits alone [human]."
+   }
+  },
+  {
+   "unit_id": "http-auth-config",
+   "level": 2,
+   "question": "All network code goes through shared retry-and-header helpers instead of each module creating its own HTTP client. What constraint made centralization the better choice?",
+   "variants": [
+    "Why were per-module HTTP clients rejected in favor of shared HTTP helpers?",
+    "What constraint favored one common HTTP and header layer for all of the library's network calls?"
+   ],
+   "reference_answer": "Retry/backoff, error mapping, and user-agent and auth headers must behave uniformly everywhere. Per-module clients would let that behavior drift.",
+   "evidence": [
+    "src/huggingface_hub/utils/_headers.py:107-122",
+    "src/huggingface_hub/_commit_api.py:762-769"
+   ]
+  },
+  {
+   "unit_id": "http-auth-config",
+   "level": 2,
+   "question": "Credentials are kept in a local token store that supports several named tokens and OAuth refresh, rather than relying only on the operating system keyring. What constraint made that the better choice?",
+   "variants": [
+    "Why was a file-based multi-token store chosen over keyring-only authentication?",
+    "Keyring-only storage was passed over in favor of a local multi-token store because of what constraint?"
+   ],
+   "reference_answer": "The library runs in headless servers, containers, notebooks and CI where a keyring is often unavailable, and users want to switch between multiple accounts. A plain local store with environment overrides works everywhere and supports token refresh across processes.",
+   "evidence": [
+    "src/huggingface_hub/utils/_auth.py:81-86",
+    "src/huggingface_hub/utils/_auth.py:255-330"
+   ]
+  },
+  {
+   "unit_id": "http-auth-config",
+   "level": 2,
+   "question": "Behavior such as endpoints, timeouts and implicit token use is controlled through environment variables read into constants, rather than a configuration file. What constraint made that the better choice?",
+   "variants": [
+    "Why was environment-variable configuration chosen over a config file for library settings?",
+    "What constraint favored env-driven constants instead of a settings file?"
+   ],
+   "reference_answer": "The library is embedded in other programs, scripts and CI/containers where users can change behavior without editing files or passing options through every call. Environment variables are easy to set per process and need no file management.",
+   "evidence": [
+    "src/huggingface_hub/utils/_headers.py:147-154"
+   ]
+  },
+  {
+   "unit_id": "http-auth-config",
+   "level": 3,
+   "question": "If the local store holding several named tokens were replaced by a single token file, which user-facing part of the system would first have to change?",
+   "variants": [
+    "If only one token could be stored locally instead of several named ones, which user-facing component would first need changing?",
+    "What would first have to change in the login and auth tooling if multi-token storage were reverted to a single stored token?"
+   ],
+   "reference_answer": "The login flow and the auth commands for listing, switching and deleting stored tokens would have to change, since they depend on named tokens. Token resolution would then read just one value.",
+   "evidence": [
+    "src/huggingface_hub/utils/_auth.py:81-86",
+    "src/huggingface_hub/utils/_headers.py:125-154"
+   ]
+  },
+  {
+   "unit_id": "http-auth-config",
+   "level": 3,
+   "question": "If each network-using module built its own HTTP client instead of using the shared one, what behaviour would every such module have to reimplement?",
+   "variants": [
+    "If modules stopped sharing a central HTTP client, what would each of them need to re-implement?",
+    "Without the centralized HTTP helpers, which behaviour would every network-calling module have to provide itself?"
+   ],
+   "reference_answer": "Retry with backoff on transient failures, plus consistent mapping of HTTP error statuses to the library's errors. Header and user-agent construction would also have to be repeated.",
+   "evidence": [
+    "src/huggingface_hub/_commit_api.py:762-779",
+    "src/huggingface_hub/utils/_headers.py:107-122"
+   ]
+  },
+  {
+   "unit_id": "http-auth-config",
+   "level": 3,
+   "question": "If browser-based login issued only long-lived tokens that never expire, which part of token resolution could be removed?",
+   "variants": [
+    "If login tokens never expired, what piece of the token-lookup path would become unnecessary?",
+    "Which part of how the library resolves a stored token would no longer be needed if OAuth tokens were permanent?"
+   ],
+   "reference_answer": "The refresh step that checks expiry of the stored token before use and exchanges the refresh token for a new one. This includes its cross-process locking and warning behaviour.",
+   "evidence": [
+    "src/huggingface_hub/utils/_auth.py:255-330",
+    "src/huggingface_hub/utils/_auth.py:81-86"
+   ]
+  },
+  {
+   "unit_id": "commit-upload",
+   "level": 1,
+   "question": "Why does the commit flow ask the Hub about the files before uploading any of them?",
+   "variants": [
+    "What does the Hub's answer before upload decide for each file being committed?",
+    "Why can't the client choose by itself how each file will be transferred?"
+   ],
+   "reference_answer": "The Hub decides per file whether it goes as regular content, LFS or Xet, and whether it should be ignored, so the client must ask first to know how to send each one.",
+   "evidence": [
+    "src/huggingface_hub/_commit_api.py:762-779"
+   ],
+   "orientation": {
+    "purpose": "Turns a list of add, delete and copy operations into a Hub commit. It decides how each file travels (plain, LFS or Xet) and handles large folder uploads.",
+    "decision": "Commits are sent as streamed NDJSON after files are classified as regular, LFS or Xet. Large folders go through a streamed multi-commit pipeline on hf_xet, which supersedes upload_large_folder. Git pushes, one-shot multipart commits and a separate large-folder API were not used. Xet is chosen for chunk-level dedup and resumability.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/_commit_api.py",
+      "what": "CommitOperation classes and commit logic"
+     },
+     {
+      "path": "src/huggingface_hub/_upload_pipeline.py",
+      "what": "streamed multi-commit upload"
+     },
+     {
+      "path": "src/huggingface_hub/lfs.py",
+      "what": "LFS batch upload"
+     }
+    ],
+    "shaped_by": "Lucain wrote the NDJSON streaming in 2022 [human] and the Xet multi-commit pipeline in 2026 [assisted]."
+   }
+  },
+  {
+   "unit_id": "commit-upload",
+   "level": 1,
+   "question": "Why does the streamed multi-commit upload block when a finished batch is already waiting to be committed?",
+   "variants": [
+    "What purpose does making the batch producer wait on a full hand-off queue serve?",
+    "Why is scanning and uploading throttled while a batch waits for its commit?"
+   ],
+   "reference_answer": "It provides natural backpressure, so scanning and uploading cannot run far ahead of the committing step.",
+   "evidence": [
+    "src/huggingface_hub/_upload_pipeline.py:540-550"
+   ],
+   "orientation": {
+    "purpose": "Turns a list of add, delete and copy operations into a Hub commit. It decides how each file travels (plain, LFS or Xet) and handles large folder uploads.",
+    "decision": "Commits are sent as streamed NDJSON after files are classified as regular, LFS or Xet. Large folders go through a streamed multi-commit pipeline on hf_xet, which supersedes upload_large_folder. Git pushes, one-shot multipart commits and a separate large-folder API were not used. Xet is chosen for chunk-level dedup and resumability.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/_commit_api.py",
+      "what": "CommitOperation classes and commit logic"
+     },
+     {
+      "path": "src/huggingface_hub/_upload_pipeline.py",
+      "what": "streamed multi-commit upload"
+     },
+     {
+      "path": "src/huggingface_hub/lfs.py",
+      "what": "LFS batch upload"
+     }
+    ],
+    "shaped_by": "Lucain wrote the NDJSON streaming in 2022 [human] and the Xet multi-commit pipeline in 2026 [assisted]."
+   }
+  },
+  {
+   "unit_id": "commit-upload",
+   "level": 1,
+   "question": "Why does the upload pipeline put a time limit on waiting for its background committer after an abort?",
+   "variants": [
+    "What hang is avoided by bounding the wait for the committer thread once the upload is aborted?",
+    "Why not wait indefinitely for the committer to finish after a failed upload?"
+   ],
+   "reference_answer": "A Xet call may be blocked on the aborted session and never return, so an unbounded wait could hang shutdown; the committer is a daemon thread so it can be left behind.",
+   "evidence": [
+    "src/huggingface_hub/_upload_pipeline.py:447-467"
+   ],
+   "orientation": {
+    "purpose": "Turns a list of add, delete and copy operations into a Hub commit. It decides how each file travels (plain, LFS or Xet) and handles large folder uploads.",
+    "decision": "Commits are sent as streamed NDJSON after files are classified as regular, LFS or Xet. Large folders go through a streamed multi-commit pipeline on hf_xet, which supersedes upload_large_folder. Git pushes, one-shot multipart commits and a separate large-folder API were not used. Xet is chosen for chunk-level dedup and resumability.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/_commit_api.py",
+      "what": "CommitOperation classes and commit logic"
+     },
+     {
+      "path": "src/huggingface_hub/_upload_pipeline.py",
+      "what": "streamed multi-commit upload"
+     },
+     {
+      "path": "src/huggingface_hub/lfs.py",
+      "what": "LFS batch upload"
+     }
+    ],
+    "shaped_by": "Lucain wrote the NDJSON streaming in 2022 [human] and the Xet multi-commit pipeline in 2026 [assisted]."
+   }
+  },
+  {
+   "unit_id": "commit-upload",
+   "level": 2,
+   "question": "Why was an NDJSON streamed commit payload chosen over a one-shot multipart commit?",
+   "variants": [
+    "What constraint favored streaming commit operations line by line instead of a single multipart body?",
+    "Commits stream the list of operations as newline-delimited JSON, rather than sending one multipart request. What constraint made streaming the better choice?"
+   ],
+   "reference_answer": "A single commit can contain very many files, so the payload must be produced incrementally without building one huge body in memory. Streaming allows lots of files in one commit.",
+   "evidence": [
+    "src/huggingface_hub/_commit_api.py:762-779"
+   ]
+  },
+  {
+   "unit_id": "commit-upload",
+   "level": 2,
+   "question": "Before committing, the pipeline asks the server how each file should be uploaded (regular, LFS or Xet) rather than deciding locally. What constraint made server-side classification better?",
+   "variants": [
+    "Why does the upload flow ask the Hub to classify files before upload instead of classifying locally?",
+    "What constraint favored a server pre-upload check for upload mode?"
+   ],
+   "reference_answer": "The Hub owns the rules, such as gitignore patterns, size thresholds and which repos use Xet, and these can change server-side. Asking the server keeps clients consistent with them without hard-coding them.",
+   "evidence": [
+    "src/huggingface_hub/_commit_api.py:762-779",
+    "src/huggingface_hub/_upload_pipeline.py:506-530"
+   ]
+  },
+  {
+   "unit_id": "commit-upload",
+   "level": 2,
+   "question": "Large folder uploads are split across several commits through a streaming pipeline, instead of one giant commit. What constraint made multiple commits better?",
+   "variants": [
+    "Why does the folder upload pipeline create multiple commits rather than a single commit?",
+    "What constraint favored batched commits for very large folders?"
+   ],
+   "reference_answer": "A huge folder cannot reliably go in one commit, so splitting into bounded batches lets uploads make progress incrementally and be resumed. Batches are flushed by size, content budget or time interval.",
+   "evidence": [
+    "src/huggingface_hub/_upload_pipeline.py:531-553"
+   ]
+  },
+  {
+   "unit_id": "commit-upload",
+   "level": 3,
+   "question": "If commits were sent as one single multipart request instead of a streamed line-by-line payload, what would the part that builds the commit request have to stop doing?",
+   "variants": [
+    "If the commit were a one-shot multipart upload rather than a streamed payload, what could the request-building step no longer do?",
+    "What capability of the commit-building step is lost if streaming of the payload is replaced by a single multipart request?"
+   ],
+   "reference_answer": "It could no longer lazily emit operations one at a time, so it would have to assemble the whole commit up front. That limits how many files and how much inline content one commit can carry.",
+   "evidence": [
+    "src/huggingface_hub/_commit_api.py:762-779"
+   ]
+  },
+  {
+   "unit_id": "commit-upload",
+   "level": 3,
+   "question": "If the server-side classification of each file before upload (inline, LFS or Xet) were removed, which stage of the multi-commit pipeline would lose the information it needs?",
+   "variants": [
+    "Without the pre-upload classification of files, which pipeline stage would no longer know what to do with each file?",
+    "Which part of the streamed multi-commit pipeline depends on the per-file upload-mode classification and would break if it were dropped?"
+   ],
+   "reference_answer": "The batching stage, which decides per file whether it is carried inline or registered for background Xet transfer, and which also skips ignored files. Without the classification it cannot route files or size batches.",
+   "evidence": [
+    "src/huggingface_hub/_commit_api.py:762-779",
+    "src/huggingface_hub/_upload_pipeline.py:506-530"
+   ]
+  },
+  {
+   "unit_id": "commit-upload",
+   "level": 3,
+   "question": "If Xet-powered transfers were replaced by classic LFS-only uploads, which part of the streamed multi-commit pipeline would have to be rewritten first?",
+   "variants": [
+    "If the multi-commit upload pipeline could no longer use Xet, what would have to be rewritten first?",
+    "Which pipeline component, tied to Xet, would first need replacing if uploads went back to plain LFS?"
+   ],
+   "reference_answer": "The step that registers large files with a Xet upload session so they upload in the background while later files are still scanned. It would need a per-file LFS upload path, and chunk-level dedup would be lost.",
+   "evidence": [
+    "src/huggingface_hub/_upload_pipeline.py:506-530",
+    "src/huggingface_hub/_upload_pipeline.py:447-467"
+   ]
+  },
+  {
+   "unit_id": "cli",
+   "level": 1,
+   "question": "Why does the command-line entry point register commands as placeholders that load their code only when invoked?",
+   "variants": [
+    "What benefit comes from loading a command's module only when the user runs it?",
+    "Why aren't all command modules imported when the CLI starts?"
+   ],
+   "reference_answer": "It keeps CLI startup fast, because only the code for the command actually being run gets imported instead of every command's dependencies.",
+   "evidence": [
+    "src/huggingface_hub/cli/hf.py:130-150",
+    "src/huggingface_hub/cli/_cli_utils.py:154-163"
+   ],
+   "orientation": {
+    "purpose": "The `hf` command-line tool. It gives terminal users, scripts and AI agents access to Hub operations with consistent output.",
+    "decision": "Typer command groups registered in hf.py, sharing one `out` output object with auto, json, human, quiet and agent formats. Errors are handled centrally and the CLI reference docs are generated. Raw argparse or click, per-command scripts and plain prints were not used. CLAUDE.md sets the conventions.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/cli/hf.py",
+      "what": "app entry point and group registration"
+     },
+     {
+      "path": "src/huggingface_hub/cli/_output.py",
+      "what": "the `out` singleton and formats"
+     },
+     {
+      "path": "src/huggingface_hub/cli/_cli_utils.py",
+      "what": "reusable option types and helpers"
+     }
+    ],
+    "shaped_by": "célina and Lucain wrote the 2026 commands and migrations [human]; later migrations and additions by célina and Caleb Fahlgren were [assisted] with Cursor."
+   }
+  },
+  {
+   "unit_id": "cli",
+   "level": 1,
+   "question": "Why does the CLI strip the global output-format flags from a command's arguments before the argument parser sees them?",
+   "variants": [
+    "What does pulling the shared format flags out ahead of parsing let every command do?",
+    "Why can any command accept the JSON or quiet flag without declaring it itself?"
+   ],
+   "reference_answer": "It lets the global format flags work uniformly on every command and set the shared output mode, without each command having to declare its own options.",
+   "evidence": [
+    "src/huggingface_hub/cli/_cli_utils.py:192-198",
+    "src/huggingface_hub/cli/_cli_utils.py:509-523"
+   ],
+   "orientation": {
+    "purpose": "The `hf` command-line tool. It gives terminal users, scripts and AI agents access to Hub operations with consistent output.",
+    "decision": "Typer command groups registered in hf.py, sharing one `out` output object with auto, json, human, quiet and agent formats. Errors are handled centrally and the CLI reference docs are generated. Raw argparse or click, per-command scripts and plain prints were not used. CLAUDE.md sets the conventions.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/cli/hf.py",
+      "what": "app entry point and group registration"
+     },
+     {
+      "path": "src/huggingface_hub/cli/_output.py",
+      "what": "the `out` singleton and formats"
+     },
+     {
+      "path": "src/huggingface_hub/cli/_cli_utils.py",
+      "what": "reusable option types and helpers"
+     }
+    ],
+    "shaped_by": "célina and Lucain wrote the 2026 commands and migrations [human]; later migrations and additions by célina and Caleb Fahlgren were [assisted] with Cursor."
+   }
+  },
+  {
+   "unit_id": "cli",
+   "level": 1,
+   "question": "Why does the command group swap a placeholder for the real loaded command after first resolving it?",
+   "variants": [
+    "What is gained by replacing a lazy placeholder in the group with the loaded command once it is resolved?",
+    "Why is the loaded command stored back into the group's registry after materialization?"
+   ],
+   "reference_answer": "Later lookups in the same process use the already loaded command directly, so the module is not materialized again.",
+   "evidence": [
+    "src/huggingface_hub/cli/_cli_utils.py:154-163"
+   ],
+   "orientation": {
+    "purpose": "The `hf` command-line tool. It gives terminal users, scripts and AI agents access to Hub operations with consistent output.",
+    "decision": "Typer command groups registered in hf.py, sharing one `out` output object with auto, json, human, quiet and agent formats. Errors are handled centrally and the CLI reference docs are generated. Raw argparse or click, per-command scripts and plain prints were not used. CLAUDE.md sets the conventions.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/cli/hf.py",
+      "what": "app entry point and group registration"
+     },
+     {
+      "path": "src/huggingface_hub/cli/_output.py",
+      "what": "the `out` singleton and formats"
+     },
+     {
+      "path": "src/huggingface_hub/cli/_cli_utils.py",
+      "what": "reusable option types and helpers"
+     }
+    ],
+    "shaped_by": "célina and Lucain wrote the 2026 commands and migrations [human]; later migrations and additions by célina and Caleb Fahlgren were [assisted] with Cursor."
+   }
+  },
+  {
+   "unit_id": "cli",
+   "level": 2,
+   "question": "The hf CLI loads each command group lazily when it is invoked rather than importing all of them at startup. What constraint made lazy loading the better choice?",
+   "variants": [
+    "Why are CLI command modules materialized only on use instead of being imported eagerly?",
+    "What constraint favored lazily registered commands in the hf entry point?"
+   ],
+   "reference_answer": "CLI startup time must stay fast even though many command groups pull in heavy dependencies. Loading only the invoked command avoids paying for the rest.",
+   "evidence": [
+    "src/huggingface_hub/cli/hf.py:130-150",
+    "src/huggingface_hub/cli/_cli_utils.py:154-169"
+   ]
+  },
+  {
+   "unit_id": "cli",
+   "level": 2,
+   "question": "CLI output goes through one shared output object with selectable modes (human, JSON, quiet, agent) instead of plain print calls in each command. What constraint made that better?",
+   "variants": [
+    "Why was a centralized multi-format output layer chosen over plain printing in each command?",
+    "What constraint favored a single output singleton with several formats over ad hoc prints?"
+   ],
+   "reference_answer": "Commands must produce consistent output that is readable by humans and also parseable by scripts and AI agents. A single layer enforces one format policy rather than each command deciding.",
+   "evidence": [
+    "src/huggingface_hub/cli/_cli_utils.py:192-198",
+    "src/huggingface_hub/cli/_cli_utils.py:509-523"
+   ]
+  },
+  {
+   "unit_id": "cli",
+   "level": 2,
+   "question": "The CLI is built on Typer groups per resource rather than using argparse or plain click directly. What constraint made Typer the better choice?",
+   "variants": [
+    "Why was Typer chosen over argparse or raw click for the hf command line?",
+    "What constraint favored Typer-based command groups instead of hand-written parsers?"
+   ],
+   "reference_answer": "The CLI has many commands grouped by resource, and Typer lets them be declared concisely from typed function signatures with automatic help and completion. It builds on click, so lower-level hooks remain available for custom behavior.",
+   "evidence": [
+    "src/huggingface_hub/cli/hf.py:130-150",
+    "src/huggingface_hub/cli/_cli_utils.py:154-198"
+   ]
+  },
+  {
+   "unit_id": "cli",
+   "level": 3,
+   "question": "If the shared global output object were replaced by commands printing directly, which cross-cutting step that runs before a command parses its arguments would lose its purpose?",
+   "variants": [
+    "If commands printed directly rather than via a shared output object, which pre-parsing step would become pointless?",
+    "Which argument-handling step run before each command would no longer make sense without the shared output layer?"
+   ],
+   "reference_answer": "The step that pulls the global format flags (json, quiet and similar) out of a command's arguments and sets the output mode. Without a shared output layer there is no mode to set.",
+   "evidence": [
+    "src/huggingface_hub/cli/_cli_utils.py:192-198",
+    "src/huggingface_hub/cli/_cli_utils.py:509-523"
+   ]
+  },
+  {
+   "unit_id": "cli",
+   "level": 3,
+   "question": "If all command groups were imported eagerly instead of loaded on demand, which part of the command-resolution machinery would become unnecessary?",
+   "variants": [
+    "If the CLI imported every command group at startup, what resolution mechanism would no longer be needed?",
+    "Which piece of how the CLI resolves a command would be redundant under eager loading of all groups?"
+   ],
+   "reference_answer": "The placeholder commands and the resolver step that swaps a placeholder for the real command when it is invoked. Startup would then import every command module and get slower.",
+   "evidence": [
+    "src/huggingface_hub/cli/hf.py:130-150",
+    "src/huggingface_hub/cli/_cli_utils.py:154-169"
+   ]
+  },
+  {
+   "unit_id": "cli",
+   "level": 3,
+   "question": "If the CLI were rebuilt on plain argparse instead of Typer, which generated artifact would first have to change how it is produced?",
+   "variants": [
+    "If Typer were replaced with argparse for the CLI, which generated artifact would first need a new generation method?",
+    "What auto-generated output of the CLI would have to be produced differently after moving from Typer to argparse?"
+   ],
+   "reference_answer": "The generated CLI reference documentation, which is derived from the Typer command tree and help formatting. A new generator would have to read argparse's structure.",
+   "evidence": [
+    "src/huggingface_hub/cli/hf.py:130-150",
+    "src/huggingface_hub/cli/_cli_utils.py:154-169"
+   ]
+  },
+  {
+   "unit_id": "cli/framework",
+   "level": 1,
+   "question": "If a command author bypassed the shared output sink and printed directly, what would a user relying on machine-readable or agent-friendly output notice first?",
+   "variants": [
+    "What would break first for a script or AI agent consuming CLI output if one command printed directly instead of using the shared output sink?",
+    "What is the first visible symptom when one command ignores the shared output sink and prints on its own?"
+   ],
+   "reference_answer": "That command would ignore the selected output mode (e.g. JSON, quiet, agent), so its output would be in a different, inconsistent format from other commands and could break parsing by scripts or agents.",
+   "evidence": [
+    "src/huggingface_hub/cli/_output.py:35-60"
+   ],
+   "orientation": {
+    "purpose": "typer_factory, shared option types, the `out` output singleton, error handling and help formatting.",
+    "decision": "A single output singleton and reusable option types that every command must use. Not chosen: Per-command printing and options. Why: Consistency across commands and formats.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/cli/_cli_utils.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/_output.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/_errors.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: célina [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "cli/framework",
+   "level": 1,
+   "question": "Why does the shared output sink resolve its mode automatically at startup based on whether the caller is an AI agent?",
+   "variants": [
+    "What purpose does auto-detecting an agent caller serve for the shared CLI output sink?",
+    "Why does the output layer pick agent versus human formatting without the user asking?"
+   ],
+   "reference_answer": "So every command emits output suited to the caller (compact, parseable output for agents, styled output for humans) by default, without each command or user choosing it; it can still be overridden per command.",
+   "evidence": [
+    "src/huggingface_hub/cli/_output.py:35-60"
+   ],
+   "orientation": {
+    "purpose": "typer_factory, shared option types, the `out` output singleton, error handling and help formatting.",
+    "decision": "A single output singleton and reusable option types that every command must use. Not chosen: Per-command printing and options. Why: Consistency across commands and formats.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/cli/_cli_utils.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/_output.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/_errors.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: célina [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "cli/framework",
+   "level": 1,
+   "question": "What would a user notice first if the shared error-handling layer for the CLI stopped translating library exceptions?",
+   "variants": [
+    "If the CLI's central error handling were removed, what would users see first when a repo is not found?",
+    "What is the first user-visible effect of losing the part that turns library errors into friendly CLI messages?"
+   ],
+   "reference_answer": "Users would see raw exceptions or tracebacks instead of concise messages with actionable hints (e.g. how to authenticate or create the missing repo).",
+   "evidence": [
+    "src/huggingface_hub/cli/_errors.py:39-60"
+   ],
+   "orientation": {
+    "purpose": "typer_factory, shared option types, the `out` output singleton, error handling and help formatting.",
+    "decision": "A single output singleton and reusable option types that every command must use. Not chosen: Per-command printing and options. Why: Consistency across commands and formats.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/cli/_cli_utils.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/_output.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/_errors.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: célina [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "cli/framework",
+   "level": 2,
+   "question": "The command-line tool routes all printing through one shared output object instead of letting each command print for itself. What constraint made that the better choice?",
+   "variants": [
+    "Why does the command-line tool send every command's output through a single shared output object rather than per-command printing?",
+    "What requirement made a single shared output sink preferable to each command printing its own results?"
+   ],
+   "reference_answer": "Every command has to behave consistently across output modes (human, agent, JSON, quiet) and the mode is resolved once, so a single sink applies it uniformly. Per-command printing would make formats drift and require each command to reimplement mode handling.",
+   "evidence": [
+    "src/huggingface_hub/cli/_output.py:35-60"
+   ]
+  },
+  {
+   "unit_id": "cli/framework",
+   "level": 2,
+   "question": "Shared, reusable option definitions (token, limit, revision and so on) were chosen over each command declaring its own options. What constraint made that the better choice?",
+   "variants": [
+    "Why does the command-line tool define common options once and reuse them instead of letting each command declare its own?",
+    "What problem is avoided by sharing option definitions across commands rather than redefining them per command?"
+   ],
+   "reference_answer": "Commands across many resources need the same flags with identical names, help text and validation. Defining them once keeps the interface uniform and avoids divergence between commands.",
+   "evidence": [
+    "src/huggingface_hub/cli/_cli_utils.py:36-38",
+    "src/huggingface_hub/cli/repos.py:25-45",
+    "src/huggingface_hub/cli/models.py:26-38"
+   ]
+  },
+  {
+   "unit_id": "cli/framework",
+   "level": 2,
+   "question": "Every command group is built through a common factory that wires in a styled help context, instead of using the underlying CLI library's default group directly. What constraint made that the better choice?",
+   "variants": [
+    "Why do all command groups go through one shared factory rather than the CLI library's plain group constructor?",
+    "What is gained by building every group from a shared factory with a custom help context instead of defaults?"
+   ],
+   "reference_answer": "Help styling and shared behaviour such as the context and error handling must apply identically to every group and subcommand. A single factory guarantees that without each module repeating the setup.",
+   "evidence": [
+    "src/huggingface_hub/cli/_cli_utils.py:36-37",
+    "src/huggingface_hub/cli/_help_formatter.py:23-34",
+    "src/huggingface_hub/cli/repos.py:52"
+   ]
+  },
+  {
+   "unit_id": "cli/framework",
+   "level": 3,
+   "question": "If the CLI's single shared output object were replaced by each command printing its own results, which part of the system would have to take over choosing between human, JSON, quiet and agent-style output?",
+   "variants": [
+    "If every command printed for itself instead of using one shared output object, what would now be responsible for selecting the output mode?",
+    "Without a single shared output object, where would the logic for human versus machine-readable output have to live?"
+   ],
+   "reference_answer": "Every individual command module (resource, jobs, sandbox, etc.) would have to implement format selection, including detecting an AI agent caller. That is why the shared output object exists: it resolves the mode once and all commands behave consistently.",
+   "evidence": [
+    "src/huggingface_hub/cli/_output.py:35-60",
+    "src/huggingface_hub/cli/repos.py:49",
+    "src/huggingface_hub/cli/sandbox.py:53"
+   ]
+  },
+  {
+   "unit_id": "cli/framework",
+   "level": 3,
+   "question": "If the shared, reusable option definitions (such as token, output format and limit) were replaced by each command declaring its own, what in the command groups across the CLI would have to change?",
+   "variants": [
+    "If commands no longer reused common option definitions, what would every command group need to do for options like token and format?",
+    "What would change in the resource and job command groups if shared option types were dropped in favour of per-command options?"
+   ],
+   "reference_answer": "Every command in every group that uses those common options would need to redeclare them with their own help text and behaviour. Flags would then drift in naming and semantics between commands, which the shared definitions prevent.",
+   "evidence": [
+    "src/huggingface_hub/cli/_cli_utils.py:36-38",
+    "src/huggingface_hub/cli/repos.py:25-45",
+    "src/huggingface_hub/cli/jobs.py:46-60"
+   ]
+  },
+  {
+   "unit_id": "cli/framework",
+   "level": 3,
+   "question": "If the central translation of Hub exceptions into user-facing messages were replaced by each command handling its own errors, what would every command need to do for a missing repository?",
+   "variants": [
+    "If error handling were no longer centralized, what would each command have to implement when a repo is not found?",
+    "Without a shared error-to-message layer, what burden shifts onto each command when the Hub reports a missing or gated repo?"
+   ],
+   "reference_answer": "Each command would have to catch the Hub exceptions itself and write its own friendly message, including hints like how to authenticate or create the repo. The shared layer exists so these messages are consistent across commands.",
+   "evidence": [
+    "src/huggingface_hub/cli/_errors.py:19-60"
+   ]
+  },
+  {
+   "unit_id": "cli/resource-commands",
+   "level": 1,
+   "question": "What would a user notice first if a new resource's commands were added as flat top-level commands instead of under a resource group?",
+   "variants": [
+    "What is the first discoverability cost for users if resource commands lived in one flat namespace?",
+    "How would help output look different if each resource did not have its own command group?"
+   ],
+   "reference_answer": "The top-level help would become a long mixed list of commands, so users could no longer discover a resource's operations by browsing that resource's group help.",
+   "evidence": [
+    "src/huggingface_hub/cli/repos.py:52",
+    "src/huggingface_hub/cli/datasets.py:57"
+   ],
+   "orientation": {
+    "purpose": "Commands for repos, models, datasets, spaces, buckets, collections, cache, auth, upload/download and webhooks.",
+    "decision": "One module per resource with verb aliases like ls/list. Not chosen: Flat command namespace. Why: Discoverability and consistency.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/cli/repos.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/models.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/datasets.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: célina [human], Lucain [human], Caleb Fahlgren [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "cli/resource-commands",
+   "level": 1,
+   "question": "Why do the models, datasets and spaces command groups all import the same shared option definitions (limit, search, author, token)?",
+   "variants": [
+    "What does reusing common option definitions across the listing commands give users?",
+    "Why are the list-style options for models, datasets and spaces defined once and shared?"
+   ],
+   "reference_answer": "It gives users the same flags with the same help and behavior across resources, and avoids each module redefining them and drifting apart.",
+   "evidence": [
+    "src/huggingface_hub/cli/models.py:26-38",
+    "src/huggingface_hub/cli/datasets.py:26-37",
+    "src/huggingface_hub/cli/spaces.py:45-60"
+   ],
+   "orientation": {
+    "purpose": "Commands for repos, models, datasets, spaces, buckets, collections, cache, auth, upload/download and webhooks.",
+    "decision": "One module per resource with verb aliases like ls/list. Not chosen: Flat command namespace. Why: Discoverability and consistency.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/cli/repos.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/models.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/datasets.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: célina [human], Lucain [human], Caleb Fahlgren [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "cli/resource-commands",
+   "level": 1,
+   "question": "What is the consequence for the repos command group of being the generic place for operations that apply to any repo type, rather than to one resource?",
+   "variants": [
+    "Why does the repos group accept a repo type, unlike the models group?",
+    "How does the repos group's placement differ from the per-resource groups for models or datasets?"
+   ],
+   "reference_answer": "It handles cross-type operations (create, delete, etc. for model, dataset, space or bucket) selected by a type option, whereas the per-resource groups focus on browsing and info for one resource.",
+   "evidence": [
+    "src/huggingface_hub/cli/repos.py:52-60"
+   ],
+   "orientation": {
+    "purpose": "Commands for repos, models, datasets, spaces, buckets, collections, cache, auth, upload/download and webhooks.",
+    "decision": "One module per resource with verb aliases like ls/list. Not chosen: Flat command namespace. Why: Discoverability and consistency.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/cli/repos.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/models.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/datasets.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: célina [human], Lucain [human], Caleb Fahlgren [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "cli/resource-commands",
+   "level": 2,
+   "question": "Commands are organised as one module per Hub resource (repos, models, datasets, spaces, buckets) instead of one flat set of top-level commands. What constraint made that the better choice?",
+   "variants": [
+    "Why group CLI commands by resource rather than putting all commands in one flat namespace?",
+    "What made a per-resource command group better than a flat namespace for the Hub CLI?"
+   ],
+   "reference_answer": "The CLI covers many resource types with overlapping verbs like list or create, so a flat namespace would collide and be hard to browse. Grouping per resource keeps verbs consistent and discoverable.",
+   "evidence": [
+    "src/huggingface_hub/cli/repos.py:52",
+    "src/huggingface_hub/cli/datasets.py:57",
+    "src/huggingface_hub/cli/spaces.py:14"
+   ]
+  },
+  {
+   "unit_id": "cli/resource-commands",
+   "level": 2,
+   "question": "The generic repo command group was renamed from singular to plural to match the per-resource groups for models, datasets and spaces. What constraint motivated that choice?",
+   "variants": [
+    "Why was the singular repo command group migrated to a plural name?",
+    "What consistency concern led to renaming the repo command group to its plural form?"
+   ],
+   "reference_answer": "The sibling resource groups use plural names, so a singular group was inconsistent and harder to guess. Matching the plural convention keeps command names predictable.",
+   "evidence": [
+    "src/huggingface_hub/cli/repos.py:52",
+    "src/huggingface_hub/cli/models.py:14"
+   ]
+  },
+  {
+   "unit_id": "cli/resource-commands",
+   "level": 2,
+   "question": "Why do models, datasets and spaces each have their own module with listing commands rather than one generic command?",
+   "variants": [
+    "What differs between resource types that justifies separate command modules for each?",
+    "The models, datasets and spaces command modules each repeat a similar structure (list, info, file listing) rather than sharing one generic repo-listing command. What constraint favours separate per-resource modules?"
+   ],
+   "reference_answer": "Each resource type has its own sort keys, expandable properties and extra commands (such as dataset SQL queries or space hot reload), so one generic command could not express them. Separate modules let each expose type-specific options while reusing shared helpers.",
+   "evidence": [
+    "src/huggingface_hub/cli/models.py:44-49",
+    "src/huggingface_hub/cli/datasets.py:43-45",
+    "src/huggingface_hub/cli/spaces.py:34-43"
+   ]
+  },
+  {
+   "unit_id": "cli/resource-commands",
+   "level": 3,
+   "question": "If the per-resource command groups were replaced by one flat command namespace, what naming problem would the list-style commands for models, datasets and spaces run into?",
+   "variants": [
+    "With a flat namespace instead of per-resource groups, what would happen to the list commands that exist for models, datasets and spaces?",
+    "If models, datasets and spaces commands were not grouped, what would have to change about how their list commands are named?"
+   ],
+   "reference_answer": "The identical verbs would collide, so each command would need a resource-qualified name and the top-level app would need to register them individually instead of mounting a group per resource. Grouping avoids this and keeps verbs consistent.",
+   "evidence": [
+    "src/huggingface_hub/cli/models.py:26-41",
+    "src/huggingface_hub/cli/datasets.py:57",
+    "src/huggingface_hub/cli/repos.py:52"
+   ]
+  },
+  {
+   "unit_id": "cli/resource-commands",
+   "level": 3,
+   "question": "When the repository command group was renamed from singular to plural for consistency, what other user-facing text elsewhere in the CLI had to be updated to stay correct?",
+   "variants": [
+    "After the repo group was renamed to its plural form, what message produced by the shared error handling had to follow the new name?",
+    "What suggestion shown to users when a repository is missing depends on the name of the repository command group?"
+   ],
+   "reference_answer": "The not-found error message that tells users how to create the repo by running the create command must reference the new plural group name. Otherwise users would be pointed to a command that no longer exists.",
+   "evidence": [
+    "src/huggingface_hub/cli/_errors.py:39-54"
+   ]
+  },
+  {
+   "unit_id": "cli/resource-commands",
+   "level": 3,
+   "question": "If the underlying Python API library added a new sort key for listing models, what would have to change in the CLI's models command group for that key to be accepted?",
+   "variants": [
+    "What CLI-side change is needed for the models listing command to accept a sort option newly added to the Python API?",
+    "When the Python API gains another model sort choice, what must be edited in the CLI models group to expose it?"
+   ],
+   "reference_answer": "Nothing, because the CLI builds its allowed sort choices from the API library's type definitions when it loads. The CLI stays in sync with the API automatically.",
+   "evidence": [
+    "src/huggingface_hub/cli/models.py:22",
+    "src/huggingface_hub/cli/models.py:44-49"
+   ]
+  },
+  {
+   "unit_id": "cli/compute-commands",
+   "level": 1,
+   "question": "Why does the sandbox command group depend on the jobs command group's shared options, such as hardware flavor and labels?",
+   "variants": [
+    "What does sandbox reusing the jobs options reveal about how sandboxes run?",
+    "Why does the sandbox group import flavor, labels and namespace options from the jobs group?"
+   ],
+   "reference_answer": "Sandboxes run on top of Hugging Face Jobs, so they take the same compute settings (flavor, labels, namespace) and reuse the jobs definitions for consistency.",
+   "evidence": [
+    "src/huggingface_hub/cli/sandbox.py:14",
+    "src/huggingface_hub/cli/sandbox.py:54"
+   ],
+   "orientation": {
+    "purpose": "Commands for running jobs, sandboxes, installing CLI extensions and agent skills.",
+    "decision": "Jobs and sandbox exposed as first-class CLI groups plus an extension/skills mechanism. Not chosen: Separate tools. Why: unclear",
+    "where": [
+     {
+      "path": "src/huggingface_hub/cli/jobs.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/sandbox.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/extensions.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "cli/compute-commands",
+   "level": 1,
+   "question": "Why does the extensions command group carry a security warning in its help text?",
+   "variants": [
+    "What risk does the extensions group's help warning address?",
+    "Why must users be cautioned before installing hf CLI extensions?"
+   ],
+   "reference_answer": "Extensions are third-party executables or Python packages that run on the user's machine, so users should install only from sources they trust.",
+   "evidence": [
+    "src/huggingface_hub/cli/extensions.py:48-52"
+   ],
+   "orientation": {
+    "purpose": "Commands for running jobs, sandboxes, installing CLI extensions and agent skills.",
+    "decision": "Jobs and sandbox exposed as first-class CLI groups plus an extension/skills mechanism. Not chosen: Separate tools. Why: unclear",
+    "where": [
+     {
+      "path": "src/huggingface_hub/cli/jobs.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/sandbox.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/extensions.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "cli/compute-commands",
+   "level": 1,
+   "question": "What is the purpose of the long capability description in the skills command?",
+   "variants": [
+    "Why does the skills command's description list so many Hub capabilities and trigger phrases?",
+    "Why does the installed agent skill enumerate topics like jobs, buckets and webhooks?"
+   ],
+   "reference_answer": "It is the description an AI assistant reads to decide when to use the hf CLI skill, so it lists the capabilities and trigger phrases that should activate it.",
+   "evidence": [
+    "src/huggingface_hub/cli/skills.py:34-56"
+   ],
+   "orientation": {
+    "purpose": "Commands for running jobs, sandboxes, installing CLI extensions and agent skills.",
+    "decision": "Jobs and sandbox exposed as first-class CLI groups plus an extension/skills mechanism. Not chosen: Separate tools. Why: unclear",
+    "where": [
+     {
+      "path": "src/huggingface_hub/cli/jobs.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/sandbox.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/cli/extensions.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "cli/compute-commands",
+   "level": 2,
+   "question": "Remote jobs and sandboxes are exposed as built-in command groups of the main CLI rather than as separate standalone tools. What constraint made that the better choice?",
+   "variants": [
+    "Why are jobs and sandboxes built into the main CLI instead of shipped as separate tools?",
+    "What made first-class CLI groups preferable to separate executables for running jobs and sandboxes?"
+   ],
+   "reference_answer": "They need the same authentication, token handling, shared options and output modes as the other commands, and run on Hub infrastructure. Building them in reuses that framework and gives one entry point instead of separate tools to install and keep consistent.",
+   "evidence": [
+    "src/huggingface_hub/cli/jobs.py:46-60",
+    "src/huggingface_hub/cli/sandbox.py:40-57"
+   ]
+  },
+  {
+   "unit_id": "cli/compute-commands",
+   "level": 2,
+   "question": "An extension mechanism that installs third-party executables or Python packages was chosen over adding every capability into the core CLI. What constraint made that the better choice?",
+   "variants": [
+    "Why let users install third-party extensions rather than building all functionality into the core CLI?",
+    "What constraint favours a pluggable extension system over shipping every command in the main package?"
+   ],
+   "reference_answer": "The core cannot ship every community-built command, so extensions allow external tools to plug in under the same entry point. The cost is trust, which is why the help warns to install only from trusted sources.",
+   "evidence": [
+    "src/huggingface_hub/cli/extensions.py:44-56"
+   ]
+  },
+  {
+   "unit_id": "cli/compute-commands",
+   "level": 2,
+   "question": "Agent skills are installed by a CLI command that writes a description of the hf CLI for AI assistants, rather than relying on assistants to discover the CLI's behaviour on their own. What constraint made that the better choice?",
+   "variants": [
+    "Why does the CLI ship a command that installs a skill for AI assistants?",
+    "What motivated generating an installable skill describing the CLI for assistants?"
+   ],
+   "reference_answer": "Assistants need a compact, explicit description of when and how to use the hf CLI, including trigger conditions, to use it reliably. Installing a skill supplies that guidance in the format assistants load.",
+   "evidence": [
+    "src/huggingface_hub/cli/skills.py:14",
+    "src/huggingface_hub/cli/skills.py:34-56"
+   ]
+  },
+  {
+   "unit_id": "cli/compute-commands",
+   "level": 3,
+   "question": "The sandbox command group reuses several option definitions and a label parser from the jobs command group. If the jobs group changed how labels are parsed, which other command group would be affected?",
+   "variants": [
+    "Which other command group's behaviour would change if the jobs group altered its label parsing?",
+    "Because of shared option code, what group besides jobs would see different label handling if jobs changed it?"
+   ],
+   "reference_answer": "The sandbox commands, since they import and reuse the jobs group's label parser and options. Sandboxes run on top of jobs, so the two groups are coupled.",
+   "evidence": [
+    "src/huggingface_hub/cli/sandbox.py:54",
+    "src/huggingface_hub/cli/sandbox.py:14"
+   ]
+  },
+  {
+   "unit_id": "cli/compute-commands",
+   "level": 3,
+   "question": "If CLI extensions were replaced by separate standalone tools, what installation and management functionality would the main CLI no longer need to provide?",
+   "variants": [
+    "If third-party add-ons were distributed as independent tools rather than extensions, what would the main CLI stop having to manage?",
+    "Without the extension mechanism, which responsibility for fetching and installing add-on programs would the main CLI drop?"
+   ],
+   "reference_answer": "It would no longer need to download and install third-party executables or Python packages, track them with a manifest in a per-user directory, and warn users about trusting them. Users would install and manage those tools themselves.",
+   "evidence": [
+    "src/huggingface_hub/cli/extensions.py:16-58"
+   ]
+  },
+  {
+   "unit_id": "cli/compute-commands",
+   "level": 3,
+   "question": "The agent skill description enumerates the areas of the CLI an assistant should use it for. If a new top-level command group were added to the CLI, what part of the skill would go stale unless updated?",
+   "variants": [
+    "If a new top-level command group were introduced, what piece of the skill content would need a manual update to mention it?",
+    "What text in the agent skill would fail to advertise a newly added command area until someone edited it?"
+   ],
+   "reference_answer": "The skill's description text, which lists the capability areas and tells agents when to trigger it. It is written out in the skill module rather than derived automatically.",
+   "evidence": [
+    "src/huggingface_hub/cli/skills.py:34-56"
+   ]
+  },
+  {
+   "unit_id": "inference",
+   "level": 1,
+   "question": "What would a user switching from one inference provider to another notice first because of the unified client design?",
+   "variants": [
+    "What stays the same for a caller when they change inference provider under the unified client?",
+    "What is the first benefit a user sees when changing providers with the shared inference API?"
+   ],
+   "reference_answer": "They keep calling the same task methods with the same arguments; only the provider choice changes, since adapters translate the call to each provider's HTTP API.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/__init__.py:228-263",
+    "src/huggingface_hub/inference/_providers/_common.py:88-124"
+   ],
+   "orientation": {
+    "purpose": "A client for running ML tasks such as chat, image generation and embeddings against Hugging Face and third-party providers through one API.",
+    "decision": "The sync InferenceClient is hand-written and the async twin is generated from it. Each provider has an adapter class mapping the shared task API to its HTTP API. Separate SDKs per provider and a hand-written async client were not chosen. Generation keeps sync and async in step.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_client.py",
+      "what": "sync InferenceClient task methods"
+     },
+     {
+      "path": "src/huggingface_hub/inference/_providers",
+      "what": "per-provider adapters"
+     },
+     {
+      "path": "utils/generate_async_inference_client.py",
+      "what": "generator for the async client"
+     }
+    ],
+    "shaped_by": "The history list does not say."
+   }
+  },
+  {
+   "unit_id": "inference",
+   "level": 1,
+   "question": "Why does the inference client choose a provider adapter before building a request?",
+   "variants": [
+    "What role does the selected provider adapter play in preparing a request?",
+    "Why must provider selection happen before the request URL and payload are prepared?"
+   ],
+   "reference_answer": "The adapter determines the provider-specific URL, headers, model mapping and payload format, so it must be chosen first to build a valid request.",
+   "evidence": [
+    "src/huggingface_hub/inference/_client.py:888-926",
+    "src/huggingface_hub/inference/_providers/_common.py:88-124"
+   ],
+   "orientation": {
+    "purpose": "A client for running ML tasks such as chat, image generation and embeddings against Hugging Face and third-party providers through one API.",
+    "decision": "The sync InferenceClient is hand-written and the async twin is generated from it. Each provider has an adapter class mapping the shared task API to its HTTP API. Separate SDKs per provider and a hand-written async client were not chosen. Generation keeps sync and async in step.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_client.py",
+      "what": "sync InferenceClient task methods"
+     },
+     {
+      "path": "src/huggingface_hub/inference/_providers",
+      "what": "per-provider adapters"
+     },
+     {
+      "path": "utils/generate_async_inference_client.py",
+      "what": "generator for the async client"
+     }
+    ],
+    "shaped_by": "The history list does not say."
+   }
+  },
+  {
+   "unit_id": "inference",
+   "level": 1,
+   "question": "What happens first when a caller picks automatic provider selection but gives no model?",
+   "variants": [
+    "What does the client do if the provider is automatic and the model is missing?",
+    "How does the provider resolution respond to automatic routing without a model?"
+   ],
+   "reference_answer": "It raises an error saying a model must be specified, because automatic routing needs the model to decide which provider serves it.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/__init__.py:241-243"
+   ],
+   "orientation": {
+    "purpose": "A client for running ML tasks such as chat, image generation and embeddings against Hugging Face and third-party providers through one API.",
+    "decision": "The sync InferenceClient is hand-written and the async twin is generated from it. Each provider has an adapter class mapping the shared task API to its HTTP API. Separate SDKs per provider and a hand-written async client were not chosen. Generation keeps sync and async in step.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_client.py",
+      "what": "sync InferenceClient task methods"
+     },
+     {
+      "path": "src/huggingface_hub/inference/_providers",
+      "what": "per-provider adapters"
+     },
+     {
+      "path": "utils/generate_async_inference_client.py",
+      "what": "generator for the async client"
+     }
+    ],
+    "shaped_by": "The history list does not say."
+   }
+  },
+  {
+   "unit_id": "inference",
+   "level": 2,
+   "question": "The inference client uses per-provider adapters that translate one unified task API into each provider's HTTP API, instead of shipping a separate SDK per provider. What constraint made that the better choice?",
+   "variants": [
+    "Why use provider adapters behind one client rather than a separate SDK for each inference provider?",
+    "What made a single unified task API with adapters better than per-provider SDKs?"
+   ],
+   "reference_answer": "Users want to switch among many providers without changing their code, so the interface must stay uniform while the request shaping, URL and payload mapping varies per provider. Adapters isolate that variation without multiplying dependencies and APIs.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/_common.py:88-124",
+    "src/huggingface_hub/inference/_providers/__init__.py:228-263"
+   ]
+  },
+  {
+   "unit_id": "inference",
+   "level": 2,
+   "question": "The async inference client is generated from the sync client's source rather than being hand-written. What constraint made that the better choice?",
+   "variants": [
+    "Why is the async inference client produced by a generator instead of written by hand?",
+    "What problem does generating the async client from the sync one solve?"
+   ],
+   "reference_answer": "The two clients must expose the same task methods and behave identically, and hand-maintaining both would let them drift as methods are added. Generating from one source keeps them in lockstep.",
+   "evidence": [
+    "utils/generate_async_inference_client.py:15-60"
+   ]
+  },
+  {
+   "unit_id": "inference",
+   "level": 2,
+   "question": "Provider selection can be left as automatic, picking the first provider available for the model according to the user's preference order, instead of forcing users to name a provider. What constraint made that default better?",
+   "variants": [
+    "Why does the inference client default to automatic provider selection rather than requiring an explicit provider?",
+    "What made auto-selecting a provider from the user's preferences the better default?"
+   ],
+   "reference_answer": "Users want to call a model without knowing which providers serve it, and the Hub knows which providers host a model and the user's ordering of them. Auto selection lets the client pick for them while still allowing an explicit override.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/__init__.py:233-249"
+   ]
+  },
+  {
+   "unit_id": "inference",
+   "level": 3,
+   "question": "If each inference provider had its own separate SDK instead of adapter classes behind one client, what would the client's task methods lose the ability to do?",
+   "variants": [
+    "Without per-provider adapters behind a single client, what could the task methods no longer do?",
+    "If provider support were split into separate SDKs, what capability of the unified client's task methods would disappear?"
+   ],
+   "reference_answer": "They could no longer build a request generically through a provider adapter chosen by provider name, including automatic provider selection for a model. Users would have to pick and learn a different SDK per provider.",
+   "evidence": [
+    "src/huggingface_hub/inference/_client.py:888-926",
+    "src/huggingface_hub/inference/_providers/__init__.py:228-263"
+   ]
+  },
+  {
+   "unit_id": "inference",
+   "level": 3,
+   "question": "If the async inference client were hand-written instead of generated, what supporting tooling and workflow around the sync client would become unnecessary or change?",
+   "variants": [
+    "If the async client were maintained by hand, what generator-related tooling would no longer be needed?",
+    "What development workflow would change if no code generation produced the async client?"
+   ],
+   "reference_answer": "The generation script and its consistency checks would be dropped, and contributors would have to edit both the sync and async clients by hand for every change. That manual duplication is the drift the generator prevents.",
+   "evidence": [
+    "utils/generate_async_inference_client.py:15-60"
+   ]
+  },
+  {
+   "unit_id": "inference",
+   "level": 3,
+   "question": "If a new third-party inference provider were added, what central lookup would have to be updated so the client could select it by name?",
+   "variants": [
+    "What central registry must be extended for the client to route to a newly added provider?",
+    "To make a new provider selectable, which shared mapping from provider names to task adapters needs a new entry?"
+   ],
+   "reference_answer": "The provider registry that maps each provider name to its per-task adapters. The client's selection logic and its error messages about supported providers and tasks read from it.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/__init__.py:251-263"
+   ]
+  },
+  {
+   "unit_id": "inference/client",
+   "level": 1,
+   "question": "What would a maintainer notice first if someone edited the generated async client directly instead of the sync one?",
+   "variants": [
+    "What happens to hand edits in the generated async client the next time the generator runs?",
+    "Why are direct edits to the async client file futile?"
+   ],
+   "reference_answer": "The edits would be overwritten the next time the generator regenerates the async client from the sync client, so changes must be made in the sync client.",
+   "evidence": [
+    "utils/generate_async_inference_client.py:15-60"
+   ],
+   "orientation": {
+    "purpose": "Task methods, request/response handling and streaming.",
+    "decision": "Sync client is authoritative; async generated from it. Not chosen: Hand-maintained async. Why: Avoids drift.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_client.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/inference/_common.py",
+      "what": ""
+     },
+     {
+      "path": "utils/generate_async_inference_client.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "inference/client",
+   "level": 1,
+   "question": "Why does the sync client's design philosophy favour ease of use, such as one timeout setting and guessing file types?",
+   "variants": [
+    "What goal drives the client accepting bytes, paths or URLs for files?",
+    "What is the intent behind the client exposing only main parameters and a recommended model per task?"
+   ],
+   "reference_answer": "The aim is to make it as easy as possible to get a first script running, even if that is less optimized, so power users consult the docs for more options.",
+   "evidence": [
+    "src/huggingface_hub/inference/_client.py:27-33"
+   ],
+   "orientation": {
+    "purpose": "Task methods, request/response handling and streaming.",
+    "decision": "Sync client is authoritative; async generated from it. Not chosen: Hand-maintained async. Why: Avoids drift.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_client.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/inference/_common.py",
+      "what": ""
+     },
+     {
+      "path": "utils/generate_async_inference_client.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "inference/client",
+   "level": 1,
+   "question": "Why is the shared utilities module for inference kept separate from the sync client?",
+   "variants": [
+    "What does the module of shared inference utilities allow the sync and async clients to do?",
+    "Why are streaming and response-parsing helpers not defined inside the sync client?"
+   ],
+   "reference_answer": "Both the sync and generated async clients need the same helpers (types, parsing, streaming), so placing them in a shared module avoids duplication and keeps generation simple.",
+   "evidence": [
+    "src/huggingface_hub/inference/_common.py:14-40"
+   ],
+   "orientation": {
+    "purpose": "Task methods, request/response handling and streaming.",
+    "decision": "Sync client is authoritative; async generated from it. Not chosen: Hand-maintained async. Why: Avoids drift.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_client.py",
+      "what": ""
+     },
+     {
+      "path": "src/huggingface_hub/inference/_common.py",
+      "what": ""
+     },
+     {
+      "path": "utils/generate_async_inference_client.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "inference/client",
+   "level": 2,
+   "question": "The sync inference client is the authoritative source with the async one derived from it, instead of two hand-maintained clients. What constraint made that the better choice?",
+   "variants": [
+    "Why is the sync client the single source of truth for the async client?",
+    "What made deriving async from sync preferable to maintaining both by hand?"
+   ],
+   "reference_answer": "Both clients expose a large, growing set of task methods that must stay identical, so maintaining two copies would drift. Deriving one from the other removes that duplication.",
+   "evidence": [
+    "utils/generate_async_inference_client.py:15-60",
+    "src/huggingface_hub/inference/_client.py:1-60"
+   ]
+  },
+  {
+   "unit_id": "inference/client",
+   "level": 2,
+   "question": "Utilities used by both the sync and async clients live in a shared common module rather than being duplicated in each client. What constraint made that the better choice?",
+   "variants": [
+    "Why keep helpers for both inference clients in one shared module?",
+    "What made a shared utility module better than duplicating helpers in the sync and async clients?"
+   ],
+   "reference_answer": "Request parameter types, content conversion and error handling do not depend on sync versus async, and the async client is generated from the sync code, so shared helpers avoid duplication. Only the stream handling differs and has separate variants.",
+   "evidence": [
+    "src/huggingface_hub/inference/_common.py:14-60",
+    "utils/generate_async_inference_client.py:50-51"
+   ]
+  },
+  {
+   "unit_id": "inference/client",
+   "level": 2,
+   "question": "The inference client favours ease of use, such as accepting files as bytes, paths or URLs and guessing the type, over being as optimized as possible. What constraint drove that choice?",
+   "variants": [
+    "Why does the inference client prioritise ease of use over optimization?",
+    "What goal led the client to accept flexible input types and recommended models?"
+   ],
+   "reference_answer": "The aim is to make it as easy as possible for users to get a first script running across many tasks, so the client absorbs details like input types and timeouts even if that is less efficient. Power users can still use the documented options.",
+   "evidence": [
+    "src/huggingface_hub/inference/_client.py:27-33"
+   ]
+  },
+  {
+   "unit_id": "inference/client",
+   "level": 3,
+   "question": "Since the async client is generated from the sync client, what would have to be done in the generator if the sync client gained a new task method?",
+   "variants": [
+    "If a new task method is added to the sync client, what change does the generator need?",
+    "What must be updated in the async code generation when the sync client adds another task method?"
+   ],
+   "reference_answer": "Nothing special: the generator converts all task methods to async automatically, so rerunning it produces the async version. This is the lockstep benefit of generating the async client.",
+   "evidence": [
+    "utils/generate_async_inference_client.py:31-60"
+   ]
+  },
+  {
+   "unit_id": "inference/client",
+   "level": 3,
+   "question": "Because the async client is produced by transforming the sync client's source, what constraint does that place on how the sync client is written?",
+   "variants": [
+    "What does generating the async client from sync source require of the sync client's code structure?",
+    "How is the sync client's code constrained by the fact that the async twin is derived from it by transformation?"
+   ],
+   "reference_answer": "The sync code must keep the patterns the generator recognizes, such as how it posts requests and handles provider responses. If those patterns change, the generator must be updated too.",
+   "evidence": [
+    "utils/generate_async_inference_client.py:31-60"
+   ]
+  },
+  {
+   "unit_id": "inference/client",
+   "level": 3,
+   "question": "Provider adapters hand back a neutral description of the request, and the client sends it. If adapters sent the HTTP requests themselves instead, what would the clients lose?",
+   "variants": [
+    "If adapters performed the HTTP calls themselves rather than returning a request description, what would the clients stop controlling?",
+    "What would change for the sync and async clients if request sending moved into the provider adapters?"
+   ],
+   "reference_answer": "The clients would no longer own the transport, meaning timeouts, streaming, and error handling. Each adapter would need separate sync and async sending code instead of the client doing it once per mode.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/_common.py:88-124",
+    "src/huggingface_hub/inference/_client.py:919-926",
+    "src/huggingface_hub/inference/_common.py:56-60"
+   ]
+  },
+  {
+   "unit_id": "inference/providers",
+   "level": 1,
+   "question": "If the per-provider helpers stopped working for one third-party inference service, what would a user of the inference client notice first for requests routed to that service?",
+   "variants": [
+    "What would break first for a user calling the inference client through a given third-party service if that service's helper failed?",
+    "When a single provider's helper is broken, what is the first visible symptom for requests routed to that provider?"
+   ],
+   "reference_answer": "Requests routed to that provider would fail, because the helper is what builds the provider-specific URL, auth headers and payload and parses its response. Other providers would keep working since each has its own helper.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/_common.py:1-60",
+    "src/huggingface_hub/inference/_providers/fal_ai.py:21-49",
+    "src/huggingface_hub/inference/_providers/together.py:37-54"
+   ],
+   "orientation": {
+    "purpose": "Per-provider helpers that build URLs, payloads and parse responses.",
+    "decision": "One class per provider behind a registry. Not chosen: Single generic mapping. Why: Providers differ in payloads and auth.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_providers",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "inference/providers",
+   "level": 1,
+   "question": "Why does the part of the inference client that sends requests need a per-provider helper between it and the remote service, rather than sending one uniform request?",
+   "variants": [
+    "What consequence of providers differing makes a per-provider helper necessary in the inference request path?",
+    "Why can't the inference client send the same request shape to every external provider without a helper?"
+   ],
+   "reference_answer": "Providers differ in routes, payload shapes and auth schemes, so the helper translates the generic task request into what each provider expects and converts the reply back.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/fal_ai.py:21-49",
+    "src/huggingface_hub/inference/_providers/together.py:37-54"
+   ],
+   "orientation": {
+    "purpose": "Per-provider helpers that build URLs, payloads and parse responses.",
+    "decision": "One class per provider behind a registry. Not chosen: Single generic mapping. Why: Providers differ in payloads and auth.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_providers",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "inference/providers",
+   "level": 1,
+   "question": "What does the per-provider helper layer let the inference client do when a user supplies a Hub token instead of a provider's own key?",
+   "variants": [
+    "How does the provider helper layer treat a Hub token differently from a provider's own API key?",
+    "What consequence does the kind of credential have on how a provider helper prepares a request?"
+   ],
+   "reference_answer": "The helper adapts auth and routing to the credential type: with a Hub token the request is routed through Hugging Face, while with a provider's own key it uses that provider's native auth header.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/fal_ai.py:25-49"
+   ],
+   "orientation": {
+    "purpose": "Per-provider helpers that build URLs, payloads and parse responses.",
+    "decision": "One class per provider behind a registry. Not chosen: Single generic mapping. Why: Providers differ in payloads and auth.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_providers",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "inference/providers",
+   "level": 2,
+   "question": "The inference client uses a separate helper per provider, looked up from a registry, rather than one generic table-driven mapping. What constraint made that the better choice?",
+   "variants": [
+    "Why did the maintainers give each inference provider its own adapter instead of a single generic mapping of URLs and payload shapes?",
+    "What made per-provider adapter classes preferable to one configuration-style mapping for supporting third-party inference providers?"
+   ],
+   "reference_answer": "Providers differ in route layout, request payload shape, authentication headers and response parsing (some even need polling), so these behaviours can't be expressed as static data; each provider needs code it can override.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/fal_ai.py:21-60",
+    "src/huggingface_hub/inference/_providers/together.py:37-54",
+    "src/huggingface_hub/inference/_providers/__init__.py:1-60"
+   ]
+  },
+  {
+   "unit_id": "inference/providers",
+   "level": 2,
+   "question": "Provider adapters are organised as one class per provider and task sharing a common base, rather than a single generic mapping. What provider difference around credentials made that more suitable?",
+   "variants": [
+    "Why can't a single generic mapping handle how different inference providers treat the caller's API key?",
+    "What authentication variation between providers pushed the design toward overridable per-provider classes?"
+   ],
+   "reference_answer": "Some providers need a different authorization header format when the user supplies their own provider key rather than a Hub token, which requires provider-specific logic that a uniform mapping can't express.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/fal_ai.py:21-49"
+   ]
+  },
+  {
+   "unit_id": "inference/providers",
+   "level": 2,
+   "question": "Rather than a single generic mapping, each provider adapter can override how it builds the route for a task. What provider constraint made overriding preferable?",
+   "variants": [
+    "Why is per-provider control over the request route better than one shared route scheme for all inference providers?",
+    "What about provider APIs made a shared generic route mapping unworkable?"
+   ],
+   "reference_answer": "Each provider exposes different endpoints per task (e.g. different paths for images, speech, embeddings, or a different API version for video), and sometimes different hosts, so routes must be decided by provider-specific code.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/together.py:43-54",
+    "src/huggingface_hub/inference/_providers/fal_ai.py:35-49"
+   ]
+  },
+  {
+   "unit_id": "inference/providers",
+   "level": 3,
+   "question": "If the per-provider adapter classes were replaced by one generic mapping table that describes every provider, what is the first other part of the system that would have to change to keep providers with unusual behaviour working?",
+   "variants": [
+    "If each inference provider no longer had its own adapter class and a single generic mapping described them all, which other part of the system would first need to change to keep providers with special behaviour working?",
+    "Suppose one generic mapping replaced the separate adapter per inference provider. What other part would first have to absorb the logic that used to live in those adapters, such as custom auth and polling?"
+   ],
+   "reference_answer": "The inference client's request-preparation and response-handling flow would have to change, because it currently just calls the adapter's hooks. It would need to hold the provider-specific branching itself (custom auth headers, routes, async job polling, payload and response translation).",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/fal_ai.py:21-60",
+    "src/huggingface_hub/inference/_providers/together.py:37-60",
+    "src/huggingface_hub/inference/_providers/__init__.py:1-60"
+   ]
+  },
+  {
+   "unit_id": "inference/providers",
+   "level": 3,
+   "question": "If providers shared one generic mapping instead of individual adapters, which part of the system that registers and looks up providers by name would first have to change?",
+   "variants": [
+    "With a single generic mapping replacing the per-provider adapters, what would happen first to the registry that maps provider names to task-specific helpers?",
+    "If the per-provider classes were dropped for a generic mapping, which part of the provider lookup that selects a helper per provider and task would need to change first?"
+   ],
+   "reference_answer": "The registry that maps each provider and task to its adapter would have to change. It would become a lookup of data entries rather than classes, and the client's code that picks a helper from it would be rewritten accordingly.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/__init__.py:1-60"
+   ]
+  },
+  {
+   "unit_id": "inference/providers",
+   "level": 3,
+   "question": "If providers that need different authentication were forced into one generic mapping, which part of the system dealing with the user's credentials would first need provider-specific changes?",
+   "variants": [
+    "If one generic mapping replaced per-provider adapters, what part of credential handling would first have to learn each provider's auth scheme?",
+    "With a generic provider mapping, where would the logic that chooses between a Hugging Face token and a provider's own key have to move?"
+   ],
+   "reference_answer": "The request-building step that decides how to send credentials would need to know each provider's scheme. Today each adapter chooses its own header format depending on whether the key is a Hugging Face token or a provider key.",
+   "evidence": [
+    "src/huggingface_hub/inference/_providers/fal_ai.py:21-49"
+   ]
+  },
+  {
+   "unit_id": "inference/types",
+   "level": 1,
+   "question": "If the generated task types fell out of date with the upstream specs, what would a user of the inference client notice?",
+   "variants": [
+    "What would be the visible consequence of the task input/output types lagging behind the shared task specs?",
+    "What goes wrong for users when generated task types stop matching the upstream task definitions?"
+   ],
+   "reference_answer": "The typed inputs and outputs would no longer match what tasks actually accept or return, e.g. missing or stale fields. Generation from the specs, checked in CI, exists to prevent this drift.",
+   "evidence": [
+    "utils/generate_inference_types.py:1-60",
+    ".github/workflows/python-quality.yml:42-57"
+   ],
+   "orientation": {
+    "purpose": "Dataclass types for each task's inputs/outputs generated from the JSON specs.",
+    "decision": "Generated dataclasses rather than hand-written ones. Not chosen: pydantic models. Why: Stay in sync with the hub-docs specs.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_generated/types",
+      "what": ""
+     },
+     {
+      "path": "utils/generate_inference_types.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "inference/types",
+   "level": 1,
+   "question": "Why is the step that regenerates the task types run as part of the quality checks rather than only occasionally by hand?",
+   "variants": [
+    "Why does CI include the type-generation script?",
+    "What does running the type generator in the quality workflow protect against?"
+   ],
+   "reference_answer": "So the committed types are verified to match what the generator would produce from the specs, and any drift or manual edit fails CI instead of silently shipping.",
+   "evidence": [
+    ".github/workflows/python-quality.yml:42-57",
+    "utils/generate_inference_types.py:1-60"
+   ],
+   "orientation": {
+    "purpose": "Dataclass types for each task's inputs/outputs generated from the JSON specs.",
+    "decision": "Generated dataclasses rather than hand-written ones. Not chosen: pydantic models. Why: Stay in sync with the hub-docs specs.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_generated/types",
+      "what": ""
+     },
+     {
+      "path": "utils/generate_inference_types.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "inference/types",
+   "level": 1,
+   "question": "What role do the generated task types play for the inference client's public documentation and exports?",
+   "variants": [
+    "How do the generated task types connect to the package's top-level exports and reference docs?",
+    "Besides defining dataclasses, what else is the type generator responsible for keeping in sync?"
+   ],
+   "reference_answer": "The generator also keeps the package's main exports and the inference types reference page consistent with the generated dataclasses.",
+   "evidence": [
+    "utils/generate_inference_types.py:26-31"
+   ],
+   "orientation": {
+    "purpose": "Dataclass types for each task's inputs/outputs generated from the JSON specs.",
+    "decision": "Generated dataclasses rather than hand-written ones. Not chosen: pydantic models. Why: Stay in sync with the hub-docs specs.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_generated/types",
+      "what": ""
+     },
+     {
+      "path": "utils/generate_inference_types.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "inference/types",
+   "level": 2,
+   "question": "Task input/output types are generated dataclasses rather than pydantic models. What constraint favored this?",
+   "variants": [
+    "Why were generated plain dataclasses chosen over pydantic models for the inference task types?",
+    "What made code-generated dataclasses a better fit than pydantic for the task types?"
+   ],
+   "reference_answer": "The types must track the task specs maintained in hub-docs, so they are generated from those JSON specs; dataclasses avoid adding a heavy required dependency like pydantic to the library.",
+   "evidence": [
+    "utils/generate_inference_types.py:15-52"
+   ]
+  },
+  {
+   "unit_id": "inference/types",
+   "level": 2,
+   "question": "The task types are produced by a generator script from JSON specs instead of being hand-written. What problem does that solve?",
+   "variants": [
+    "Why generate the inference task types from specs rather than writing them by hand?",
+    "What constraint made spec-driven generation preferable to manual type maintenance for task inputs and outputs?"
+   ],
+   "reference_answer": "Hand-written types would drift from the shared task specs; generating them keeps the client's types in sync whenever the specs change.",
+   "evidence": [
+    "utils/generate_inference_types.py:15-31",
+    ".github/workflows/python-quality.yml:49"
+   ]
+  },
+  {
+   "unit_id": "inference/types",
+   "level": 2,
+   "question": "Generated types are checked into the repository and re-generated in CI rather than only being created at install or runtime. What does that choice buy?",
+   "variants": [
+    "Why are the generated task types committed to the repo with a CI check instead of generated on the fly?",
+    "What is the benefit of keeping generated inference types as committed files verified by CI?"
+   ],
+   "reference_answer": "Users get a plain static, importable and type-checkable module with no generation step, while CI fails if the committed files differ from what the specs would produce, so they can't silently drift.",
+   "evidence": [
+    ".github/workflows/python-quality.yml:42-57",
+    "utils/generate_inference_types.py:26-31"
+   ]
+  },
+  {
+   "unit_id": "inference/types",
+   "level": 3,
+   "question": "If the task input/output types were hand-written instead of generated from the shared specs, what first other part of the development workflow would have to change?",
+   "variants": [
+    "If generated dataclasses were replaced by hand-maintained types, which part of the CI/quality workflow would lose its purpose first?",
+    "What part of the repository's quality checks would have to be dropped or rewritten if task types were no longer generated from specs?"
+   ],
+   "reference_answer": "The CI/quality check that regenerates the types and fails on drift would be removed or replaced. Keeping the types in sync with the specs would then depend on manual review.",
+   "evidence": [
+    "utils/generate_inference_types.py:1-60",
+    ".github/workflows/python-quality.yml:42-57"
+   ]
+  },
+  {
+   "unit_id": "inference/types",
+   "level": 3,
+   "question": "If the generated task types were replaced by pydantic models, what first dependency-related change would the package need?",
+   "variants": [
+    "If pydantic models replaced the generated dataclasses for task types, what would the package's dependencies have to include?",
+    "Switching task types to pydantic models would first force what change to the library's install requirements?"
+   ],
+   "reference_answer": "Pydantic would have to become a required dependency of the library, which it currently avoids by using plain dataclasses. The generator would also need to emit models instead of dataclasses.",
+   "evidence": [
+    "utils/generate_inference_types.py:38-52"
+   ]
+  },
+  {
+   "unit_id": "inference/types",
+   "level": 3,
+   "question": "If the task types were no longer generated, what first part of the documentation would have to change?",
+   "variants": [
+    "Without generation of the task types, which docs page would need manual upkeep?",
+    "If hand-written types replaced the generated ones, what generated reference documentation would have to be maintained manually?"
+   ],
+   "reference_answer": "The package reference page for inference types, which the generator keeps in step with the types, would need to be maintained by hand.",
+   "evidence": [
+    "utils/generate_inference_types.py:26-31"
+   ]
+  },
+  {
+   "unit_id": "hf-filesystem-buckets",
+   "level": 1,
+   "question": "What would a pandas user notice first if the file-system interface over Hub repos and buckets stopped working?",
+   "variants": [
+    "If the fsspec interface to the Hub broke, what would be the first thing a data user reading hf:// paths would see?",
+    "What first breaks for tools like pandas when the Hub file-system layer fails?"
+   ],
+   "reference_answer": "Reading or writing Hub paths directly through those tools would fail, since they rely on the standard file-system interface to reach repos and buckets without explicit download steps.",
+   "evidence": [
+    "src/huggingface_hub/hf_file_system.py:549-556"
+   ],
+   "orientation": {
+    "purpose": "Gives Hub repos and buckets a file-system interface (fsspec) that tools like pandas and datasets can use. It also holds bucket live-following and Spaces hot-reload.",
+    "decision": "A POSIX-like fsspec filesystem, with Buckets as a separate Xet-backed storage type. Plain download and upload helpers or a custom file API were not chosen. fsspec gives interoperability with the data ecosystem.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/hf_file_system.py",
+      "what": "HfFileSystem implementation"
+     },
+     {
+      "path": "src/huggingface_hub/_buckets.py",
+      "what": "bucket types and operations"
+     },
+     {
+      "path": "src/huggingface_hub/_hot_reload",
+      "what": "Spaces hot-reload code"
+     }
+    ],
+    "shaped_by": "Charles wrote hot-reload in Feb 2026 [human]; Lucain's Buckets API that month was [assisted] with Cursor."
+   }
+  },
+  {
+   "unit_id": "hf-filesystem-buckets",
+   "level": 1,
+   "question": "Why does the file-system layer have to check that a bucket exists when resolving a path pointing at one?",
+   "variants": [
+    "What is the consequence of path resolution distinguishing buckets from repos?",
+    "Why does resolving a bucket path involve an existence check on the bucket?"
+   ],
+   "reference_answer": "Buckets are a separate storage type from repos, so the path is resolved to a bucket and a missing one must produce a file-not-found error rather than being treated as a repo path.",
+   "evidence": [
+    "src/huggingface_hub/hf_file_system.py:549-556"
+   ],
+   "orientation": {
+    "purpose": "Gives Hub repos and buckets a file-system interface (fsspec) that tools like pandas and datasets can use. It also holds bucket live-following and Spaces hot-reload.",
+    "decision": "A POSIX-like fsspec filesystem, with Buckets as a separate Xet-backed storage type. Plain download and upload helpers or a custom file API were not chosen. fsspec gives interoperability with the data ecosystem.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/hf_file_system.py",
+      "what": "HfFileSystem implementation"
+     },
+     {
+      "path": "src/huggingface_hub/_buckets.py",
+      "what": "bucket types and operations"
+     },
+     {
+      "path": "src/huggingface_hub/_hot_reload",
+      "what": "Spaces hot-reload code"
+     }
+    ],
+    "shaped_by": "Charles wrote hot-reload in Feb 2026 [human]; Lucain's Buckets API that month was [assisted] with Cursor."
+   }
+  },
+  {
+   "unit_id": "hf-filesystem-buckets",
+   "level": 1,
+   "question": "What benefit does live-following a bucket give to a file-system instance that lists that bucket repeatedly?",
+   "variants": [
+    "Why does the file-system layer follow bucket changes in the background?",
+    "What does bucket live-follow save a repeatedly listing user from?"
+   ],
+   "reference_answer": "Its cached listings are updated incrementally with bucket changes (or invalidated on resync), so listings stay fresh without refetching everything each time.",
+   "evidence": [
+    "src/huggingface_hub/hf_file_system.py:857-864",
+    "src/huggingface_hub/hf_file_system.py:679-702"
+   ],
+   "orientation": {
+    "purpose": "Gives Hub repos and buckets a file-system interface (fsspec) that tools like pandas and datasets can use. It also holds bucket live-following and Spaces hot-reload.",
+    "decision": "A POSIX-like fsspec filesystem, with Buckets as a separate Xet-backed storage type. Plain download and upload helpers or a custom file API were not chosen. fsspec gives interoperability with the data ecosystem.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/hf_file_system.py",
+      "what": "HfFileSystem implementation"
+     },
+     {
+      "path": "src/huggingface_hub/_buckets.py",
+      "what": "bucket types and operations"
+     },
+     {
+      "path": "src/huggingface_hub/_hot_reload",
+      "what": "Spaces hot-reload code"
+     }
+    ],
+    "shaped_by": "Charles wrote hot-reload in Feb 2026 [human]; Lucain's Buckets API that month was [assisted] with Cursor."
+   }
+  },
+  {
+   "unit_id": "hf-filesystem-buckets",
+   "level": 2,
+   "question": "The Hub is exposed through a POSIX-like filesystem interface built on fsspec instead of only download/upload helpers. What constraint made that the better choice?",
+   "variants": [
+    "Why was an fsspec-based filesystem chosen over just offering download and upload functions for Hub content?",
+    "What interoperability need favored an fsspec filesystem over a custom file API?"
+   ],
+   "reference_answer": "Data libraries such as pandas and datasets already read and write through fsspec, so implementing it lets them use Hub paths directly without custom integration.",
+   "evidence": [
+    "src/huggingface_hub/hf_file_system.py:549-556"
+   ]
+  },
+  {
+   "unit_id": "hf-filesystem-buckets",
+   "level": 2,
+   "question": "Buckets are modeled as a separate storage type alongside repos in the filesystem, rather than as another kind of git repo. What constraint motivated this?",
+   "variants": [
+    "Why are buckets treated as their own storage type instead of being folded into repos?",
+    "What made a distinct bucket storage type, backed by Xet, preferable to reusing the repo model?"
+   ],
+   "reference_answer": "Buckets are non-versioned, file-oriented object storage built on Xet, with no git commits or revisions, so they need their own path resolution and API rather than the repo model.",
+   "evidence": [
+    "src/huggingface_hub/hf_file_system.py:549-556",
+    "src/huggingface_hub/_buckets.py"
+   ]
+  },
+  {
+   "unit_id": "hf-filesystem-buckets",
+   "level": 2,
+   "question": "The filesystem refreshes bucket listings through a shared background follower that pushes change events, rather than re-fetching listings on every call. What constraint motivated this?",
+   "variants": [
+    "Why does the filesystem follow bucket changes live instead of repeatedly re-listing?",
+    "What problem with cached bucket listings does the live-follow mechanism solve?"
+   ],
+   "reference_answer": "fsspec caches directory listings, which go stale when a bucket changes remotely; following the server's change events keeps caches fresh without re-listing, and one shared follower serves all filesystem instances on the bucket.",
+   "evidence": [
+    "src/huggingface_hub/hf_file_system.py:679-702",
+    "src/huggingface_hub/_bucket_live_follow.py:367-380"
+   ]
+  },
+  {
+   "unit_id": "hf-filesystem-buckets",
+   "level": 3,
+   "question": "If buckets were treated as just another kind of repository instead of a separate storage type, what first part of the filesystem's path handling would have to change?",
+   "variants": [
+    "If buckets were folded into ordinary repos, what part of the filesystem's path-resolution logic would first need to change?",
+    "What would happen first to the filesystem's path resolution if bucket paths no longer had their own branch distinct from repo paths?"
+   ],
+   "reference_answer": "The path resolution step, which currently branches into a bucket-specific path with its own existence check and no revisions, would have to treat buckets as repos with revisions and commits.",
+   "evidence": [
+    "src/huggingface_hub/hf_file_system.py:549-556"
+   ]
+  },
+  {
+   "unit_id": "hf-filesystem-buckets",
+   "level": 3,
+   "question": "If the bucket live-follow feature were removed so listings were never refreshed from server events, what first part of the filesystem would lose its purpose?",
+   "variants": [
+    "Without live-follow of bucket changes, what filesystem state would become unnecessary?",
+    "If buckets no longer had a background change follower, which part of the filesystem's listing cache handling would be dropped first?"
+   ],
+   "reference_answer": "The filesystem's queue of pending bucket changes and the step applying them to cached listings would become unnecessary. Listing caches would then be refreshed only by normal invalidation.",
+   "evidence": [
+    "src/huggingface_hub/hf_file_system.py:857-864",
+    "src/huggingface_hub/hf_file_system.py:679-702"
+   ]
+  },
+  {
+   "unit_id": "hf-filesystem-buckets",
+   "level": 3,
+   "question": "If the fsspec-based filesystem were replaced by only download and upload helpers, which external consumers would first be affected?",
+   "variants": [
+    "If the library offered only download/upload helpers instead of an fsspec filesystem, who would first lose seamless access to Hub files?",
+    "Dropping the fsspec filesystem in favour of transfer helpers would first break which kind of downstream usage?"
+   ],
+   "reference_answer": "Data libraries such as pandas and datasets, which read hf:// paths through fsspec, would lose direct access and would have to download files first.",
+   "evidence": [
+    "src/huggingface_hub/hf_file_system.py:549-556"
+   ]
+  },
+  {
+   "unit_id": "repocard-mixin",
+   "level": 1,
+   "question": "What would a library author notice first if the mixin that adds save, push and load behaviour to framework classes were removed?",
+   "variants": [
+    "If the mixin for framework classes disappeared, what would integrators first have to do themselves?",
+    "What first burden returns to a framework maintainer without the shared save/push/load mixin?"
+   ],
+   "reference_answer": "They would have to reimplement saving, config and model card writing, and uploading to the Hub in each integration, instead of just implementing the framework-specific weight saving.",
+   "evidence": [
+    "src/huggingface_hub/hub_mixin.py:402-428",
+    "src/huggingface_hub/hub_mixin.py:661-678"
+   ],
+   "orientation": {
+    "purpose": "Reads, edits and pushes model and dataset cards (README metadata). It also gives ML framework classes save, push and from_pretrained behaviour.",
+    "decision": "Cards use YAML front-matter with jinja templates. ModelHubMixin lets framework integrations share the logic, and PyTorch models default to safetensors. Framework-specific integrations and pickle weights were not chosen, for downstream integration and safety.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/repocard.py",
+      "what": "RepoCard, ModelCard, DatasetCard"
+     },
+     {
+      "path": "src/huggingface_hub/hub_mixin.py",
+      "what": "ModelHubMixin"
+     },
+     {
+      "path": "src/huggingface_hub/templates",
+      "what": "card templates"
+     }
+    ],
+    "shaped_by": "Leandro von Werra, Lucain and Benjamin Muskalla made the key decisions in 2022–2024 [human]."
+   }
+  },
+  {
+   "unit_id": "repocard-mixin",
+   "level": 1,
+   "question": "Why does saving a model through the mixin avoid overwriting an existing model card in the target folder?",
+   "variants": [
+    "Why does the save step preserve a pre-existing model card?",
+    "What does the mixin's save step do when a README already exists?"
+   ],
+   "reference_answer": "A card already present may have been written by hand or by the framework-specific saver, so the mixin only generates one if missing to avoid destroying curated content.",
+   "evidence": [
+    "src/huggingface_hub/hub_mixin.py:424-428"
+   ],
+   "orientation": {
+    "purpose": "Reads, edits and pushes model and dataset cards (README metadata). It also gives ML framework classes save, push and from_pretrained behaviour.",
+    "decision": "Cards use YAML front-matter with jinja templates. ModelHubMixin lets framework integrations share the logic, and PyTorch models default to safetensors. Framework-specific integrations and pickle weights were not chosen, for downstream integration and safety.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/repocard.py",
+      "what": "RepoCard, ModelCard, DatasetCard"
+     },
+     {
+      "path": "src/huggingface_hub/hub_mixin.py",
+      "what": "ModelHubMixin"
+     },
+     {
+      "path": "src/huggingface_hub/templates",
+      "what": "card templates"
+     }
+    ],
+    "shaped_by": "Leandro von Werra, Lucain and Benjamin Muskalla made the key decisions in 2022–2024 [human]."
+   }
+  },
+  {
+   "unit_id": "repocard-mixin",
+   "level": 1,
+   "question": "Why does a subclass of the mixin inherit its parent's model card information by default?",
+   "variants": [
+    "What is the benefit of subclasses of the framework mixin copying parent card metadata?",
+    "Why does the mixin carry card metadata through class inheritance?"
+   ],
+   "reference_answer": "So a library can declare shared card details (docs link, tags, template) once on a base class and have all its model subclasses reuse them, overriding only what differs.",
+   "evidence": [
+    "src/huggingface_hub/hub_mixin.py:185-244"
+   ],
+   "orientation": {
+    "purpose": "Reads, edits and pushes model and dataset cards (README metadata). It also gives ML framework classes save, push and from_pretrained behaviour.",
+    "decision": "Cards use YAML front-matter with jinja templates. ModelHubMixin lets framework integrations share the logic, and PyTorch models default to safetensors. Framework-specific integrations and pickle weights were not chosen, for downstream integration and safety.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/repocard.py",
+      "what": "RepoCard, ModelCard, DatasetCard"
+     },
+     {
+      "path": "src/huggingface_hub/hub_mixin.py",
+      "what": "ModelHubMixin"
+     },
+     {
+      "path": "src/huggingface_hub/templates",
+      "what": "card templates"
+     }
+    ],
+    "shaped_by": "Leandro von Werra, Lucain and Benjamin Muskalla made the key decisions in 2022–2024 [human]."
+   }
+  },
+  {
+   "unit_id": "repocard-mixin",
+   "level": 2,
+   "question": "The PyTorch mixin saves weights as safetensors by default rather than pickle. What constraint made that the better choice?",
+   "variants": [
+    "Why does the PyTorch hub mixin default to safetensors instead of pickle-based weights?",
+    "What made safetensors preferable to pickle for weights saved via the mixin?"
+   ],
+   "reference_answer": "Pickle files can execute arbitrary code when loaded, so shared models are a security risk; safetensors is a safe, data-only format.",
+   "evidence": [
+    "src/huggingface_hub/hub_mixin.py:744-749"
+   ]
+  },
+  {
+   "unit_id": "repocard-mixin",
+   "level": 2,
+   "question": "A generic mixin gives any framework's model class save/push/load, instead of building a separate integration per framework. What constraint favored the mixin?",
+   "variants": [
+    "Why offer a mixin that library authors subclass rather than framework-specific integrations inside the hub library?",
+    "What made a reusable mixin better than bespoke per-framework integrations for downstream libraries?"
+   ],
+   "reference_answer": "Downstream libraries differ and evolve independently, so the hub library can't maintain integrations for each; a mixin lets them add Hub support by implementing only the framework-specific save/load parts while the shared flow handles config, model card and upload.",
+   "evidence": [
+    "src/huggingface_hub/hub_mixin.py:185-244",
+    "src/huggingface_hub/hub_mixin.py:402-428",
+    "src/huggingface_hub/hub_mixin.py:661-678"
+   ]
+  },
+  {
+   "unit_id": "repocard-mixin",
+   "level": 2,
+   "question": "The mixin generates a model card automatically from a template and metadata when saving. What constraint made this worthwhile?",
+   "variants": [
+    "Why does saving a model through the mixin also write a templated README?",
+    "What does generating a templated card with YAML metadata give models pushed through the mixin?"
+   ],
+   "reference_answer": "The Hub reads YAML front-matter metadata from the README for tags, library and pipeline, so generated cards make pushed models discoverable and documented without user effort; templates let libraries customize them.",
+   "evidence": [
+    "src/huggingface_hub/hub_mixin.py:185-244",
+    "src/huggingface_hub/hub_mixin.py:402-428"
+   ]
+  },
+  {
+   "unit_id": "repocard-mixin",
+   "level": 3,
+   "question": "If the PyTorch mixin saved weights with pickle instead of safetensors, what first part of the loading side would have to change?",
+   "variants": [
+    "If pickle replaced safetensors as the default weight format for the PyTorch mixin, which part of the load path would first need to change?",
+    "Switching the PyTorch mixin's default save format to pickle would first force what change on the model-loading code?"
+   ],
+   "reference_answer": "The loading code would have to read the pickle weight file and handle its security risk (arbitrary code execution) instead of loading the safetensors file. The expected weights filename would change too.",
+   "evidence": [
+    "src/huggingface_hub/hub_mixin.py:744-749"
+   ]
+  },
+  {
+   "unit_id": "repocard-mixin",
+   "level": 3,
+   "question": "If framework libraries each had their own integration instead of one shared mixin, what first part of the push workflow would be duplicated?",
+   "variants": [
+    "Without a shared mixin, which step shared across frameworks would each library need to reimplement?",
+    "If each framework had a custom integration instead of the mixin, what part of pushing a model would be duplicated first?"
+   ],
+   "reference_answer": "The push workflow of saving locally to a temporary folder (weights, config, model card) and then uploading it as a single commit would be reimplemented by each library.",
+   "evidence": [
+    "src/huggingface_hub/hub_mixin.py:661-678",
+    "src/huggingface_hub/hub_mixin.py:402-428"
+   ]
+  },
+  {
+   "unit_id": "repocard-mixin",
+   "level": 3,
+   "question": "If model cards were not generated from templates, what first part of the mixin's subclassing mechanism would become unnecessary?",
+   "variants": [
+    "Without jinja-style card templates, which subclass-level settings of the mixin would lose their purpose?",
+    "If cards were not templated, what class-level configuration that libraries pass when subclassing the mixin would become pointless?"
+   ],
+   "reference_answer": "The subclass-time options that supply the card template and card metadata (links, tags, license, and so on) would become unnecessary, since they exist to fill the generated card.",
+   "evidence": [
+    "src/huggingface_hub/hub_mixin.py:185-244"
+   ]
+  },
+  {
+   "unit_id": "codegen-quality-ci",
+   "level": 1,
+   "question": "What would a contributor see first in CI if they edited the synchronous inference client but did not update the async one?",
+   "variants": [
+    "What does CI report when the sync inference client changes without regenerating the async client?",
+    "What is the first visible failure if the async client is stale relative to the sync client?"
+   ],
+   "reference_answer": "The quality check fails with a mismatch message saying the async client is out of date and telling them to run the style target to regenerate it.",
+   "evidence": [
+    "utils/generate_async_inference_client.py:74-108",
+    ".github/workflows/python-quality.yml:42-57"
+   ],
+   "orientation": {
+    "purpose": "Keeps generated files and code quality consistent. Formatting, linting, type checks and CI test suites all run through it.",
+    "decision": "Generated outputs (static imports, async client, CLI docs, types) are committed and checked by utils scripts through make style and make quality and by CI. Runtime generation and manual upkeep were not used. The aim is a public surface and docs that stay in sync. Tests are split into api, transfer and inference suites.",
+    "where": [
+     {
+      "path": "utils",
+      "what": "generator and checker scripts"
+     },
+     {
+      "path": "Makefile",
+      "what": "style and quality targets"
+     },
+     {
+      "path": ".github/workflows",
+      "what": "CI workflows"
+     }
+    ],
+    "shaped_by": "Lucain wrote the 2022–2023 tooling alone [human]; his 2026 quality, test-migration and CI-split work was [assisted]."
+   }
+  },
+  {
+   "unit_id": "codegen-quality-ci",
+   "level": 1,
+   "question": "Why does the style target run the generator scripts in update mode while the quality target runs them in check mode?",
+   "variants": [
+    "What is the difference in purpose between style and quality targets regarding generated files?",
+    "Why does quality only verify generated files while style rewrites them?"
+   ],
+   "reference_answer": "Style fixes generated files locally for the developer to review and commit, while quality (and CI) only verifies they are in sync and fails without modifying anything.",
+   "evidence": [
+    "Makefile:7-24",
+    "utils/check_static_imports.py:105-134"
+   ],
+   "orientation": {
+    "purpose": "Keeps generated files and code quality consistent. Formatting, linting, type checks and CI test suites all run through it.",
+    "decision": "Generated outputs (static imports, async client, CLI docs, types) are committed and checked by utils scripts through make style and make quality and by CI. Runtime generation and manual upkeep were not used. The aim is a public surface and docs that stay in sync. Tests are split into api, transfer and inference suites.",
+    "where": [
+     {
+      "path": "utils",
+      "what": "generator and checker scripts"
+     },
+     {
+      "path": "Makefile",
+      "what": "style and quality targets"
+     },
+     {
+      "path": ".github/workflows",
+      "what": "CI workflows"
+     }
+    ],
+    "shaped_by": "Lucain wrote the 2022–2023 tooling alone [human]; his 2026 quality, test-migration and CI-split work was [assisted]."
+   }
+  },
+  {
+   "unit_id": "codegen-quality-ci",
+   "level": 1,
+   "question": "Why does the quality workflow type-check the root package file separately from the whole package?",
+   "variants": [
+    "What does the extra check on the package's root file guarantee?",
+    "Why is there a dedicated type check on the top-level init in CI?"
+   ],
+   "reference_answer": "To confirm that every module listed for lazy loading actually exists, so the lazy and static import facades stay valid.",
+   "evidence": [
+    ".github/workflows/python-quality.yml:52-54",
+    "utils/check_static_imports.py:105-134"
+   ],
+   "orientation": {
+    "purpose": "Keeps generated files and code quality consistent. Formatting, linting, type checks and CI test suites all run through it.",
+    "decision": "Generated outputs (static imports, async client, CLI docs, types) are committed and checked by utils scripts through make style and make quality and by CI. Runtime generation and manual upkeep were not used. The aim is a public surface and docs that stay in sync. Tests are split into api, transfer and inference suites.",
+    "where": [
+     {
+      "path": "utils",
+      "what": "generator and checker scripts"
+     },
+     {
+      "path": "Makefile",
+      "what": "style and quality targets"
+     },
+     {
+      "path": ".github/workflows",
+      "what": "CI workflows"
+     }
+    ],
+    "shaped_by": "Lucain wrote the 2022–2023 tooling alone [human]; his 2026 quality, test-migration and CI-split work was [assisted]."
+   }
+  },
+  {
+   "unit_id": "codegen-quality-ci",
+   "level": 2,
+   "question": "Generated files like the async client are committed and verified by checks rather than generated at runtime. What constraint made that the better choice?",
+   "variants": [
+    "Why check in generated artifacts and enforce them in CI instead of generating them at runtime?",
+    "What made committed generated code better than runtime generation for the async client and similar files?"
+   ],
+   "reference_answer": "The public surface must be static so type checkers, IDE autocompletion and docs see it; CI checks ensure the committed files stay in sync with their sources.",
+   "evidence": [
+    "utils/generate_async_inference_client.py:74-108",
+    "Makefile:7-24"
+   ]
+  },
+  {
+   "unit_id": "codegen-quality-ci",
+   "level": 2,
+   "question": "Contributors fix generated files by running a style command with an update mode instead of editing them manually. What constraint motivates this?",
+   "variants": [
+    "Why have an update mode that regenerates files rather than relying on manual maintenance of derived files?",
+    "What makes hand-maintaining derived files like the async client or static imports impractical?"
+   ],
+   "reference_answer": "Derived files must exactly mirror their sources (e.g. the sync client or lazy import table), and hand edits drift or are error-prone, so a script regenerates them and the same script in check mode fails CI on mismatch.",
+   "evidence": [
+    "utils/check_static_imports.py:105-134",
+    "Makefile:18-24"
+   ]
+  },
+  {
+   "unit_id": "codegen-quality-ci",
+   "level": 2,
+   "question": "The package keeps a lazy-import table and also static imports kept in sync by a script. What constraint made keeping both the better choice?",
+   "variants": [
+    "Why maintain static imports mirroring the lazy imports, with a check enforcing agreement?",
+    "What does enforcing agreement between lazy definitions and static imports protect?"
+   ],
+   "reference_answer": "Lazy loading keeps import time low, but type checkers and IDEs can't follow it, so static imports are kept for them; the check prevents the two from diverging.",
+   "evidence": [
+    "utils/check_static_imports.py:105-134",
+    ".github/workflows/python-quality.yml:52-54"
+   ]
+  },
+  {
+   "unit_id": "codegen-quality-ci",
+   "level": 3,
+   "question": "If the async client were generated at runtime instead of being checked in, what first part of the quality tooling would become unnecessary?",
+   "variants": [
+    "If the async inference client were produced at import time, which quality check would lose its purpose?",
+    "Without a committed generated async client, what verification step in the style/quality workflow would be dropped?"
+   ],
+   "reference_answer": "The check that regenerates the async client from the synchronous one and fails on a mismatch, with its update mode in the style step, would no longer be needed.",
+   "evidence": [
+    "utils/generate_async_inference_client.py:74-108",
+    "Makefile:7-24"
+   ]
+  },
+  {
+   "unit_id": "codegen-quality-ci",
+   "level": 3,
+   "question": "If the lazy-import facade were maintained manually instead of being checked by a script, which developer tooling would first lose its guarantee?",
+   "variants": [
+    "If static imports were hand-maintained without a checker, what would first stop being guaranteed for type checkers and IDEs?",
+    "Without the script that checks static imports against lazy definitions, which tooling would first see inconsistencies?"
+   ],
+   "reference_answer": "Autocompletion and static type checking, which depend on the static imports matching the lazy definitions, would no longer be guaranteed and could drift silently.",
+   "evidence": [
+    "utils/check_static_imports.py:105-134",
+    ".github/workflows/python-quality.yml:42-57"
+   ]
+  },
+  {
+   "unit_id": "codegen-quality-ci",
+   "level": 3,
+   "question": "If generated artifacts were maintained manually rather than checked in CI, what first contributor-facing workflow would lose its safety net?",
+   "variants": [
+    "Without CI enforcement of generated files, what contributor step would no longer be caught when forgotten?",
+    "If CI stopped verifying generated artifacts, which contributor mistake would first go undetected?"
+   ],
+   "reference_answer": "Contributors who change a source file (such as the sync client) and forget to regenerate dependent files would no longer be caught by CI, so artifacts would drift out of sync.",
+   "evidence": [
+    "utils/generate_async_inference_client.py:98-105",
+    ".github/workflows/python-quality.yml:42-57"
+   ]
+  },
+  {
+   "unit_id": "mcp-agent",
+   "level": 1,
+   "question": "If the part that connects a Hub-served language model to external tool servers were removed, what would a user building an agent notice first?",
+   "variants": [
+    "What capability would a user of the agent feature lose first if the tool-server connection layer disappeared?",
+    "If the layer linking the chat model to tool servers stopped working, what would an agent user see first?"
+   ],
+   "reference_answer": "The model could no longer discover or call tools hosted on tool servers, so the agent could only chat and not take tool actions.",
+   "evidence": [
+    "src/huggingface_hub/inference/_mcp/mcp_client.py:199-250"
+   ],
+   "orientation": {
+    "purpose": "Lets an LLM served through InferenceClient call tools on MCP servers. It includes a small agent loop and a CLI.",
+    "decision": "The agent is built on the async InferenceClient and the optional mcp package. External agent frameworks were not used. The stated aim is parity with Tiny Agents in JS.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_mcp",
+      "what": "MCPClient, agent loop and CLI"
+     }
+    ],
+    "shaped_by": "célina wrote it in May 2025 [human]."
+   }
+  },
+  {
+   "unit_id": "mcp-agent",
+   "level": 1,
+   "question": "Why does the tool-connection client wrap an asynchronous inference client rather than a synchronous one, given that it must talk to tool servers?",
+   "variants": [
+    "What consequence of talking to tool servers explains why the agent's inference client is asynchronous?",
+    "Why must the inference client used by the tool-calling agent be async?"
+   ],
+   "reference_answer": "Tool-server sessions are asynchronous and long-lived and must be managed alongside model calls in one event loop, so the model client must be async too.",
+   "evidence": [
+    "src/huggingface_hub/inference/_mcp/mcp_client.py:75-112"
+   ],
+   "orientation": {
+    "purpose": "Lets an LLM served through InferenceClient call tools on MCP servers. It includes a small agent loop and a CLI.",
+    "decision": "The agent is built on the async InferenceClient and the optional mcp package. External agent frameworks were not used. The stated aim is parity with Tiny Agents in JS.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_mcp",
+      "what": "MCPClient, agent loop and CLI"
+     }
+    ],
+    "shaped_by": "célina wrote it in May 2025 [human]."
+   }
+  },
+  {
+   "unit_id": "mcp-agent",
+   "level": 1,
+   "question": "What consequence follows for the command-line agent from the first Ctrl+C only interrupting the current run instead of quitting?",
+   "variants": [
+    "What does a user get from the first Ctrl+C aborting only the current generation in the agent CLI?",
+    "Why does the agent command-line tool treat the first interrupt differently from the second?"
+   ],
+   "reference_answer": "The user can cancel a running turn without losing the session and its tool connections; only a second interrupt exits.",
+   "evidence": [
+    "src/huggingface_hub/inference/_mcp/cli.py:40-56"
+   ],
+   "orientation": {
+    "purpose": "Lets an LLM served through InferenceClient call tools on MCP servers. It includes a small agent loop and a CLI.",
+    "decision": "The agent is built on the async InferenceClient and the optional mcp package. External agent frameworks were not used. The stated aim is parity with Tiny Agents in JS.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/inference/_mcp",
+      "what": "MCPClient, agent loop and CLI"
+     }
+    ],
+    "shaped_by": "célina wrote it in May 2025 [human]."
+   }
+  },
+  {
+   "unit_id": "mcp-agent",
+   "level": 2,
+   "question": "The Python agent for connecting a model to tool servers was built directly on the library's own async inference client, with the tool-protocol package as an optional extra, rather than on an external agent framework. What constraint made that the better choice?",
+   "variants": [
+    "Why was the Python tool-using agent built on the library's own async inference client plus an optional tool-protocol dependency instead of adopting an existing agent framework?",
+    "What constraint favoured building the tool-server agent on the library's own async client with an optional extra, rather than depending on a third-party agent framework?"
+   ],
+   "reference_answer": "The goal was a small Python counterpart to the JS Tiny Agents, reusing the library's existing inference client and providers. An external framework would add heavy dependencies and a different abstraction, and making the protocol package optional keeps the base install light.",
+   "evidence": [
+    "src/huggingface_hub/inference/_mcp/mcp_client.py:75-112",
+    "src/huggingface_hub/inference/_mcp/agent.py:37-55"
+   ]
+  },
+  {
+   "unit_id": "mcp-agent",
+   "level": 2,
+   "question": "When several tool servers are attached to one agent, each tool name is mapped to a single server and duplicates are skipped instead of being namespaced or overwritten. What constraint made that the better choice?",
+   "variants": [
+    "Why does the agent keep the first server's tool when two servers expose the same tool name, rather than prefixing names or letting the later one replace it?",
+    "What constraint led to skipping duplicate tool names across servers instead of namespacing them?"
+   ],
+   "reference_answer": "The model calls tools by name only, so each name must resolve to exactly one server session. Skipping later duplicates with a warning keeps routing unambiguous without changing the tool names the model sees.",
+   "evidence": [
+    "src/huggingface_hub/inference/_mcp/mcp_client.py:230-250"
+   ]
+  },
+  {
+   "unit_id": "mcp-agent",
+   "level": 3,
+   "question": "If the tool-using agent were built on top of an external agent framework instead of directly on the library's own async chat-completion client, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If the agent relied on a third-party agent framework rather than the library's own async inference client, which part of the system would first need rework?",
+    "Suppose the MCP agent delegated its chat loop to an external agent framework instead of the async inference client. What is the first other component that would have to change?"
+   ],
+   "reference_answer": "The part that manages connections to tool servers and sends chat requests (the MCP client wrapping the async inference client) would have to be reworked, since it owns the inference client, its lifecycle and the tool-call loop that the framework would now replace.",
+   "evidence": [
+    "src/huggingface_hub/inference/_mcp/mcp_client.py:75-112",
+    "src/huggingface_hub/inference/_mcp/agent.py:37-55"
+   ]
+  },
+  {
+   "unit_id": "mcp-agent",
+   "level": 3,
+   "question": "If the agent had to run on the synchronous inference client instead of the async one, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If the async chat client underneath the agent were swapped for a blocking one, which neighbouring part would first need to change?",
+    "What would be the first other component to need rewriting if the MCP agent no longer used an async inference client?"
+   ],
+   "reference_answer": "The tool-server connection handling would have to change first, because MCP sessions and their lifecycle are async context-managed resources that share the same event loop and cleanup stack as the async client.",
+   "evidence": [
+    "src/huggingface_hub/inference/_mcp/mcp_client.py:75-112",
+    "src/huggingface_hub/inference/_mcp/mcp_client.py:199-250"
+   ]
+  },
+  {
+   "unit_id": "mcp-agent",
+   "level": 3,
+   "question": "If the command-line front end for the agent were removed and the agent were used only as a library, which behaviour that it currently supplies would the rest of the system lose?",
+   "variants": [
+    "Without the terminal front end for the agent, what interactive behaviour would no longer exist anywhere in the system?",
+    "If only library use of the agent were supported, what does the command-line layer provide that would disappear?"
+   ],
+   "reference_answer": "The interactive handling of user interruption: the first Ctrl+C aborts the current generation and a second quits. The agent core itself has no such signal handling, so library users would have to supply it themselves.",
+   "evidence": [
+    "src/huggingface_hub/inference/_mcp/cli.py:33-65"
+   ]
+  },
+  {
+   "unit_id": "sandbox",
+   "level": 1,
+   "question": "What would a user be exposed to if the local cache of pooled sandbox handles could be reused by any credential or namespace?",
+   "variants": [
+    "What risk arises if one namespace's cached sandbox hosts could be served to another credential?",
+    "Why must the pooled-sandbox cache not be shared across credentials or namespaces?"
+   ],
+   "reference_answer": "They could be handed hosts belonging to another namespace or principal, a confidentiality problem, since cached entries are used to rebuild connections that send credentials.",
+   "evidence": [
+    "src/huggingface_hub/_sandbox_cache.py:74-109"
+   ],
+   "orientation": {
+    "purpose": "A client for creating and talking to Hub sandboxes, with a local cache of pooled sandbox handles. Jobs API types live alongside.",
+    "decision": "The pool cache is bound to the context that wrote it, so another context cannot reuse it. Sandbox is a library module with a CLI wrapper on top. No caching and remote-only handles were not chosen. The history shows this was a fix, and other reasons are unclear.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/_sandbox.py",
+      "what": "sandbox client"
+     },
+     {
+      "path": "src/huggingface_hub/_sandbox_cache.py",
+      "what": "pooled cache"
+     },
+     {
+      "path": "src/huggingface_hub/_jobs_api.py",
+      "what": "jobs API types"
+     }
+    ],
+    "shaped_by": "Lucain made the cache-binding fix in Sept 2026 [assisted] with Claude Code."
+   }
+  },
+  {
+   "unit_id": "sandbox",
+   "level": 1,
+   "question": "What would a user notice first if the local pooled-sandbox cache were unusable, such as a corrupt file?",
+   "variants": [
+    "What is the visible effect of a broken local sandbox pool cache on connecting?",
+    "If the pool cache file is unreadable, what happens from the user's perspective?"
+   ],
+   "reference_answer": "Nothing breaks; it is treated as a miss and the client falls back to the slower cold discovery path, costing only latency.",
+   "evidence": [
+    "src/huggingface_hub/_sandbox_cache.py:166-190"
+   ],
+   "orientation": {
+    "purpose": "A client for creating and talking to Hub sandboxes, with a local cache of pooled sandbox handles. Jobs API types live alongside.",
+    "decision": "The pool cache is bound to the context that wrote it, so another context cannot reuse it. Sandbox is a library module with a CLI wrapper on top. No caching and remote-only handles were not chosen. The history shows this was a fix, and other reasons are unclear.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/_sandbox.py",
+      "what": "sandbox client"
+     },
+     {
+      "path": "src/huggingface_hub/_sandbox_cache.py",
+      "what": "pooled cache"
+     },
+     {
+      "path": "src/huggingface_hub/_jobs_api.py",
+      "what": "jobs API types"
+     }
+    ],
+    "shaped_by": "Lucain made the cache-binding fix in Sept 2026 [assisted] with Claude Code."
+   }
+  },
+  {
+   "unit_id": "sandbox",
+   "level": 1,
+   "question": "Why does the cache identify the caller's credential by a locally computed fingerprint rather than resolving it to a user id?",
+   "variants": [
+    "What benefit comes from fingerprinting the token locally instead of asking the Hub who the user is?",
+    "Why is the credential identity in the cache computed without a network call?"
+   ],
+   "reference_answer": "Resolving to a user id would need a network round-trip, defeating the cache's purpose of zero-round-trip hits.",
+   "evidence": [
+    "src/huggingface_hub/_sandbox_cache.py:92-104"
+   ],
+   "orientation": {
+    "purpose": "A client for creating and talking to Hub sandboxes, with a local cache of pooled sandbox handles. Jobs API types live alongside.",
+    "decision": "The pool cache is bound to the context that wrote it, so another context cannot reuse it. Sandbox is a library module with a CLI wrapper on top. No caching and remote-only handles were not chosen. The history shows this was a fix, and other reasons are unclear.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/_sandbox.py",
+      "what": "sandbox client"
+     },
+     {
+      "path": "src/huggingface_hub/_sandbox_cache.py",
+      "what": "pooled cache"
+     },
+     {
+      "path": "src/huggingface_hub/_jobs_api.py",
+      "what": "jobs API types"
+     }
+    ],
+    "shaped_by": "Lucain made the cache-binding fix in Sept 2026 [assisted] with Claude Code."
+   }
+  },
+  {
+   "unit_id": "sandbox",
+   "level": 2,
+   "question": "The sandbox pool cache is bound to the endpoint, credential and namespace that wrote it, instead of being a single cache keyed only by pool name. What constraint made that the better choice?",
+   "variants": [
+    "Why is each cached sandbox pool entry tied to the endpoint, credential and namespace that created it rather than just the pool name?",
+    "What constraint led to scoping the sandbox pool cache by the writer's endpoint, credential and namespace instead of using one shared cache per pool name?"
+   ],
+   "reference_answer": "Cached entries are used to rebuild host connections that send credentials, so serving one from another namespace or credential would leak access to someone else's hosts. Binding the cache to its writer turns any foreign entry into a harmless cache miss.",
+   "evidence": [
+    "src/huggingface_hub/_sandbox_cache.py:74-109",
+    "src/huggingface_hub/_sandbox_cache.py:304-323",
+    "src/huggingface_hub/_sandbox.py:1526-1543"
+   ]
+  },
+  {
+   "unit_id": "sandbox",
+   "level": 2,
+   "question": "The credential in the sandbox cache context is identified by a locally computed digest of the token instead of by resolving it to a user id through the Hub. What constraint made that the better choice?",
+   "variants": [
+    "Why does the sandbox cache identify the caller by a local fingerprint of the token rather than looking up the user's identity from the Hub?",
+    "What constraint favoured a locally derived token digest over a remote identity lookup for naming the credential in the sandbox cache?"
+   ],
+   "reference_answer": "A cache hit must cost zero network round-trips, and a remote identity lookup would defeat the purpose of the cache. A local digest also avoids storing the raw token, and a rotated token simply becomes a miss.",
+   "evidence": [
+    "src/huggingface_hub/_sandbox_cache.py:92-104"
+   ]
+  },
+  {
+   "unit_id": "sandbox",
+   "level": 3,
+   "question": "If the local pool cache were keyed only by pool name rather than bound to the endpoint, credential and namespace that wrote it, what else in the system would have to change to stay safe?",
+   "variants": [
+    "If cache entries ignored which credential and namespace wrote them, what other part would need to compensate?",
+    "What would have to change elsewhere if the sandbox cache were looked up by pool name alone?"
+   ],
+   "reference_answer": "Reconnecting to a pool would have to verify ownership (e.g. via a remote lookup) before trusting cached hosts, because otherwise it could be served hosts from another namespace or credential and send them the user's tokens. That would remove the zero-round-trip fast path.",
+   "evidence": [
+    "src/huggingface_hub/_sandbox_cache.py:74-109",
+    "src/huggingface_hub/_sandbox.py:1526-1543"
+   ]
+  },
+  {
+   "unit_id": "sandbox",
+   "level": 3,
+   "question": "If the pool cache stored the user id obtained by resolving the credential instead of a local fingerprint of the token, what cost would the reconnect path acquire?",
+   "variants": [
+    "What would reconnecting cost if the cache identity came from asking the Hub who the user is rather than a local digest?",
+    "If the cache's credential identity required a network lookup, what would change on the fast reconnect path?"
+   ],
+   "reference_answer": "Every cache lookup would need a network round trip to identify the user, which defeats the purpose of the cache since a hit currently costs zero round trips.",
+   "evidence": [
+    "src/huggingface_hub/_sandbox_cache.py:92-104"
+   ]
+  },
+  {
+   "unit_id": "sandbox",
+   "level": 3,
+   "question": "If a corrupt or mismatched cache file were treated as a hard error rather than a cache miss, which part of the system's behaviour would first be affected?",
+   "variants": [
+    "If bad cache files raised errors instead of being ignored, what part of sandbox usage would break first?",
+    "What caller-facing flow would be hurt first if unreadable cache entries were fatal rather than a miss?"
+   ],
+   "reference_answer": "Reconnecting to a pool and the following creation of sandboxes would fail on bad cache, instead of falling back to the cold discovery path, which always works. A bad cache would then cost errors rather than just latency.",
+   "evidence": [
+    "src/huggingface_hub/_sandbox_cache.py:166-190",
+    "src/huggingface_hub/_sandbox.py:1526-1543"
+   ]
+  },
+  {
+   "unit_id": "webhooks",
+   "level": 1,
+   "question": "What would a user running the webhook receiver without a secret notice about who can trigger their handlers?",
+   "variants": [
+    "If no shared secret is configured on the webhook server, who can call the handlers?",
+    "What protection is absent from webhook endpoints when the user sets no secret?"
+   ],
+   "reference_answer": "Handlers are not protected by a secret check, so any caller reaching the endpoint can trigger them; the server warns about the empty secret.",
+   "evidence": [
+    "src/huggingface_hub/_webhooks_server.py:99-108",
+    "src/huggingface_hub/_webhooks_server.py:166-173"
+   ],
+   "orientation": {
+    "purpose": "Lets a user run a small local server to receive Hub webhook events. It provides typed payload definitions for them.",
+    "decision": "An optional server built on Gradio and FastAPI, with pydantic payload models. Documenting raw HTTP only was not chosen. The reason given is easy webhook handling in Spaces.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/_webhooks_server.py",
+      "what": "webhook server"
+     },
+     {
+      "path": "src/huggingface_hub/_webhooks_payload.py",
+      "what": "payload models"
+     }
+    ],
+    "shaped_by": "Lucain wrote it in April 2023 [human]."
+   }
+  },
+  {
+   "unit_id": "webhooks",
+   "level": 1,
+   "question": "What does a Space author get from the webhook server being built on top of a Gradio app?",
+   "variants": [
+    "Why does running the webhook receiver on a Gradio app suit Spaces?",
+    "What practical benefit does reusing Gradio as the host give to webhook receivers?"
+   ],
+   "reference_answer": "The Gradio app provides the web server and a UI page, so the webhook routes can be served on a Space with little setup.",
+   "evidence": [
+    "src/huggingface_hub/_webhooks_server.py:153-173"
+   ],
+   "orientation": {
+    "purpose": "Lets a user run a small local server to receive Hub webhook events. It provides typed payload definitions for them.",
+    "decision": "An optional server built on Gradio and FastAPI, with pydantic payload models. Documenting raw HTTP only was not chosen. The reason given is easy webhook handling in Spaces.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/_webhooks_server.py",
+      "what": "webhook server"
+     },
+     {
+      "path": "src/huggingface_hub/_webhooks_payload.py",
+      "what": "payload models"
+     }
+    ],
+    "shaped_by": "Lucain wrote it in April 2023 [human]."
+   }
+  },
+  {
+   "unit_id": "webhooks",
+   "level": 1,
+   "question": "What does a user see when a Hub event arrives at a secret-protected webhook route without the secret header?",
+   "variants": [
+    "What response does a secret-protected webhook route give to a request missing the secret?",
+    "How does the receiver respond to an unauthenticated webhook call when a secret is set?"
+   ],
+   "reference_answer": "The request is rejected with a 401 unauthorized error and the handler is not run; a wrong secret gets 403.",
+   "evidence": [
+    "src/huggingface_hub/_webhooks_server.py:333-378"
+   ],
+   "orientation": {
+    "purpose": "Lets a user run a small local server to receive Hub webhook events. It provides typed payload definitions for them.",
+    "decision": "An optional server built on Gradio and FastAPI, with pydantic payload models. Documenting raw HTTP only was not chosen. The reason given is easy webhook handling in Spaces.",
+    "where": [
+     {
+      "path": "src/huggingface_hub/_webhooks_server.py",
+      "what": "webhook server"
+     },
+     {
+      "path": "src/huggingface_hub/_webhooks_payload.py",
+      "what": "payload models"
+     }
+    ],
+    "shaped_by": "Lucain wrote it in April 2023 [human]."
+   }
+  },
+  {
+   "unit_id": "webhooks",
+   "level": 2,
+   "question": "The webhook receiver was built as an optional server on top of a UI framework and web framework, with typed payload models, rather than only documenting the raw HTTP format. What constraint made that the better choice?",
+   "variants": [
+    "Why ship an optional webhook server with typed payloads instead of just documenting the raw HTTP requests users would need to handle?",
+    "What constraint favoured providing a ready-made webhook server built on existing UI and web frameworks over leaving users to implement raw HTTP handling?"
+   ],
+   "reference_answer": "Users, especially in Spaces, need to receive webhooks locally with little setup. Building on the existing Gradio/FastAPI stack gives a ready server, and the extras stay optional so the base install is unaffected.",
+   "evidence": [
+    "src/huggingface_hub/_webhooks_server.py:99-173"
+   ]
+  },
+  {
+   "unit_id": "webhooks",
+   "level": 2,
+   "question": "The webhook secret check is added by wrapping each handler instead of using a web-framework middleware. What constraint made that the better choice?",
+   "variants": [
+    "Why is the webhook secret verified by wrapping each registered handler rather than through a middleware?",
+    "What constraint ruled out middleware for the webhook secret check?"
+   ],
+   "reference_answer": "The web app is started by the UI framework's internals, and the web framework does not allow adding middleware after the app has started. So the check has to be attached per route.",
+   "evidence": [
+    "src/huggingface_hub/_webhooks_server.py:333-378",
+    "src/huggingface_hub/_webhooks_server.py:153-173"
+   ]
+  },
+  {
+   "unit_id": "webhooks",
+   "level": 3,
+   "question": "If the webhook receiver were replaced by documentation of raw HTTP only, what part of the system that users currently get for free would they have to write themselves?",
+   "variants": [
+    "Without a bundled webhook server, what would users have to implement themselves that is currently provided?",
+    "If only raw HTTP docs were offered for webhooks, what built-in handling would disappear?"
+   ],
+   "reference_answer": "Users would have to build their own web server, route registration, shared-secret verification and parsing of the incoming event into typed objects, instead of just decorating a function.",
+   "evidence": [
+    "src/huggingface_hub/_webhooks_server.py:99-173",
+    "src/huggingface_hub/_webhooks_server.py:333-378"
+   ]
+  },
+  {
+   "unit_id": "webhooks",
+   "level": 3,
+   "question": "If the webhook server owned and started its own web app instead of piggybacking on the Gradio app, what is the first other part of the system that would change?",
+   "variants": [
+    "If the webhook server no longer relied on Gradio to start the underlying web app, which part would first need rewriting?",
+    "What would first have to change in secret checking if the web app were no longer launched by Gradio?"
+   ],
+   "reference_answer": "The secret-checking mechanism could become a normal middleware instead of a wrapper that rewrites each route's signature, because that workaround exists only since Gradio starts the app and middleware can't be added afterwards.",
+   "evidence": [
+    "src/huggingface_hub/_webhooks_server.py:333-348",
+    "src/huggingface_hub/_webhooks_server.py:153-173"
+   ]
+  },
+  {
+   "unit_id": "webhooks",
+   "level": 3,
+   "question": "If the server required users to call launch explicitly instead of also supporting automatic launch at interpreter exit, what part of the simple decorator-based usage would be lost?",
+   "variants": [
+    "Without the exit-time automatic launch, what convenience of the decorator-only style would disappear?",
+    "If automatic launching were dropped, what would decorator-only scripts no longer be able to do?"
+   ],
+   "reference_answer": "Scripts that only decorate functions with the global endpoint decorator would no longer start serving by themselves; users would need to create an app and call launch themselves.",
+   "evidence": [
+    "src/huggingface_hub/_webhooks_server.py:275-296"
+   ]
+  }
+ ]
+}
