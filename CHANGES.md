@@ -154,3 +154,5 @@
 2026-11-15 [note] mlflow at the pin: all 12 file-less units now get 4 source files (Python and TypeScript agree); samples need no reload.
 
 2026-11-15 [doc] DEPLOY.md: Plabs steps 1, 2 and 7 marked done (migrations, SHARED_TABLES, the three sample loads in production); step 8 waits on the owner's yes to Plabs; owner steps still open.
+
+2026-11-15 [code] .udebt/map.json refreshed (12 units, 7 sub-units, 98% of clustered source; covers web/, udebt/hosted/, supabase/) so this repository can be the fourth hosted sample at this pin.
