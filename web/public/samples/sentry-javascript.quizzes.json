@@ -1,0 +1,2562 @@
+{
+ "format": "udebt-advance-quizzes",
+ "version": 1,
+ "repo": "https://github.com/getsentry/sentry-javascript",
+ "name": "sentry-javascript",
+ "sha": "6bee2f2ccccdac123199d1b610c70a3bad5c8194",
+ "generated_at": "2026-11-15T12:48:44+00:00",
+ "levels": [
+  1,
+  2,
+  3
+ ],
+ "per": 3,
+ "calls": 9,
+ "questions": [
+  {
+   "unit_id": "core-sdk",
+   "level": 1,
+   "question": "If the shared foundation package that all platform SDKs build on stopped working, what would a user of any platform SDK notice first?",
+   "variants": [
+    "What would break first for users of every platform SDK if the common foundation package they all wrap stopped functioning?",
+    "When the shared package underlying all platform SDKs fails, what is the first symptom a user would see?"
+   ],
+   "reference_answer": "Nothing could be captured or sent: errors and other events would no longer be turned into envelopes and delivered through a transport, for every platform at once, since all platform SDKs only wrap this shared code.",
+   "evidence": [
+    "packages/core/src/client.ts:252-274",
+    "packages/core/src/utils/prepareEvent.ts:74-109"
+   ],
+   "orientation": {
+    "purpose": "The shared foundation every platform SDK builds on. It holds the client, scopes, integrations, and the steps that turn an event into an envelope and send it through a transport.",
+    "decision": "One core package holds a hub-less scope/client model, event preparation, and the envelope and transport base. Platform SDKs only wrap it. Per-platform cores and a hub-based model were not chosen, to share behaviour across browser, server and edge. Utilities were later folded into core when utils-hoist was removed.",
+    "where": [
+     {
+      "path": "packages/core/src/client.ts",
+      "what": "base Client class"
+     },
+     {
+      "path": "packages/core/src/scope.ts",
+      "what": "scope data model"
+     },
+     {
+      "path": "packages/core/src/utils/prepareEvent.ts",
+      "what": "event preparation pipeline"
+     }
+    ],
+    "shaped_by": "Humans alone: Abhijeet Prasad introduced the transports API in 2022, and Francesco Gringl-Novy removed utils-hoist in 2025 [human]."
+   }
+  },
+  {
+   "unit_id": "core-sdk",
+   "level": 1,
+   "question": "Why does the event-preparation step have to run before the event is handed on to be sent, rather than after?",
+   "variants": [
+    "Why must the step that enriches a captured event with scope data run before the event is dispatched to the transport?",
+    "What would be missing from outgoing events if event preparation ran only after sending?"
+   ],
+   "reference_answer": "Preparation merges scope data (tags, user, breadcrumbs, active span) into the event and runs event processors, so the event must be completed before it is sent. Otherwise the sent event would lack that context.",
+   "evidence": [
+    "packages/core/src/utils/prepareEvent.ts:74-109",
+    "packages/core/src/client.ts:1469-1503"
+   ],
+   "orientation": {
+    "purpose": "The shared foundation every platform SDK builds on. It holds the client, scopes, integrations, and the steps that turn an event into an envelope and send it through a transport.",
+    "decision": "One core package holds a hub-less scope/client model, event preparation, and the envelope and transport base. Platform SDKs only wrap it. Per-platform cores and a hub-based model were not chosen, to share behaviour across browser, server and edge. Utilities were later folded into core when utils-hoist was removed.",
+    "where": [
+     {
+      "path": "packages/core/src/client.ts",
+      "what": "base Client class"
+     },
+     {
+      "path": "packages/core/src/scope.ts",
+      "what": "scope data model"
+     },
+     {
+      "path": "packages/core/src/utils/prepareEvent.ts",
+      "what": "event preparation pipeline"
+     }
+    ],
+    "shaped_by": "Humans alone: Abhijeet Prasad introduced the transports API in 2022, and Francesco Gringl-Novy removed utils-hoist in 2025 [human]."
+   }
+  },
+  {
+   "unit_id": "core-sdk",
+   "level": 1,
+   "question": "What consequence does having one shared core for the client and scope model have for a bug in how events are sampled or processed?",
+   "variants": [
+    "Because all platform SDKs wrap one shared core, what follows when a bug is fixed in its event-processing logic?",
+    "What is the effect on the browser, server and edge SDKs of fixing event-processing behaviour in the shared core?"
+   ],
+   "reference_answer": "A fix in the shared core applies to browser, server, edge and framework SDKs at once, because they all reuse that behaviour instead of keeping their own copies.",
+   "evidence": [
+    "packages/core/src/client.ts:1469-1503",
+    "packages/core/src/scope.ts:674-693"
+   ],
+   "orientation": {
+    "purpose": "The shared foundation every platform SDK builds on. It holds the client, scopes, integrations, and the steps that turn an event into an envelope and send it through a transport.",
+    "decision": "One core package holds a hub-less scope/client model, event preparation, and the envelope and transport base. Platform SDKs only wrap it. Per-platform cores and a hub-based model were not chosen, to share behaviour across browser, server and edge. Utilities were later folded into core when utils-hoist was removed.",
+    "where": [
+     {
+      "path": "packages/core/src/client.ts",
+      "what": "base Client class"
+     },
+     {
+      "path": "packages/core/src/scope.ts",
+      "what": "scope data model"
+     },
+     {
+      "path": "packages/core/src/utils/prepareEvent.ts",
+      "what": "event preparation pipeline"
+     }
+    ],
+    "shaped_by": "Humans alone: Abhijeet Prasad introduced the transports API in 2022, and Francesco Gringl-Novy removed utils-hoist in 2025 [human]."
+   }
+  },
+  {
+   "unit_id": "core-sdk",
+   "level": 2,
+   "question": "Client, scope, event preparation, envelope building and the transport base live in one shared package that every platform SDK wraps, rather than each platform keeping its own copy. What constraint made sharing the better choice?",
+   "variants": [
+    "Why does Sentry keep the client, scope and event pipeline in one platform-agnostic package instead of duplicating that logic in each platform SDK?",
+    "What constraint favoured one shared core that browser, server, edge and framework SDKs wrap over separate per-platform cores?"
+   ],
+   "reference_answer": "Capture, enrichment, sampling and envelope behaviour must be identical across browser, server, edge and framework SDKs. A single shared core means a fix or feature is made once instead of being re-implemented and drifting apart in several copies.",
+   "evidence": [
+    "packages/core/src/client.ts:252-274",
+    "packages/browser/src/sdk.ts:1-30"
+   ]
+  },
+  {
+   "unit_id": "core-sdk",
+   "level": 2,
+   "question": "Scopes hold their client reference and are merged (global-isolation plus current) when an event is prepared, instead of routing everything through a central hub object. What constraint made that the better choice?",
+   "variants": [
+    "Why does the SDK let a scope forward captures straight to its client and combine two scopes at event time, rather than using a hub that owns the client and scope stack?",
+    "What problem with a hub-based model led to scopes carrying the client themselves and being merged during event preparation?"
+   ],
+   "reference_answer": "A hub was an extra indirection layer that made context handling confusing and hard to make async-safe. With the client on the scope and an isolation scope combined with the current scope at event time, context is isolated per request or operation without a separate hub.",
+   "evidence": [
+    "packages/core/src/scope.ts:674-693",
+    "packages/core/src/utils/prepareEvent.ts:74-109"
+   ]
+  },
+  {
+   "unit_id": "core-sdk",
+   "level": 2,
+   "question": "The shared core builds envelopes and defines the transport base, but each platform supplies the component that actually sends bytes over the network. What constraint made that split the better choice?",
+   "variants": [
+    "Why does the core own envelope construction while platform SDKs plug in their own network sender?",
+    "Why isn't a single network-sending implementation baked into the shared core?"
+   ],
+   "reference_answer": "The envelope format and delivery logic (queueing, rate limits) are the same everywhere, but available network APIs differ per runtime (e.g. fetch in browsers versus Node's HTTP). The pluggable sender lets each platform use what it has, and users can substitute their own.",
+   "evidence": [
+    "packages/browser/src/sdk.ts:119-131",
+    "packages/core/src/envelope.ts"
+   ]
+  },
+  {
+   "unit_id": "core-sdk",
+   "level": 3,
+   "question": "If the shared core package were replaced by separate duplicated cores in each platform SDK, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If each platform SDK carried its own copy of the core logic instead of sharing one package, which part of the system would first need to change?",
+    "What is the first thing elsewhere in the system that would have to change if browser, server and framework SDKs each had their own duplicated core rather than a shared one?"
+   ],
+   "reference_answer": "The platform SDKs and framework packages that currently just wrap the shared core would each need to carry their own client, scope, event preparation and transport logic, and integrations written against the shared client interface would have to be duplicated or adapted per platform.",
+   "evidence": [
+    "packages/core/src/client.ts",
+    "packages/core/src/integration.ts",
+    "packages/browser/src/sdk.ts"
+   ]
+  },
+  {
+   "unit_id": "core-sdk",
+   "level": 3,
+   "question": "If the scope model that is not tied to a hub were replaced by a hub-based model, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If scopes were obtained through a hub object rather than directly, which other part of the system would first have to change?",
+    "What would be the first other part to change if the hub-less scope and client model were swapped back for a hub-based one?"
+   ],
+   "reference_answer": "The code that captures events and applies scope data, such as the capture entry points and event preparation, would have to change to fetch the client and scope via a hub. Likewise the tracing code that reads the current scope and client would have to change.",
+   "evidence": [
+    "packages/core/src/scope.ts:674-693",
+    "packages/core/src/utils/prepareEvent.ts:74-109",
+    "packages/core/src/tracing/trace.ts:54-95"
+   ]
+  },
+  {
+   "unit_id": "core-sdk",
+   "level": 3,
+   "question": "If the shared utilities had stayed in a separate hoisted package instead of being folded into the core package, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If general-purpose helpers were kept in their own package rather than merged into core, which part of the system would first need to change?",
+    "What would first need to change elsewhere if the helper utilities were not folded into the core package?"
+   ],
+   "reference_answer": "The core package's own internals and the platform SDKs that import those helpers from core would need to import them from the separate package instead. That would add a package dependency and a build step to every SDK.",
+   "evidence": [
+    "packages/core/src/index.ts",
+    "packages/browser/src/sdk.ts:1-12"
+   ]
+  },
+  {
+   "unit_id": "tracing-core",
+   "level": 1,
+   "question": "If the part of core that creates spans stopped working, what would a user notice first about their performance data?",
+   "variants": [
+    "What would a user first notice missing if span creation in the shared core broke?",
+    "When the tracing model in core fails, what is the first visible loss for users?"
+   ],
+   "reference_answer": "No traces or spans would be produced, so performance data and trace propagation to downstream services would disappear, while error capturing would still work.",
+   "evidence": [
+    "packages/core/src/tracing/trace.ts:54-95",
+    "packages/core/src/tracing/trace.ts:331-384"
+   ],
+   "orientation": {
+    "purpose": "Creates and manages spans and traces inside core. It covers sampling, idle spans, the dynamic sampling context, span streaming and trace propagation.",
+    "decision": "Spans are implemented natively in core, with an async-context strategy that OpenTelemetry can override, plus a newer streamed-span mode. OpenTelemetry-only and transaction-only models were not used. The browser needs lightweight tracing, and servers get OTel through the strategy hook.",
+    "where": [
+     {
+      "path": "packages/core/src/tracing",
+      "what": "span classes, sampling, trace.ts"
+     },
+     {
+      "path": "packages/core/src/asyncContext",
+      "what": "overridable async-context strategy"
+     },
+     {
+      "path": "packages/core/src/utils/spanUtils.ts",
+      "what": "span helpers"
+     }
+    ],
+    "shaped_by": "Recent history is test ports to span streaming by Martin Sonnberger and Nicolas Hrubec, assisted by OpenAI Codex, and Sonnberger's Svelte E2E port, assisted by Claude Code [assisted], in late 2026."
+   }
+  },
+  {
+   "unit_id": "tracing-core",
+   "level": 1,
+   "question": "Why must the sampling decision for a new top-level span be made when the span is created, rather than when it ends?",
+   "variants": [
+    "Why does the tracing model decide whether a trace is sampled at the time the root span starts?",
+    "What is the consequence of deciding sampling at span start for the rest of the trace?"
+   ],
+   "reference_answer": "The decision is needed up front so child spans and outgoing requests inherit it and downstream services stay consistent; unsampled traces can also be dropped cheaply and recorded as dropped outcomes.",
+   "evidence": [
+    "packages/core/src/tracing/trace.ts:480-547"
+   ],
+   "orientation": {
+    "purpose": "Creates and manages spans and traces inside core. It covers sampling, idle spans, the dynamic sampling context, span streaming and trace propagation.",
+    "decision": "Spans are implemented natively in core, with an async-context strategy that OpenTelemetry can override, plus a newer streamed-span mode. OpenTelemetry-only and transaction-only models were not used. The browser needs lightweight tracing, and servers get OTel through the strategy hook.",
+    "where": [
+     {
+      "path": "packages/core/src/tracing",
+      "what": "span classes, sampling, trace.ts"
+     },
+     {
+      "path": "packages/core/src/asyncContext",
+      "what": "overridable async-context strategy"
+     },
+     {
+      "path": "packages/core/src/utils/spanUtils.ts",
+      "what": "span helpers"
+     }
+    ],
+    "shaped_by": "Recent history is test ports to span streaming by Martin Sonnberger and Nicolas Hrubec, assisted by OpenAI Codex, and Sonnberger's Svelte E2E port, assisted by Claude Code [assisted], in late 2026."
+   }
+  },
+  {
+   "unit_id": "tracing-core",
+   "level": 1,
+   "question": "What is the point of the overridable async-context strategy for a server running OpenTelemetry?",
+   "variants": [
+    "Why does core let the way the active span is tracked across async calls be overridden?",
+    "What does the replaceable async-context mechanism let OpenTelemetry do in the span model?"
+   ],
+   "reference_answer": "It lets OpenTelemetry supply its own context tracking, so core's span and scope APIs follow OTel's active context on servers while the browser keeps the lightweight native behaviour.",
+   "evidence": [
+    "packages/core/src/tracing/trace.ts:54-95",
+    "packages/core/src/tracing/trace.ts:331-340"
+   ],
+   "orientation": {
+    "purpose": "Creates and manages spans and traces inside core. It covers sampling, idle spans, the dynamic sampling context, span streaming and trace propagation.",
+    "decision": "Spans are implemented natively in core, with an async-context strategy that OpenTelemetry can override, plus a newer streamed-span mode. OpenTelemetry-only and transaction-only models were not used. The browser needs lightweight tracing, and servers get OTel through the strategy hook.",
+    "where": [
+     {
+      "path": "packages/core/src/tracing",
+      "what": "span classes, sampling, trace.ts"
+     },
+     {
+      "path": "packages/core/src/asyncContext",
+      "what": "overridable async-context strategy"
+     },
+     {
+      "path": "packages/core/src/utils/spanUtils.ts",
+      "what": "span helpers"
+     }
+    ],
+    "shaped_by": "Recent history is test ports to span streaming by Martin Sonnberger and Nicolas Hrubec, assisted by OpenAI Codex, and Sonnberger's Svelte E2E port, assisted by Claude Code [assisted], in late 2026."
+   }
+  },
+  {
+   "unit_id": "tracing-core",
+   "level": 2,
+   "question": "Spans are implemented natively in the core rather than relying solely on OpenTelemetry for tracing. What constraint made that the better choice?",
+   "variants": [
+    "Why does the core ship its own span implementation instead of making OpenTelemetry the only tracing mechanism?",
+    "What constraint ruled out an OpenTelemetry-only tracing design for the SDK as a whole?"
+   ],
+   "reference_answer": "The browser SDK needs lightweight tracing without the size and runtime weight of OpenTelemetry, so the core provides its own spans. Server SDKs that want OpenTelemetry can still plug it in through the core's override points.",
+   "evidence": [
+    "packages/core/src/tracing/trace.ts:54-95",
+    "packages/core/src/tracing/trace.ts:331-384"
+   ]
+  },
+  {
+   "unit_id": "tracing-core",
+   "level": 2,
+   "question": "Before creating a span, the core lets listeners adjust the scope and parent, instead of handling incoming remote parents entirely itself. What constraint made that the better choice?",
+   "variants": [
+    "Why does span creation emit a hook that lets the server SDK change the scope and parent first?",
+    "Why doesn't the core resolve an incoming remote trace on its own when starting a span?"
+   ],
+   "reference_answer": "On the server, an incoming trace lives in the ambient OpenTelemetry context, which the platform-agnostic core cannot see. A hook lets the Node SDK translate that into a propagation context so the new span continues the incoming trace.",
+   "evidence": [
+    "packages/core/src/tracing/trace.ts:331-341"
+   ]
+  },
+  {
+   "unit_id": "tracing-core",
+   "level": 2,
+   "question": "A streamed-span mode, where spans are sent individually, was added next to the transaction-only model that bundles a whole span tree into one event. What constraint motivated this?",
+   "variants": [
+    "Why add a mode that sends spans one by one instead of keeping only the model that sends them together as a transaction?",
+    "What limitation of bundling all spans into a single transaction when the root ends motivated the streaming mode?"
+   ],
+   "reference_answer": "The transaction model holds the whole tree until the root span finishes and reports it as one transaction event. Streaming sends spans independently, so they need no transaction and are not tied to the root's lifetime.",
+   "evidence": [
+    "packages/core/src/tracing/trace.ts:528-538"
+   ]
+  },
+  {
+   "unit_id": "tracing-core",
+   "level": 3,
+   "question": "If tracing were OpenTelemetry-only, with no native span implementation in the shared core, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If the shared core dropped its own span implementation and relied only on OpenTelemetry, which part of the system would first need to change?",
+    "What would first have to change elsewhere if spans were provided solely by OpenTelemetry instead of natively in core?"
+   ],
+   "reference_answer": "The browser SDK's tracing integration and request instrumentation, which create idle spans and request spans using the core span API, would have to depend on OpenTelemetry. That would defeat the browser's need for lightweight bundles.",
+   "evidence": [
+    "packages/browser/src/tracing/browserTracingIntegration.ts:1-60",
+    "packages/browser/src/tracing/request.ts:1-60",
+    "packages/core/src/tracing/trace.ts:54-95"
+   ]
+  },
+  {
+   "unit_id": "tracing-core",
+   "level": 3,
+   "question": "If the streamed-span mode were removed and everything went back to a transaction-only model, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If spans were no longer streamed and only whole transactions were sent, which other part would first have to change?",
+    "What would first need to change elsewhere if the transaction-only model replaced the streamed-span mode?"
+   ],
+   "reference_answer": "The browser tracing and web-vitals code that branches on whether streaming is enabled would have to drop the streaming path and attach spans to transactions instead. The sampling and outcome recording for dropped spans would also change.",
+   "evidence": [
+    "packages/browser-utils/src/web-vitals/spans.ts:1-60",
+    "packages/browser/src/tracing/request.ts:1-60",
+    "packages/core/src/tracing/trace.ts:528-538"
+   ]
+  },
+  {
+   "unit_id": "tracing-core",
+   "level": 3,
+   "question": "If the async-context strategy that OpenTelemetry can override were fixed to a single built-in implementation, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If the pluggable async-context mechanism were replaced by one fixed implementation, which other part would first have to change?",
+    "What would first have to change elsewhere if OpenTelemetry could no longer override how the active scope and span are tracked?"
+   ],
+   "reference_answer": "The Node server SDK's OpenTelemetry integration would have to change, because it relies on that override to make OTel's context carry the current scope and active span. Core span creation reads the active scope through that mechanism.",
+   "evidence": [
+    "packages/core/src/tracing/trace.ts:54-95",
+    "packages/core/src/tracing/trace.ts:331-345"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk",
+   "level": 1,
+   "question": "What would a page owner notice first if the browser SDK's initialization were never called early in page load?",
+   "variants": [
+    "If a site loaded the browser SDK but never initialized it, what is the first thing the owner would see?",
+    "What is lost first when the browser SDK is present but init is not run?"
+   ],
+   "reference_answer": "No client would be created and no integrations installed, so no errors, breadcrumbs or traces would be reported from the page.",
+   "evidence": [
+    "packages/browser/src/sdk.ts:97-131"
+   ],
+   "orientation": {
+    "purpose": "The browser SDK. It provides the browser client, global error handlers, breadcrumbs, browser tracing, and CDN bundle variants. Web-vitals and performance instrumentation live in a companion utils package.",
+    "decision": "An integration-based SDK with many pre-composed CDN bundle entry points, and performance instrumentation in a separate browser-utils package. A monolithic bundle and lazy-loading everything were not chosen. The aim is bundle-size control (size-limit) and tree-shaking.",
+    "where": [
+     {
+      "path": "packages/browser/src/sdk.ts",
+      "what": "init and default integrations"
+     },
+     {
+      "path": "packages/browser/src/index.bundle.tracing.replay.ts",
+      "what": "example CDN bundle entry"
+     },
+     {
+      "path": "packages/browser-utils/src",
+      "what": "web vitals and performance code"
+     }
+    ],
+    "shaped_by": "Martin Sonnberger, a human working alone, made the latest change in July 2026: extracting performance mark/measure spans [human]."
+   }
+  },
+  {
+   "unit_id": "browser-sdk",
+   "level": 1,
+   "question": "Why is web-vitals and performance instrumentation placed in a separate companion package rather than inside the main browser package?",
+   "variants": [
+    "What benefit comes from keeping performance instrumentation outside the main browser SDK package?",
+    "Why split browser performance code into its own utils package?"
+   ],
+   "reference_answer": "It keeps the main browser package smaller and tree-shakeable, so bundles that don't need tracing don't pay for it, and the code can be shared by other packages.",
+   "evidence": [
+    "packages/browser/src/tracing/browserTracingIntegration.ts:28-36",
+    "packages/browser-utils/src/web-vitals/spans.ts:1-60"
+   ],
+   "orientation": {
+    "purpose": "The browser SDK. It provides the browser client, global error handlers, breadcrumbs, browser tracing, and CDN bundle variants. Web-vitals and performance instrumentation live in a companion utils package.",
+    "decision": "An integration-based SDK with many pre-composed CDN bundle entry points, and performance instrumentation in a separate browser-utils package. A monolithic bundle and lazy-loading everything were not chosen. The aim is bundle-size control (size-limit) and tree-shaking.",
+    "where": [
+     {
+      "path": "packages/browser/src/sdk.ts",
+      "what": "init and default integrations"
+     },
+     {
+      "path": "packages/browser/src/index.bundle.tracing.replay.ts",
+      "what": "example CDN bundle entry"
+     },
+     {
+      "path": "packages/browser-utils/src",
+      "what": "web vitals and performance code"
+     }
+    ],
+    "shaped_by": "Martin Sonnberger, a human working alone, made the latest change in July 2026: extracting performance mark/measure spans [human]."
+   }
+  },
+  {
+   "unit_id": "browser-sdk",
+   "level": 1,
+   "question": "What does offering several pre-composed CDN bundle entry points let a script-tag user do?",
+   "variants": [
+    "Why would a site using a script tag choose among the different CDN bundle variants?",
+    "What choice do the many CDN bundle entry points give a non-npm user?"
+   ],
+   "reference_answer": "They can load only the feature set they need, such as errors only or with tracing and replay, trading capability against download size.",
+   "evidence": [
+    "packages/browser/src/sdk.ts:30-49"
+   ],
+   "orientation": {
+    "purpose": "The browser SDK. It provides the browser client, global error handlers, breadcrumbs, browser tracing, and CDN bundle variants. Web-vitals and performance instrumentation live in a companion utils package.",
+    "decision": "An integration-based SDK with many pre-composed CDN bundle entry points, and performance instrumentation in a separate browser-utils package. A monolithic bundle and lazy-loading everything were not chosen. The aim is bundle-size control (size-limit) and tree-shaking.",
+    "where": [
+     {
+      "path": "packages/browser/src/sdk.ts",
+      "what": "init and default integrations"
+     },
+     {
+      "path": "packages/browser/src/index.bundle.tracing.replay.ts",
+      "what": "example CDN bundle entry"
+     },
+     {
+      "path": "packages/browser-utils/src",
+      "what": "web vitals and performance code"
+     }
+    ],
+    "shaped_by": "Martin Sonnberger, a human working alone, made the latest change in July 2026: extracting performance mark/measure spans [human]."
+   }
+  },
+  {
+   "unit_id": "browser-sdk",
+   "level": 2,
+   "question": "The browser SDK is assembled from separate integrations instead of one monolithic bundle with all features built in. What constraint made that the better choice?",
+   "variants": [
+    "Why is browser functionality split into opt-in integrations rather than shipped as a single everything-included bundle?",
+    "What constraint made integration-based composition preferable to a monolithic browser bundle?"
+   ],
+   "reference_answer": "Bundle size matters to browser users. With features as separate integrations, bundlers can tree-shake what isn't used and users include only what they need.",
+   "evidence": [
+    "packages/browser/src/sdk.ts:30-49",
+    "packages/browser/src/sdk.ts:114-117"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk",
+   "level": 2,
+   "question": "Performance and web-vitals instrumentation is kept in a separate utilities package instead of inside the main browser package. What constraint made that the better choice?",
+   "variants": [
+    "Why does the web-vitals and performance code live in its own package rather than within the browser SDK package?",
+    "What drove splitting browser performance instrumentation out of the main browser package?"
+   ],
+   "reference_answer": "Keeping it separate lets other packages reuse the browser instrumentation without depending on the whole browser SDK, and keeps it individually tree-shakeable for size control.",
+   "evidence": [
+    "packages/browser/src/tracing/browserTracingIntegration.ts:29-36",
+    "packages/browser-utils/src/web-vitals/spans.ts"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk",
+   "level": 2,
+   "question": "Many pre-composed CDN bundle variants are published instead of one bundle that lazy-loads every feature on demand. What constraint made that the better choice?",
+   "variants": [
+    "Why offer several ready-made script-tag bundles instead of one loader that fetches everything lazily?",
+    "What constraint favoured pre-composed CDN bundles over lazy-loading all features?"
+   ],
+   "reference_answer": "Script-tag users cannot run a bundler to tree-shake, so ready-made combinations let them pick the size and feature set they want. Lazy-loading everything would add extra network requests and delayed or failing availability of error capture.",
+   "evidence": [
+    "packages/browser/rollup.bundle.config.mjs",
+    ".size-limit.js"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk",
+   "level": 3,
+   "question": "If the browser SDK were a single monolithic bundle instead of integration-based, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If browser features were all built in rather than opt-in integrations, which other part would first have to change?",
+    "What would first have to change elsewhere if the browser SDK dropped its integration-based design for a monolithic bundle?"
+   ],
+   "reference_answer": "The bundle size limit checks and the build configuration producing the many pre-composed CDN bundles would have to change, because they depend on features being separable. Stand-in shims for omitted integrations would become unnecessary.",
+   "evidence": [
+    "packages/browser/src/sdk.ts:30-49",
+    "packages/browser/src/sdk.ts:97-131"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk",
+   "level": 3,
+   "question": "If web-vitals and performance instrumentation were moved from the separate utils package into the main browser package, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If the separate browser utilities package were merged into the browser package, which other part would first have to change?",
+    "What would first need to change elsewhere if performance instrumentation no longer lived in its own package?"
+   ],
+   "reference_answer": "Other SDKs that currently import those utilities from the separate package, such as framework or replay packages, would have to depend on the whole browser package instead. The browser tracing integration's imports would also change.",
+   "evidence": [
+    "packages/browser/src/tracing/browserTracingIntegration.ts:29-36",
+    "packages/browser-utils/src/performance/entries.ts:1-60"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk",
+   "level": 3,
+   "question": "If the browser SDK loaded all optional features lazily at runtime instead of composing them into pre-built CDN bundles, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If every optional browser feature were lazy-loaded, which other part would first have to change?",
+    "What would first have to change elsewhere if pre-composed bundle variants were replaced by lazy loading of everything?"
+   ],
+   "reference_answer": "The build and release configuration for the bundle entry points would change to emit separately loadable chunks. The shims standing in for non-bundled features would be replaced by loader logic.",
+   "evidence": [
+    "packages/browser/src/sdk.ts:97-131"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/integrations",
+   "level": 1,
+   "question": "What role does the default set of integrations play when the browser SDK starts?",
+   "variants": [
+    "What is the job of the default integration list that browser initialization composes?",
+    "What does the default integration list give a user who calls init with no extra options?"
+   ],
+   "reference_answer": "It gives a working baseline out of the box, such as global error handlers, breadcrumbs and deduplication, without the user configuring each one.",
+   "evidence": [
+    "packages/browser/src/sdk.ts:30-49",
+    "packages/browser/src/sdk.ts:97-131"
+   ],
+   "orientation": {
+    "purpose": "sdk init, global handlers, breadcrumbs, httpclient, profiling.",
+    "decision": "Default integrations composed in sdk.ts.",
+    "where": [
+     {
+      "path": "packages/browser/src/sdk.ts",
+      "what": ""
+     },
+     {
+      "path": "packages/browser/src/integrations",
+      "what": ""
+     },
+     {
+      "path": "packages/browser/src/profiling",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "browser-sdk/integrations",
+   "level": 1,
+   "question": "If the global error handler integration were missing from the browser defaults, what would a user notice first?",
+   "variants": [
+    "What would go unreported if the integration for global error handlers were not installed?",
+    "What is the first visible effect of dropping the global handlers integration from the browser SDK?"
+   ],
+   "reference_answer": "Uncaught exceptions and unhandled promise rejections would no longer be captured automatically; only manually captured errors would appear.",
+   "evidence": [
+    "packages/browser/src/integrations/globalhandlers.ts:26-51"
+   ],
+   "orientation": {
+    "purpose": "sdk init, global handlers, breadcrumbs, httpclient, profiling.",
+    "decision": "Default integrations composed in sdk.ts.",
+    "where": [
+     {
+      "path": "packages/browser/src/sdk.ts",
+      "what": ""
+     },
+     {
+      "path": "packages/browser/src/integrations",
+      "what": ""
+     },
+     {
+      "path": "packages/browser/src/profiling",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "browser-sdk/integrations",
+   "level": 1,
+   "question": "Why does the setup that installs integrations skip an integration that is already installed?",
+   "variants": [
+    "What does skipping already-installed integrations protect against when a client is set up?",
+    "Why does core avoid installing an integration of the same name twice?"
+   ],
+   "reference_answer": "It prevents duplicate installation, so global hooks are not patched twice and events are not duplicated, while per-client setup still runs for each client.",
+   "evidence": [
+    "packages/core/src/integration.ts:109-125"
+   ],
+   "orientation": {
+    "purpose": "sdk init, global handlers, breadcrumbs, httpclient, profiling.",
+    "decision": "Default integrations composed in sdk.ts.",
+    "where": [
+     {
+      "path": "packages/browser/src/sdk.ts",
+      "what": ""
+     },
+     {
+      "path": "packages/browser/src/integrations",
+      "what": ""
+     },
+     {
+      "path": "packages/browser/src/profiling",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "browser-sdk/integrations",
+   "level": 2,
+   "question": "The default set of browser integrations is composed in the init step, with the option to override it, instead of being hard-wired into the client. What constraint made that the better choice?",
+   "variants": [
+    "Why is the default integration list assembled at init time and overridable rather than fixed inside the client?",
+    "Why does browser init pick its default integrations as a replaceable list instead of baking them into the client class?"
+   ],
+   "reference_answer": "Users and framework SDKs (such as Angular) need to adjust or replace the defaults and keep bundle size down. A replaceable list at init allows that without changing the client.",
+   "evidence": [
+    "packages/browser/src/sdk.ts:30-49",
+    "packages/browser/src/sdk.ts:101-117"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/integrations",
+   "level": 2,
+   "question": "Integrations have a run-once-ever setup step separate from a per-client setup step. What constraint made that split the better choice over a single setup step?",
+   "variants": [
+    "Why do integrations get both a one-time global hook and a per-client hook?",
+    "Why isn't one setup step enough for integrations, given that more than one client may exist?"
+   ],
+   "reference_answer": "Some work, like patching global APIs, must happen only once per page or process, while other work must be bound to each client instance. Separate steps let both be correct when multiple clients are created.",
+   "evidence": [
+    "packages/core/src/integration.ts:109-125",
+    "packages/browser/src/integrations/globalhandlers.ts:33-48"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/integrations",
+   "level": 2,
+   "question": "The global error and unhandled-rejection listeners are delivered as an integration with separately switchable handlers instead of always being installed by the client. What constraint made that the better choice?",
+   "variants": [
+    "Why are the global error handlers an integration with individual toggles rather than hard-coded into the browser client?",
+    "What constraint favoured making global handler installation opt-out per handler rather than unconditional?"
+   ],
+   "reference_answer": "Apps may already handle these events themselves or want to avoid duplicates or noise, so each global handler must be disableable. Packaging them as an integration keeps them removable and tree-shakeable.",
+   "evidence": [
+    "packages/browser/src/integrations/globalhandlers.ts:26-51"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/integrations",
+   "level": 3,
+   "question": "If the browser default integrations were no longer composed in the init code and users had to add every integration explicitly, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If the browser SDK shipped with no default integrations, which other part would first have to change?",
+    "What would first have to change elsewhere if default browser integrations were removed from initialization?"
+   ],
+   "reference_answer": "Framework SDKs that re-export or adjust the default set, such as Angular, would need to change. Documentation and user setup would also have to add the global error handlers and breadcrumbs explicitly.",
+   "evidence": [
+    "packages/browser/src/sdk.ts:30-49",
+    "packages/browser/src/sdk.ts:97-131"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/integrations",
+   "level": 3,
+   "question": "If the global error handlers were installed at module load time instead of when the integration is set up on a client, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If uncaught-error hooks were installed at import time rather than during per-client integration setup, which other part would first have to change?",
+    "What would first change elsewhere if global handler installation moved out of the integration setup step?"
+   ],
+   "reference_answer": "The integration setup mechanism in core, which runs per-client setup and tracks installs, would no longer control it. Options to turn individual handlers on or off would also stop working.",
+   "evidence": [
+    "packages/browser/src/integrations/globalhandlers.ts:26-51",
+    "packages/core/src/integration.ts:109-125"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/integrations",
+   "level": 3,
+   "question": "If the browser init defaulted to a different transport instead of the fetch-based one, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If the browser SDK no longer defaulted to a fetch-based transport, which other part would first have to change?",
+    "What would first change elsewhere if a different default transport replaced the fetch one in browser init?"
+   ],
+   "reference_answer": "The browser's client options and transport factory wiring would change. The shared transport base and envelope sending in core must be able to work with the new transport.",
+   "evidence": [
+    "packages/browser/src/sdk.ts:119-131"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/tracing",
+   "level": 1,
+   "question": "What does the browser tracing integration give a user that error-only setup does not?",
+   "variants": [
+    "What capability is added to a page by enabling the browser tracing integration?",
+    "What does a user get from browser tracing that plain error monitoring lacks?"
+   ],
+   "reference_answer": "It creates page-load and navigation spans plus request and performance spans, so users can see page performance and trace requests to the backend.",
+   "evidence": [
+    "packages/browser/src/tracing/browserTracingIntegration.ts:1-60"
+   ],
+   "orientation": {
+    "purpose": "browserTracingIntegration, request spans and web-vitals/performance spans.",
+    "decision": "Spans emitted from PerformanceObserver entries in browser-utils.",
+    "where": [
+     {
+      "path": "packages/browser/src/tracing",
+      "what": ""
+     },
+     {
+      "path": "packages/browser-utils/src",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "browser-sdk/tracing",
+   "level": 1,
+   "question": "Why does the request-span part of browser tracing restrict which outgoing requests get trace headers by default?",
+   "variants": [
+    "What is the reason tracing headers are attached only to same-origin requests by default in the browser?",
+    "Why not attach trace headers to every outgoing browser request?"
+   ],
+   "reference_answer": "Adding extra headers to cross-origin requests can cause CORS failures unless the target server allows them, so the default is limited to same-origin requests.",
+   "evidence": [
+    "packages/browser/src/tracing/request.ts:50-60"
+   ],
+   "orientation": {
+    "purpose": "browserTracingIntegration, request spans and web-vitals/performance spans.",
+    "decision": "Spans emitted from PerformanceObserver entries in browser-utils.",
+    "where": [
+     {
+      "path": "packages/browser/src/tracing",
+      "what": ""
+     },
+     {
+      "path": "packages/browser-utils/src",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "browser-sdk/tracing",
+   "level": 1,
+   "question": "What do the web-vitals spans in the browser utils package let a user see about a page?",
+   "variants": [
+    "What information about page experience do web-vitals spans provide?",
+    "What does emitting spans from performance observer entries expose to users?"
+   ],
+   "reference_answer": "They expose real-user page quality metrics such as largest contentful paint, layout shift and interaction latency, tied to the page's trace.",
+   "evidence": [
+    "packages/browser-utils/src/web-vitals/spans.ts:1-60"
+   ],
+   "orientation": {
+    "purpose": "browserTracingIntegration, request spans and web-vitals/performance spans.",
+    "decision": "Spans emitted from PerformanceObserver entries in browser-utils.",
+    "where": [
+     {
+      "path": "packages/browser/src/tracing",
+      "what": ""
+     },
+     {
+      "path": "packages/browser-utils/src",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "browser-sdk/tracing",
+   "level": 2,
+   "question": "Browser performance and web-vital spans are built from the browser's own performance observer entries, rather than from timings the SDK measures itself. What constraint made that the better choice?",
+   "variants": [
+    "Why does the SDK derive performance spans from the browser's performance entries instead of manual timing?",
+    "What constraint favoured reusing the browser's built-in performance reporting over self-measured timings for spans?"
+   ],
+   "reference_answer": "The browser already records accurate navigation, resource, paint and interaction timings, and many metrics (like LCP, CLS, INP) can only be obtained from it. Reusing them is more accurate and smaller than self-measurement.",
+   "evidence": [
+    "packages/browser-utils/src/web-vitals/spans.ts:1-60",
+    "packages/browser-utils/src/performance/entries.ts:1-60"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/tracing",
+   "level": 2,
+   "question": "Tracing is provided by an optional integration that is not among the default browser integrations. What constraint made that the better choice over enabling it by default?",
+   "variants": [
+    "Why isn't browser tracing part of the default integration set?",
+    "Why must users opt in to browser tracing instead of getting it automatically?"
+   ],
+   "reference_answer": "Tracing brings in a lot of code (web vitals, request instrumentation, idle spans), and the default bundle must stay small. Making it opt-in keeps it out of bundles for users who only want error monitoring.",
+   "evidence": [
+    "packages/browser/src/sdk.ts:30-49",
+    "packages/browser/src/tracing/browserTracingIntegration.ts:1-60"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/tracing",
+   "level": 2,
+   "question": "By default, browser request instrumentation attaches trace headers only to same-origin requests rather than to all outgoing requests. What constraint made that the better default?",
+   "variants": [
+    "Why do browser trace headers go only to same-origin requests by default?",
+    "What constraint led to restricting trace propagation in the browser to same-origin by default?"
+   ],
+   "reference_answer": "Adding extra headers to cross-origin requests can trigger CORS failures when the target server doesn't allow them. Sending them only to origins the app controls avoids breaking requests.",
+   "evidence": [
+    "packages/browser/src/tracing/request.ts:50-60"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/tracing",
+   "level": 3,
+   "question": "If web-vitals spans were created from something other than performance observer entries, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If performance observers stopped being the source of browser performance spans, which other part would first have to change?",
+    "What would first have to change elsewhere if spans were not emitted from observer entries?"
+   ],
+   "reference_answer": "The instrumentation handlers in the browser utilities package, which subscribe to performance observers, would be replaced. The browser tracing integration that registers those handlers would need to change too.",
+   "evidence": [
+    "packages/browser-utils/src/web-vitals/spans.ts:26-31",
+    "packages/browser/src/tracing/browserTracingIntegration.ts:29-36"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/tracing",
+   "level": 3,
+   "question": "If the browser request spans were created inside the browser utils package rather than in the browser tracing code, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If outgoing request span creation moved into the browser utilities package, which other part would first have to change?",
+    "What would first need to change elsewhere if request spans were no longer created in the browser tracing code?"
+   ],
+   "reference_answer": "The browser tracing integration, which currently wires outgoing request instrumentation and options such as propagation targets, would need to import and configure it from the utils package. The utils package would also need a dependency on the core tracing and propagation features.",
+   "evidence": [
+    "packages/browser/src/tracing/request.ts:1-60",
+    "packages/browser/src/tracing/browserTracingIntegration.ts:45"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/tracing",
+   "level": 3,
+   "question": "If the browser tracing integration stopped using idle spans for page loads and navigations, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If page-load and navigation spans no longer ended automatically when idle, which other part would first have to change?",
+    "What would first need to change elsewhere if idle spans were dropped from browser page-load tracing?"
+   ],
+   "reference_answer": "The code that adds performance entries and web vitals to the active page-load span would need a new signal for when the span ends. The idle-span logic in core would be unused by the browser.",
+   "evidence": [
+    "packages/browser/src/tracing/browserTracingIntegration.ts:28-36"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/bundles",
+   "level": 1,
+   "question": "If the stand-in placeholders for integrations left out of a CDN bundle did not exist, what would a page using that bundle notice first when its init code asks for one of those integrations?",
+   "variants": [
+    "What would break first for a CDN-bundle user whose init code references an integration the bundle deliberately omits, if no placeholder stood in for it?",
+    "Why do the CDN bundle variants export placeholder versions of integrations they do not include, rather than leaving those names out?"
+   ],
+   "reference_answer": "The page's init code would fail, because the requested integration would be undefined and calling it would throw. The placeholders keep the same API surface across bundle variants, so the same config works even though the real integration is not included.",
+   "evidence": [
+    "packages/browser/src/index.bundle.tracing.replay.ts:1-42"
+   ],
+   "orientation": {
+    "purpose": "Bundle entry points and shims for absent integrations.",
+    "decision": "Separate index.bundle.* variants built with rollup.",
+    "where": [
+     {
+      "path": "packages/browser/rollup.bundle.config.mjs",
+      "what": ""
+     },
+     {
+      "path": "packages/integration-shims",
+      "what": ""
+     },
+     {
+      "path": "packages/browser/src/index.bundle.tracing.replay.ts",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "browser-sdk/bundles",
+   "level": 1,
+   "question": "Why does the CDN build produce many separate bundles, such as ones with tracing, replay or both, instead of one bundle with everything?",
+   "variants": [
+    "What consequence for page weight follows from shipping several CDN bundle variants with different feature combinations?",
+    "What does a user loading the SDK from a script tag gain from there being separate bundle variants per feature set?"
+   ],
+   "reference_answer": "Script-tag users pay download size only for the features they need, since larger features like tracing and replay are included only in the variants that need them. Omitted features are replaced by lightweight placeholders.",
+   "evidence": [
+    "packages/browser/rollup.bundle.config.mjs:1-60",
+    "packages/browser/src/index.bundle.tracing.replay.ts:1-42"
+   ],
+   "orientation": {
+    "purpose": "Bundle entry points and shims for absent integrations.",
+    "decision": "Separate index.bundle.* variants built with rollup.",
+    "where": [
+     {
+      "path": "packages/browser/rollup.bundle.config.mjs",
+      "what": ""
+     },
+     {
+      "path": "packages/integration-shims",
+      "what": ""
+     },
+     {
+      "path": "packages/browser/src/index.bundle.tracing.replay.ts",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "browser-sdk/bundles",
+   "level": 1,
+   "question": "What job do the separately built add-on bundles for optional integrations do for a page that loaded the main CDN bundle?",
+   "variants": [
+    "How does a page using the main CDN bundle get an optional integration that the main bundle leaves out?",
+    "What is the purpose of building optional integrations as standalone files next to the main CDN bundle?"
+   ],
+   "reference_answer": "They let a page load an optional integration as a separate script on top of the main bundle, only when needed. This keeps the main bundle small.",
+   "evidence": [
+    "packages/browser/rollup.bundle.config.mjs:1-58"
+   ],
+   "orientation": {
+    "purpose": "Bundle entry points and shims for absent integrations.",
+    "decision": "Separate index.bundle.* variants built with rollup.",
+    "where": [
+     {
+      "path": "packages/browser/rollup.bundle.config.mjs",
+      "what": ""
+     },
+     {
+      "path": "packages/integration-shims",
+      "what": ""
+     },
+     {
+      "path": "packages/browser/src/index.bundle.tracing.replay.ts",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "browser-sdk/bundles",
+   "level": 2,
+   "question": "The browser SDK ships several separate prebuilt script variants, each with a different fixed feature set, rather than one bundle that loads features on demand. What constraint made separate variants the better choice for script-tag users?",
+   "variants": [
+    "Why does the browser SDK build distinct CDN bundles per feature combination instead of a single bundle that lazily loads features?",
+    "What constraint favours shipping pre-composed bundle variants over one all-inclusive or on-demand-loading CDN bundle for script-tag users?"
+   ],
+   "reference_answer": "CDN users load a single script tag with no bundler to tree-shake, so size must be fixed up front. Separate variants let each user pick only the features they need and keep the payload small, with stand-ins for omitted features.",
+   "evidence": [
+    "packages/browser/rollup.bundle.config.mjs:1-60",
+    "packages/browser/src/index.bundle.tracing.replay.ts:1-42"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/bundles",
+   "level": 2,
+   "question": "In a prebuilt browser bundle that leaves out an integration such as user feedback, the entry still exports that name backed by a stub instead of omitting the export. What constraint made stubs better than leaving the export out?",
+   "variants": [
+    "Why do the reduced browser bundles export placeholder implementations for omitted integrations rather than removing those exports?",
+    "What problem is avoided by exporting no-op stand-ins for left-out integrations in a CDN bundle instead of omitting them?"
+   ],
+   "reference_answer": "Users' code calls the same global API across all bundle variants, so a missing export would throw on use. A stub keeps the API surface uniform and lets the code fail softly, typically with a warning, without adding the real code's size.",
+   "evidence": [
+    "packages/browser/src/index.bundle.tracing.replay.ts:1-42"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/bundles",
+   "level": 2,
+   "question": "Rarely used browser integrations are built as separate add-on scripts rather than included in the main bundle. What constraint drove that choice?",
+   "variants": [
+    "Why are optional browser integrations shipped as standalone add-on scripts instead of folded into the main CDN bundle?",
+    "What constraint made separate add-on bundles better than putting every integration into the main browser bundle?"
+   ],
+   "reference_answer": "Main bundle size matters for every script-tag user, and there is no tree-shaking. Add-ons let users load extra features only when needed.",
+   "evidence": [
+    "packages/browser/rollup.bundle.config.mjs:1-60"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/bundles",
+   "level": 3,
+   "question": "If the CDN bundles stopped using stand-in placeholders for integrations that a given bundle variant leaves out, what is the first other part of the system that would break for users of those bundles?",
+   "variants": [
+    "If bundle variants no longer substituted stubs for excluded integrations, what would first break for users who call those integrations from a CDN bundle?",
+    "What would break first for CDN users if the leftover public API entries for omitted integrations were removed from each bundle variant rather than stubbed?"
+   ],
+   "reference_answer": "User code written against the full API (for example calling a feedback or logging integration) would fail on bundles that omit it, because the names would no longer exist. The stand-ins keep the exported API shape uniform and typically just warn instead of throwing.",
+   "evidence": [
+    "packages/browser/src/index.bundle.tracing.replay.ts:1-42"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/bundles",
+   "level": 3,
+   "question": "If the CDN bundle variants were replaced by a single bundle containing every feature, what would have to change for the add-on integrations that are currently shipped as separate loadable files?",
+   "variants": [
+    "If one all-inclusive CDN bundle replaced the feature-specific variants, what would happen to the separately loaded add-on integration files?",
+    "What would become unnecessary or need rework in the standalone add-on integration builds if CDN users got one single full-featured bundle?"
+   ],
+   "reference_answer": "The separate add-on files would largely lose their purpose, since their features would already be built in. The build setup that emits per-integration add-ons would be dropped or reduced, and the size savings of opt-in loading would be lost.",
+   "evidence": [
+    "packages/browser/rollup.bundle.config.mjs:1-58"
+   ]
+  },
+  {
+   "unit_id": "browser-sdk/bundles",
+   "level": 3,
+   "question": "If the tracing-plus-replay CDN bundle began including the real feedback feature instead of a placeholder, what other part of the system would the change first affect?",
+   "variants": [
+    "If the combined tracing and replay CDN bundle shipped the real feedback widget rather than a stub, what would first be affected?",
+    "What would be the first knock-on effect of swapping the feedback placeholder in the tracing-replay bundle for the real implementation?"
+   ],
+   "reference_answer": "The bundle's size would grow, affecting size limits and the bundle's role as a lighter variant, and the shim exports would be replaced by real exports. There would also be overlap with the separate feedback add-on bundle.",
+   "evidence": [
+    "packages/browser/src/index.bundle.tracing.replay.ts:1-42",
+    "packages/browser/rollup.bundle.config.mjs:36-45"
+   ]
+  },
+  {
+   "unit_id": "node-sdk",
+   "level": 1,
+   "question": "If the shared server integrations package were missing, what would a Bun app's default setup lose compared with what it gets today?",
+   "variants": [
+    "What would the Bun SDK's default integrations lack if the runtime-agnostic server package were removed?",
+    "What capability would Bun users lose by default if database, AI and framework instrumentation were not available from the shared server package?"
+   ],
+   "reference_answer": "Bun would lose the database, AI and framework instrumentation it reuses from the shared package, since its defaults pull the tracing and framework integrations from there. Bun would have to reimplement them or go without.",
+   "evidence": [
+    "packages/bun/src/sdk.ts:38-77",
+    "packages/server-utils/src/integrations/index.ts:43-97"
+   ],
+   "orientation": {
+    "purpose": "The Node SDK covers init, HTTP/fetch instrumentation and process-level integrations. A runtime-agnostic server-utils package holds the integrations shared by Bun, Deno, Cloudflare and others.",
+    "decision": "Database, AI and framework instrumentations move out of @sentry/node into @sentry/server-utils, using diagnostics-channel subscribers. Keeping per-library OTel instrumentation inside @sentry/node was the alternative. The reason is reuse across runtimes.",
+    "where": [
+     {
+      "path": "packages/node/src",
+      "what": "Node init and integrations"
+     },
+     {
+      "path": "packages/server-utils/src",
+      "what": "shared server integrations"
+     },
+     {
+      "path": "packages/bun/src",
+      "what": "a runtime SDK reusing them"
+     }
+    ],
+    "shaped_by": "Francesco Gringl-Novy, a human working alone, consolidated the server-utils integration exports in August 2026 [human]."
+   }
+  },
+  {
+   "unit_id": "node-sdk",
+   "level": 1,
+   "question": "Why are the framework integrations that also capture errors registered regardless of whether tracing is enabled?",
+   "variants": [
+    "Why are some framework integrations in the shared server package not gated behind tracing being on?",
+    "What would an app with tracing disabled lose if framework integrations were only added when tracing was enabled?"
+   ],
+   "reference_answer": "They do more than tracing: they capture errors and handle trace propagation. Gating them behind tracing would lose error capture and propagation for apps without performance monitoring.",
+   "evidence": [
+    "packages/server-utils/src/integrations/index.ts:83-97",
+    "packages/bun/src/sdk.ts:70-72"
+   ],
+   "orientation": {
+    "purpose": "The Node SDK covers init, HTTP/fetch instrumentation and process-level integrations. A runtime-agnostic server-utils package holds the integrations shared by Bun, Deno, Cloudflare and others.",
+    "decision": "Database, AI and framework instrumentations move out of @sentry/node into @sentry/server-utils, using diagnostics-channel subscribers. Keeping per-library OTel instrumentation inside @sentry/node was the alternative. The reason is reuse across runtimes.",
+    "where": [
+     {
+      "path": "packages/node/src",
+      "what": "Node init and integrations"
+     },
+     {
+      "path": "packages/server-utils/src",
+      "what": "shared server integrations"
+     },
+     {
+      "path": "packages/bun/src",
+      "what": "a runtime SDK reusing them"
+     }
+    ],
+    "shaped_by": "Francesco Gringl-Novy, a human working alone, consolidated the server-utils integration exports in August 2026 [human]."
+   }
+  },
+  {
+   "unit_id": "node-sdk",
+   "level": 1,
+   "question": "What does the shared package's tracing integration set give a runtime SDK that wants performance data, beyond its basic setup?",
+   "variants": [
+    "Why does a runtime SDK add the shared package's tracing integrations only when spans are enabled?",
+    "What role does the list of tracing integrations in the shared server package play for a runtime SDK when spans are enabled?"
+   ],
+   "reference_answer": "It gives the SDK a ready-made set of database, AI-provider and messaging instrumentations to add when spans are enabled. Each runtime SDK can reuse it instead of building its own.",
+   "evidence": [
+    "packages/server-utils/src/integrations/index.ts:43-81",
+    "packages/bun/src/sdk.ts:38-44"
+   ],
+   "orientation": {
+    "purpose": "The Node SDK covers init, HTTP/fetch instrumentation and process-level integrations. A runtime-agnostic server-utils package holds the integrations shared by Bun, Deno, Cloudflare and others.",
+    "decision": "Database, AI and framework instrumentations move out of @sentry/node into @sentry/server-utils, using diagnostics-channel subscribers. Keeping per-library OTel instrumentation inside @sentry/node was the alternative. The reason is reuse across runtimes.",
+    "where": [
+     {
+      "path": "packages/node/src",
+      "what": "Node init and integrations"
+     },
+     {
+      "path": "packages/server-utils/src",
+      "what": "shared server integrations"
+     },
+     {
+      "path": "packages/bun/src",
+      "what": "a runtime SDK reusing them"
+     }
+    ],
+    "shaped_by": "Francesco Gringl-Novy, a human working alone, consolidated the server-utils integration exports in August 2026 [human]."
+   }
+  },
+  {
+   "unit_id": "node-sdk",
+   "level": 2,
+   "question": "Database, AI and framework instrumentation was moved into a shared runtime-agnostic package built on diagnostics channels, rather than staying as per-library OpenTelemetry instrumentation inside the Node package. What constraint made that better?",
+   "variants": [
+    "Why were library instrumentations moved to a shared diagnostics-channel-based package instead of staying as OpenTelemetry instrumentations in the Node SDK?",
+    "What constraint favoured runtime-agnostic channel subscribers over Node-only per-library OpenTelemetry instrumentation?"
+   ],
+   "reference_answer": "Bun, Deno, Cloudflare and other runtimes need the same instrumentation, but Node-specific OpenTelemetry patching doesn't work or isn't available there. Subscribing to channels is runtime-neutral and can be shared.",
+   "evidence": [
+    "packages/server-utils/src/integrations/index.ts:43-97",
+    "packages/bun/src/sdk.ts:38-77",
+    "packages/server-utils/src/integrations/express/index.ts:13-23"
+   ]
+  },
+  {
+   "unit_id": "node-sdk",
+   "level": 2,
+   "question": "Among the default integrations, the Node-family SDK separates framework error-handling integrations from tracing-only integrations and registers the former even when tracing is off. What constraint made that split necessary?",
+   "variants": [
+    "Why are framework integrations registered by default regardless of tracing, while database and AI integrations are gated on tracing being enabled?",
+    "What constraint required keeping framework integrations out of the tracing-only group?"
+   ],
+   "reference_answer": "Framework integrations also capture errors and handle trace propagation, which must work without performance tracing. Database and AI integrations only produce spans, so they are needed only when spans are enabled.",
+   "evidence": [
+    "packages/server-utils/src/integrations/index.ts:83-97",
+    "packages/bun/src/sdk.ts:38-44"
+   ]
+  },
+  {
+   "unit_id": "node-sdk",
+   "level": 2,
+   "question": "The Node SDK by default runs without the OpenTelemetry tracer provider, and only some framework SDKs opt in. What constraint made opt-in better than always enabling it?",
+   "variants": [
+    "Why is the OpenTelemetry setup off by default in the Node SDK and enabled only by SDKs that ask for it?",
+    "What made default-off, opt-in OpenTelemetry setup better than always installing it in Node?"
+   ],
+   "reference_answer": "Most Node SDKs now get spans through channel-based instrumentation and don't need OTel. Always installing it would let foreign OTel spans override the Sentry trace on events, so only SDKs that must surface OTel spans enable it.",
+   "evidence": [
+    "packages/node/src/sdk/index.ts:202-242",
+    "packages/node/src/sdk/client.ts:109-120"
+   ]
+  },
+  {
+   "unit_id": "node-sdk",
+   "level": 3,
+   "question": "If database, AI and framework instrumentations were moved back from the runtime-agnostic shared package into the Node SDK, what would first have to change for the Bun SDK?",
+   "variants": [
+    "If the shared server instrumentations were returned to the Node SDK, what would the Bun SDK first need to change?",
+    "What would the Bun SDK have to do differently if its default integrations could no longer come from the shared server package?"
+   ],
+   "reference_answer": "Bun's default integration setup would have to depend on the Node SDK for those instrumentations, or reimplement them. Today it pulls tracing and framework integrations from the shared package.",
+   "evidence": [
+    "packages/bun/src/sdk.ts:38-77",
+    "packages/server-utils/src/integrations/index.ts:43-97"
+   ]
+  },
+  {
+   "unit_id": "node-sdk",
+   "level": 3,
+   "question": "If the shared instrumentations subscribed to diagnostics channels were replaced by per-library OpenTelemetry patching, what would first have to change in how those integrations get set up?",
+   "variants": [
+    "If channel subscribers were replaced with OpenTelemetry per-library patching, what would change first in integration setup?",
+    "What would integration setup need to do differently if it no longer subscribed to diagnostics channels?"
+   ],
+   "reference_answer": "Setup would no longer subscribe to tracing channels fed by injected code. It would register library-specific patching, which depends on Node's module loading and is not portable to other runtimes.",
+   "evidence": [
+    "packages/server-utils/src/integrations/express/index.ts:13-23"
+   ]
+  },
+  {
+   "unit_id": "node-sdk",
+   "level": 3,
+   "question": "If the framework integrations that also capture errors were gated behind tracing being enabled like the performance ones, what would stop working for users who run without tracing?",
+   "variants": [
+    "If error-capturing framework integrations were only added when tracing is on, what would users without tracing lose?",
+    "What would break for tracing-disabled users if the web framework integrations were treated as performance-only?"
+   ],
+   "reference_answer": "Error capture and trace propagation for the web frameworks would stop working when tracing is off. That is why they are registered regardless of tracing.",
+   "evidence": [
+    "packages/server-utils/src/integrations/index.ts:83-97",
+    "packages/bun/src/sdk.ts:70-72"
+   ]
+  },
+  {
+   "unit_id": "otel-bridge",
+   "level": 1,
+   "question": "If the bridge between Sentry's scopes and OpenTelemetry's context were absent, what would a Sentry user notice first about scope data inside a request?",
+   "variants": [
+    "What would go wrong first with per-request Sentry scope data if scopes were not tied to OpenTelemetry's active context?",
+    "Why must the bridge store Sentry scopes inside OpenTelemetry's active context for an OTel-based Node SDK?"
+   ],
+   "reference_answer": "Scope data such as tags and user info would not follow the active request or span across async boundaries. Events and spans would then be attributed to the wrong scope or to a default one.",
+   "evidence": [
+    "packages/opentelemetry/src/asyncContextStrategy.ts:30-78",
+    "packages/opentelemetry/src/asyncLocalStorageContextManager.ts:58-75"
+   ],
+   "orientation": {
+    "purpose": "Adapts Sentry scopes, spans, sampling and propagation so they run on top of OpenTelemetry.",
+    "decision": "Node-family SDKs delegate span and context management to OpenTelemetry through a custom propagator, sampler and async-context strategy. Sentry's own Node tracing was not kept. The reason is reuse of the OTel instrumentation ecosystem.",
+    "where": [
+     {
+      "path": "packages/opentelemetry/src",
+      "what": "propagator, sampler, context strategy"
+     },
+     {
+      "path": "packages/node/src/sdk",
+      "what": "Node wiring of OTel"
+     }
+    ],
+    "shaped_by": "Lukas Stracke, a human working alone, switched sveltekit to the OTel-based @sentry/node in March 2024 [human]."
+   }
+  },
+  {
+   "unit_id": "otel-bridge",
+   "level": 1,
+   "question": "Why is the OpenTelemetry setup in the Node SDK off by default and turned on only by some SDKs?",
+   "variants": [
+    "What is the consequence of most Node-based SDKs not running a Sentry OpenTelemetry tracer provider by default?",
+    "Why do only certain Node-family SDKs opt in to surfacing OpenTelemetry spans in Sentry?"
+   ],
+   "reference_answer": "Most Node-based SDKs do not need OTel spans surfaced in Sentry, so they skip the setup. Only SDKs that rely on OTel-produced spans opt in, and they get them in Sentry that way.",
+   "evidence": [
+    "packages/node/src/sdk/index.ts:198-242"
+   ],
+   "orientation": {
+    "purpose": "Adapts Sentry scopes, spans, sampling and propagation so they run on top of OpenTelemetry.",
+    "decision": "Node-family SDKs delegate span and context management to OpenTelemetry through a custom propagator, sampler and async-context strategy. Sentry's own Node tracing was not kept. The reason is reuse of the OTel instrumentation ecosystem.",
+    "where": [
+     {
+      "path": "packages/opentelemetry/src",
+      "what": "propagator, sampler, context strategy"
+     },
+     {
+      "path": "packages/node/src/sdk",
+      "what": "Node wiring of OTel"
+     }
+    ],
+    "shaped_by": "Lukas Stracke, a human working alone, switched sveltekit to the OTel-based @sentry/node in March 2024 [human]."
+   }
+  },
+  {
+   "unit_id": "otel-bridge",
+   "level": 1,
+   "question": "Why does the Node client choose its async context strategy before the rest of client initialization runs?",
+   "variants": [
+    "What depends on the async context strategy already being chosen when integrations are set up?",
+    "Why must the context strategy be installed before integrations are set up in the Node client?"
+   ],
+   "reference_answer": "Channel-based integrations capture the strategy's async storage during their setup. If the strategy were chosen later, they would bind to the wrong storage.",
+   "evidence": [
+    "packages/node/src/sdk/client.ts:109-120"
+   ],
+   "orientation": {
+    "purpose": "Adapts Sentry scopes, spans, sampling and propagation so they run on top of OpenTelemetry.",
+    "decision": "Node-family SDKs delegate span and context management to OpenTelemetry through a custom propagator, sampler and async-context strategy. Sentry's own Node tracing was not kept. The reason is reuse of the OTel instrumentation ecosystem.",
+    "where": [
+     {
+      "path": "packages/opentelemetry/src",
+      "what": "propagator, sampler, context strategy"
+     },
+     {
+      "path": "packages/node/src/sdk",
+      "what": "Node wiring of OTel"
+     }
+    ],
+    "shaped_by": "Lukas Stracke, a human working alone, switched sveltekit to the OTel-based @sentry/node in March 2024 [human]."
+   }
+  },
+  {
+   "unit_id": "otel-bridge",
+   "level": 2,
+   "question": "Node-family SDKs delegate span and context management to OpenTelemetry instead of keeping their own tracing implementation. What constraint made delegation the better choice?",
+   "variants": [
+    "Why did the Node SDKs adopt OpenTelemetry for spans and context rather than maintaining a Sentry-only tracer?",
+    "What constraint favoured building on OpenTelemetry over a custom Node tracing implementation?"
+   ],
+   "reference_answer": "The large ecosystem of OpenTelemetry instrumentations for Node libraries could be reused instead of rewritten, and users' own OTel setups would interoperate. Sentry then only needs an adapter layer for scopes, sampling and propagation.",
+   "evidence": [
+    "packages/opentelemetry/src/asyncContextStrategy.ts:30-78",
+    "packages/node/src/sdk/index.ts:202-242"
+   ]
+  },
+  {
+   "unit_id": "otel-bridge",
+   "level": 2,
+   "question": "The bridge supplies its own context manager that stores context in async-local storage and attaches Sentry scopes whenever a context is entered, rather than using a stock OpenTelemetry context manager. What constraint made that better?",
+   "variants": [
+    "Why does the OpenTelemetry bridge use a custom context manager that builds Sentry scopes into contexts instead of the default one?",
+    "What constraint required a Sentry-aware context manager rather than a stock OpenTelemetry one?"
+   ],
+   "reference_answer": "Sentry's scopes must follow the active OpenTelemetry context across async boundaries and fork correctly. A stock manager knows nothing about scopes, so Sentry's scope APIs would go out of sync with the active span.",
+   "evidence": [
+    "packages/opentelemetry/src/asyncLocalStorageContextManager.ts:58-75",
+    "packages/opentelemetry/src/asyncContextStrategy.ts:30-78"
+   ]
+  },
+  {
+   "unit_id": "otel-bridge",
+   "level": 2,
+   "question": "When the bridge is set up repeatedly, it reuses the existing async-local storage instead of creating a fresh one each time. What constraint made reuse the better choice?",
+   "variants": [
+    "Why does repeated OpenTelemetry bridge setup keep the previously installed async storage rather than swapping in a new one?",
+    "What constraint made reusing the existing async-local store better than creating a new one on each setup?"
+   ],
+   "reference_answer": "Integrations that subscribe to channels have already captured the earlier store. A new store would leave them reading a different one, breaking scope propagation across async boundaries.",
+   "evidence": [
+    "packages/opentelemetry/src/asyncContextStrategy.ts:30-38"
+   ]
+  },
+  {
+   "unit_id": "otel-bridge",
+   "level": 3,
+   "question": "If the Node SDK stopped delegating context management to OpenTelemetry and used its own plain async-local-storage context handling, what would first have to change for the instrumentations that subscribe to channels?",
+   "variants": [
+    "If OpenTelemetry no longer managed context in the Node SDK, what would channel-based instrumentations first need to change?",
+    "What would channel-based integrations need to change if the OTel-backed context strategy were replaced with a plain one?"
+   ],
+   "reference_answer": "They bind to the context storage of whichever strategy is active, so they would need to bind to the plain store instead of OTel's. The SDK already picks one or the other at client init, before integrations are set up.",
+   "evidence": [
+    "packages/node/src/sdk/client.ts:109-120",
+    "packages/opentelemetry/src/asyncContextStrategy.ts:30-38"
+   ]
+  },
+  {
+   "unit_id": "otel-bridge",
+   "level": 3,
+   "question": "If Node-family SDKs had their own tracing implementation instead of using OpenTelemetry, what would the SDKs that need OTel spans surfaced in Sentry, like Next.js and SvelteKit, lose or have to change?",
+   "variants": [
+    "If OpenTelemetry were dropped in favour of an in-house tracer, what would Next.js and SvelteKit SDKs need to change?",
+    "What would SDKs that rely on OTel spans reaching Sentry have to do if there were no OpenTelemetry bridge?"
+   ],
+   "reference_answer": "They would lose the ability to surface spans created by third-party OTel instrumentation. They would need their own instrumentation or an adapter for those spans, because the opt-in for OTel setup would no longer exist.",
+   "evidence": [
+    "packages/node/src/sdk/index.ts:198-242"
+   ]
+  },
+  {
+   "unit_id": "otel-bridge",
+   "level": 3,
+   "question": "If the OpenTelemetry context manager did not wrap each context so it carries Sentry scopes, what would first break in the way Sentry scopes are looked up?",
+   "variants": [
+    "If contexts activated through OpenTelemetry did not carry Sentry scopes, what would break first in scope lookup?",
+    "What breaks in current-scope lookup if the OTel context manager stopped attaching Sentry scopes to contexts?"
+   ],
+   "reference_answer": "Scope lookup reads scopes from the active OTel context, so it would fall back to the default global scopes. Per-request isolation would be lost.",
+   "evidence": [
+    "packages/opentelemetry/src/asyncLocalStorageContextManager.ts:58-75",
+    "packages/opentelemetry/src/asyncContextStrategy.ts:40-54"
+   ]
+  },
+  {
+   "unit_id": "orchestrion",
+   "level": 1,
+   "question": "If the code transformation that injects tracing channels did not run for a database library, what would a user notice about that library?",
+   "variants": [
+    "What happens to a library's tracing data when the transform that injects channels into it never runs?",
+    "What would a user see for a third-party library whose code was never transformed to publish tracing channels?"
+   ],
+   "reference_answer": "The integration would record nothing for that library, since no channel events are published for it to subscribe to. No spans would appear for its calls.",
+   "evidence": [
+    "packages/server-utils/src/orchestrion/instrumentation.ts:104-144",
+    "packages/server-utils/src/orchestrion/config/pg.ts:5-22"
+   ],
+   "orientation": {
+    "purpose": "Instruments third-party libraries by transforming their code at build or load time so they publish tracing channels.",
+    "decision": "AST transforms (bundler plugins, ESM loader hooks, a runtime injection package) with per-library config publish tracing channels. Runtime monkey-patching through require-in-the-middle or OTel instrumentation was not used. Transforms work with ESM and bundlers, and the injection code was split into its own package.",
+    "where": [
+     {
+      "path": "packages/server-utils/src/orchestrion",
+      "what": "per-library channel config and instrumentation"
+     },
+     {
+      "path": "packages/server-runtime-injection",
+      "what": "runtime injection package"
+     },
+     {
+      "path": "packages/server-utils/src/tracing-channel.ts",
+      "what": "tracing-channel helper"
+     }
+    ],
+    "shaped_by": "Francesco Gringl-Novy made the August 2026 export change alone [human] and, with Claude Code, split out the injection package in September 2026 [assisted]."
+   }
+  },
+  {
+   "unit_id": "orchestrion",
+   "level": 1,
+   "question": "Why do channel-based integrations wait for a module to be reported as injected instead of always subscribing at startup?",
+   "variants": [
+    "What limit makes it undesirable for integrations to claim channels for modules that never load?",
+    "Why does a channel integration defer subscribing until its library is actually loaded?"
+   ],
+   "reference_answer": "Node caps the number of channels in use at 1024, so subscribing for modules that never load wastes slots. They subscribe only once the module is loaded.",
+   "evidence": [
+    "packages/server-runtime-injection/src/register.ts:219-222"
+   ],
+   "orientation": {
+    "purpose": "Instruments third-party libraries by transforming their code at build or load time so they publish tracing channels.",
+    "decision": "AST transforms (bundler plugins, ESM loader hooks, a runtime injection package) with per-library config publish tracing channels. Runtime monkey-patching through require-in-the-middle or OTel instrumentation was not used. Transforms work with ESM and bundlers, and the injection code was split into its own package.",
+    "where": [
+     {
+      "path": "packages/server-utils/src/orchestrion",
+      "what": "per-library channel config and instrumentation"
+     },
+     {
+      "path": "packages/server-runtime-injection",
+      "what": "runtime injection package"
+     },
+     {
+      "path": "packages/server-utils/src/tracing-channel.ts",
+      "what": "tracing-channel helper"
+     }
+    ],
+    "shaped_by": "Francesco Gringl-Novy made the August 2026 export change alone [human] and, with Claude Code, split out the injection package in September 2026 [assisted]."
+   }
+  },
+  {
+   "unit_id": "orchestrion",
+   "level": 1,
+   "question": "What job does the per-library configuration entry, such as the one for the Postgres client, do for the transform step?",
+   "variants": [
+    "What does the transform learn from a per-library config entry?",
+    "How does the code transform know which library functions to wrap with tracing channels?"
+   ],
+   "reference_answer": "It tells the transform which module, version range and file, and which class method to wrap, and under what channel name. That is how it knows where to inject channel publishing.",
+   "evidence": [
+    "packages/server-utils/src/orchestrion/config/pg.ts:5-22"
+   ],
+   "orientation": {
+    "purpose": "Instruments third-party libraries by transforming their code at build or load time so they publish tracing channels.",
+    "decision": "AST transforms (bundler plugins, ESM loader hooks, a runtime injection package) with per-library config publish tracing channels. Runtime monkey-patching through require-in-the-middle or OTel instrumentation was not used. Transforms work with ESM and bundlers, and the injection code was split into its own package.",
+    "where": [
+     {
+      "path": "packages/server-utils/src/orchestrion",
+      "what": "per-library channel config and instrumentation"
+     },
+     {
+      "path": "packages/server-runtime-injection",
+      "what": "runtime injection package"
+     },
+     {
+      "path": "packages/server-utils/src/tracing-channel.ts",
+      "what": "tracing-channel helper"
+     }
+    ],
+    "shaped_by": "Francesco Gringl-Novy made the August 2026 export change alone [human] and, with Claude Code, split out the injection package in September 2026 [assisted]."
+   }
+  },
+  {
+   "unit_id": "orchestrion",
+   "level": 2,
+   "question": "Instrumentation is injected into third-party libraries by transforming their code at build or load time so they publish tracing channels, rather than monkey-patching at runtime. What constraint made code transformation better?",
+   "variants": [
+    "Why use build/load-time code transforms to add tracing channels instead of runtime monkey-patching of libraries?",
+    "What constraint favoured AST transformation over require-hook patching for instrumenting libraries?"
+   ],
+   "reference_answer": "Runtime patching depends on CommonJS require hooks and so fails under ESM and bundled apps. Transforming the source works in all of those, including bundlers, and emits runtime-neutral channels.",
+   "evidence": [
+    "packages/server-runtime-injection/src/register.ts:188-269",
+    "packages/server-utils/src/orchestrion/instrumentation.ts:104-144"
+   ]
+  },
+  {
+   "unit_id": "orchestrion",
+   "level": 2,
+   "question": "Channel-based integrations wait until the target library actually loads before subscribing, instead of subscribing to all channels at init. What constraint made deferring better?",
+   "variants": [
+    "Why do channel integrations defer subscribing until their library is loaded rather than subscribing at startup?",
+    "What constraint favoured lazy subscription to tracing channels over subscribing everything at init?"
+   ],
+   "reference_answer": "Node caps the number of channels in use at 1024, so claiming channels for libraries that never load would waste slots. Subscribing on module load avoids that.",
+   "evidence": [
+    "packages/server-runtime-injection/src/register.ts:219-222",
+    "packages/server-utils/src/orchestrion/instrumentation.ts:135-144"
+   ]
+  },
+  {
+   "unit_id": "orchestrion",
+   "level": 2,
+   "question": "The runtime injection is kept in its own package, separate from the shared instrumentation integrations. What constraint made the split better?",
+   "variants": [
+    "Why was runtime code injection split into a dedicated package apart from the server integrations?",
+    "What constraint favoured a separate runtime-injection package over keeping it inside the shared integrations package?"
+   ],
+   "reference_answer": "Runtime injection relies on heavy, runtime-specific module hooks and the transform engine, which only apps with loader access need. Bundled targets such as Cloudflare use build plugins and shouldn't pull that code in, so it is kept separate.",
+   "evidence": [
+    "packages/server-runtime-injection/src/register.ts:188-269",
+    "packages/server-utils/src/orchestrion/instrumentation.ts:118-131"
+   ]
+  },
+  {
+   "unit_id": "orchestrion",
+   "level": 3,
+   "question": "If code transformation to inject tracing channels were replaced with runtime monkey-patching of libraries, what part of the shared integrations' setup would first stop being needed?",
+   "variants": [
+    "If monkey-patching replaced build/load-time transforms, what part of integration setup would first become unnecessary?",
+    "What would integration setup no longer need to wait for if libraries were patched at runtime instead of transformed?"
+   ],
+   "reference_answer": "The wait for a module-injected signal before subscribing would be unnecessary, as would the bundler-plugin requirement on edge runtimes. Patching happens when the module is required rather than at transform time.",
+   "evidence": [
+    "packages/server-utils/src/orchestrion/instrumentation.ts:104-144"
+   ]
+  },
+  {
+   "unit_id": "orchestrion",
+   "level": 3,
+   "question": "If the per-library transform configuration were removed, what other part of the system would no longer be able to function?",
+   "variants": [
+    "If the per-library transform rules disappeared, what else could no longer work?",
+    "What would stop working if there were no per-library config describing which functions to wrap?"
+   ],
+   "reference_answer": "The runtime hooks and bundler plugins that rewrite library code would have nothing to inject, so no channels would be published. The integrations subscribing to them would record nothing.",
+   "evidence": [
+    "packages/server-utils/src/orchestrion/config/pg.ts:5-22",
+    "packages/server-runtime-injection/src/register.ts:230-269"
+   ]
+  },
+  {
+   "unit_id": "orchestrion",
+   "level": 3,
+   "question": "If the runtime injection were not a separate package from the shared server utilities, what would first be affected for users who only bundle their app?",
+   "variants": [
+    "If runtime injection lived inside the shared server package, what would first be affected for bundler-only users?",
+    "What cost would bundler-only users face if load-time injection code were folded into the shared server utilities?"
+   ],
+   "reference_answer": "Users who rely on bundler plugins would still receive the load-hook code and its Node module-hook dependencies in the shared package they install. The split keeps that code optional.",
+   "evidence": [
+    "packages/server-runtime-injection/src/register.ts:188-269"
+   ]
+  },
+  {
+   "unit_id": "cloudflare",
+   "level": 1,
+   "question": "Why does the Cloudflare SDK wrap the bindings object handed to a worker instead of leaving bindings untouched?",
+   "variants": [
+    "What does wrapping bindings let the Cloudflare SDK do for calls to databases and queues?",
+    "What would a Cloudflare user lose if the SDK did not wrap the environment bindings?"
+   ],
+   "reference_answer": "Wrapping lets the SDK observe calls on bindings such as D1 databases and queues, creating spans and adding trace context to queue messages. Without it, those calls would not be traced.",
+   "evidence": [
+    "packages/cloudflare/src/instrumentations/worker/instrumentEnv.ts:43-76",
+    "packages/cloudflare/src/instrumentations/worker/instrumentQueueProducer.ts:97-111"
+   ],
+   "orientation": {
+    "purpose": "The SDK for Cloudflare Workers. It instruments handlers, Durable Objects, Workflows, queues and bindings, and propagates trace context.",
+    "decision": "Handlers and bindings are wrapped explicitly, and trace context is propagated through RPC, fetch and queue messages. A Node-compat SDK without wrapping was not chosen. The reason is Workers runtime constraints.",
+    "where": [
+     {
+      "path": "packages/cloudflare/src/withSentry.ts",
+      "what": "handler wrapper"
+     },
+     {
+      "path": "packages/cloudflare/src/durableobject.ts",
+      "what": "Durable Object instrumentation"
+     },
+     {
+      "path": "packages/cloudflare/src/workflows.ts",
+      "what": "Workflow instrumentation"
+     }
+    ],
+    "shaped_by": "Jan Peer Stöcklmair added RPC propagation alone in April 2026 [human]. Later RPC and queue propagation changes were assisted by Claude Code, by Stöcklmair and Arthur Fiorette [assisted]."
+   }
+  },
+  {
+   "unit_id": "cloudflare",
+   "level": 1,
+   "question": "Why does queue trace propagation add the trace header into the message body rather than into a message header?",
+   "variants": [
+    "What platform limitation forces the trace context for queue messages into the body?",
+    "Why is the queue trace context carried inside the payload for Cloudflare Queues?"
+   ],
+   "reference_answer": "Cloudflare Queues has no message-header API, so the only place to carry trace context is a named field in a record-like body. Other body types pass through untouched.",
+   "evidence": [
+    "packages/cloudflare/src/utils/queueTraceMeta.ts:5-30"
+   ],
+   "orientation": {
+    "purpose": "The SDK for Cloudflare Workers. It instruments handlers, Durable Objects, Workflows, queues and bindings, and propagates trace context.",
+    "decision": "Handlers and bindings are wrapped explicitly, and trace context is propagated through RPC, fetch and queue messages. A Node-compat SDK without wrapping was not chosen. The reason is Workers runtime constraints.",
+    "where": [
+     {
+      "path": "packages/cloudflare/src/withSentry.ts",
+      "what": "handler wrapper"
+     },
+     {
+      "path": "packages/cloudflare/src/durableobject.ts",
+      "what": "Durable Object instrumentation"
+     },
+     {
+      "path": "packages/cloudflare/src/workflows.ts",
+      "what": "Workflow instrumentation"
+     }
+    ],
+    "shaped_by": "Jan Peer Stöcklmair added RPC propagation alone in April 2026 [human]. Later RPC and queue propagation changes were assisted by Claude Code, by Stöcklmair and Arthur Fiorette [assisted]."
+   }
+  },
+  {
+   "unit_id": "cloudflare",
+   "level": 1,
+   "question": "Why is queue trace propagation controlled per binding instead of being on for every queue?",
+   "variants": [
+    "What is the benefit of letting users choose which queue bindings get trace context added?",
+    "Why does the Cloudflare SDK let users limit queue trace propagation to chosen bindings?"
+   ],
+   "reference_answer": "Propagation changes the message body and costs payload size against Cloudflare's limit, so it is opt-in per binding. Users enable it only for queues whose consumers are instrumented and whose payloads can take the extra field.",
+   "evidence": [
+    "packages/cloudflare/src/utils/bindingPropagation.ts:9-19",
+    "packages/cloudflare/src/utils/queueTraceMeta.ts:16-30"
+   ],
+   "orientation": {
+    "purpose": "The SDK for Cloudflare Workers. It instruments handlers, Durable Objects, Workflows, queues and bindings, and propagates trace context.",
+    "decision": "Handlers and bindings are wrapped explicitly, and trace context is propagated through RPC, fetch and queue messages. A Node-compat SDK without wrapping was not chosen. The reason is Workers runtime constraints.",
+    "where": [
+     {
+      "path": "packages/cloudflare/src/withSentry.ts",
+      "what": "handler wrapper"
+     },
+     {
+      "path": "packages/cloudflare/src/durableobject.ts",
+      "what": "Durable Object instrumentation"
+     },
+     {
+      "path": "packages/cloudflare/src/workflows.ts",
+      "what": "Workflow instrumentation"
+     }
+    ],
+    "shaped_by": "Jan Peer Stöcklmair added RPC propagation alone in April 2026 [human]. Later RPC and queue propagation changes were assisted by Claude Code, by Stöcklmair and Arthur Fiorette [assisted]."
+   }
+  },
+  {
+   "unit_id": "cloudflare",
+   "level": 2,
+   "question": "The Cloudflare SDK wraps handlers and bindings explicitly rather than reusing the Node-compat SDK unchanged. What constraint made explicit wrapping better?",
+   "variants": [
+    "Why does the Cloudflare SDK explicitly instrument handlers and bindings instead of relying on the Node SDK in compat mode?",
+    "What constraint in Workers made explicit wrapping a better choice than an unwrapped Node-compat approach?"
+   ],
+   "reference_answer": "Workers have no process-level hooks or Node-style module patching, and handlers and bindings are handed in per request. Wrapping them is the only way to create spans, flush events and trace calls.",
+   "evidence": [
+    "packages/cloudflare/src/instrumentations/worker/instrumentEnv.ts:43-76"
+   ]
+  },
+  {
+   "unit_id": "cloudflare",
+   "level": 2,
+   "question": "Queue trace context is added to the message body as a copied field, only for plain-object bodies, rather than as a header. What constraint forced that design?",
+   "variants": [
+    "Why is trace context injected into queue message bodies instead of headers on Cloudflare?",
+    "What constraint made embedding trace context in the message payload necessary for Cloudflare Queues?"
+   ],
+   "reference_answer": "Cloudflare Queues has no message-header API, so the body is the only carrier, and only record-like bodies can hold a named field. Binary or other bodies pass untouched, and the body is copied so callers' payloads aren't mutated.",
+   "evidence": [
+    "packages/cloudflare/src/utils/queueTraceMeta.ts:5-30"
+   ]
+  },
+  {
+   "unit_id": "cloudflare",
+   "level": 2,
+   "question": "Queue trace propagation is opt-in per binding rather than enabled for every queue by default. What constraint made opt-in better?",
+   "variants": [
+    "Why must users opt in per queue binding before trace context is added to messages?",
+    "What constraint favoured per-binding opt-in over always propagating trace context into queue messages?"
+   ],
+   "reference_answer": "Propagation modifies the message body and adds bytes, which can push payloads near Cloudflare's 128 KB limit into failing or break consumers that expect an exact body shape. Opt-in avoids altering messages unexpectedly.",
+   "evidence": [
+    "packages/cloudflare/src/utils/bindingPropagation.ts:9-19",
+    "packages/cloudflare/src/utils/queueTraceMeta.ts:16-30",
+    "packages/cloudflare/src/instrumentations/worker/instrumentQueueProducer.ts:97-111"
+   ]
+  },
+  {
+   "unit_id": "cloudflare",
+   "level": 3,
+   "question": "If the SDK stopped wrapping queue bindings explicitly and relied on Node-compat behaviour, what would first be lost?",
+   "variants": [
+    "If queue bindings were no longer wrapped by the SDK, what would first be lost?",
+    "What would be lost for queue producers if the Cloudflare SDK did not wrap the environment bindings?"
+   ],
+   "reference_answer": "Producer-side spans for queue sends and the trace context placed in messages would be lost, so consumers could not link back to the producer trace.",
+   "evidence": [
+    "packages/cloudflare/src/instrumentations/worker/instrumentEnv.ts:43-76",
+    "packages/cloudflare/src/instrumentations/worker/instrumentQueueProducer.ts:97-111"
+   ]
+  },
+  {
+   "unit_id": "cloudflare",
+   "level": 3,
+   "question": "If Cloudflare Queues offered a message-headers API, what part of the current queue trace propagation approach could be dropped?",
+   "variants": [
+    "If queues supported message headers, what would the current propagation approach no longer need?",
+    "What workaround in queue trace propagation would become unnecessary with a headers API for messages?"
+   ],
+   "reference_answer": "The propagation would no longer need to copy the message body and add a field to it, or check whether the body is a plain object. It would carry trace context in headers, avoiding the body size cost.",
+   "evidence": [
+    "packages/cloudflare/src/utils/queueTraceMeta.ts:5-30"
+   ]
+  },
+  {
+   "unit_id": "cloudflare",
+   "level": 3,
+   "question": "If all queue bindings propagated trace context by default, what would first change for users' messages?",
+   "variants": [
+    "What would change for user payloads if queue trace propagation were on for every binding?",
+    "If trace propagation to queues were enabled for every binding automatically instead of by opt-in list, what would first be affected for existing users' messages?"
+   ],
+   "reference_answer": "Message bodies for bindings that did not opt in would gain an extra field, which can affect consumers that read the body strictly. It also eats into the message size limit.",
+   "evidence": [
+    "packages/cloudflare/src/utils/bindingPropagation.ts:9-19",
+    "packages/cloudflare/src/utils/queueTraceMeta.ts:16-30"
+   ]
+  },
+  {
+   "unit_id": "nextjs",
+   "level": 1,
+   "question": "Why does the Next.js SDK's build-time wrapping step matter to a user who wants every server page and route traced without editing each file?",
+   "variants": [
+    "What does the Next.js SDK's build-time wrapping step let users avoid doing by hand for their server pages and routes?",
+    "Why can a Next.js user get tracing on all server pages and routes without touching each file?"
+   ],
+   "reference_answer": "The build step adds loaders that automatically wrap server components and route handlers as they are bundled. That way they are instrumented without the user changing their own source files.",
+   "evidence": [
+    "packages/nextjs/src/config/webpack.ts:287-315",
+    "packages/nextjs/src/config/loaders/wrappingLoader.ts:126-167"
+   ],
+   "orientation": {
+    "purpose": "The Next.js SDK. It provides client, server and edge entry points, build config wrapping for webpack/turbopack, route wrapping and use-cache instrumentation.",
+    "decision": "A build-time config wrapper, with loaders that wrap routes and components, plus separate client, server and edge runtimes. Runtime-only instrumentation was not chosen. Next's multi-runtime architecture drove this.",
+    "where": [
+     {
+      "path": "packages/nextjs/src",
+      "what": "all SDK source"
+     },
+     {
+      "path": "packages/nextjs/src/config",
+      "what": "build config wrapper and loaders"
+     },
+     {
+      "path": "packages/nextjs/src/server",
+      "what": "server runtime code"
+     }
+    ],
+    "shaped_by": "The only history is a 2025 fix by Charly Gomez, handling async params in URL extraction, written alone [human]."
+   }
+  },
+  {
+   "unit_id": "nextjs",
+   "level": 1,
+   "question": "When the Next.js build-time wrapper meets a component that Next.js has marked as running in the browser, what does it do with it?",
+   "variants": [
+    "How does the Next.js build-time wrapper treat a file that Next.js flags as a browser-side component?",
+    "What happens to a client-side component when the Next.js build wrapper processes it?"
+   ],
+   "reference_answer": "It leaves the component untouched and does not wrap it. Server-side wrapping is meant for server code, and client code is covered by the separate browser entry point.",
+   "evidence": [
+    "packages/nextjs/src/config/loaders/wrappingLoader.ts:152-159"
+   ],
+   "orientation": {
+    "purpose": "The Next.js SDK. It provides client, server and edge entry points, build config wrapping for webpack/turbopack, route wrapping and use-cache instrumentation.",
+    "decision": "A build-time config wrapper, with loaders that wrap routes and components, plus separate client, server and edge runtimes. Runtime-only instrumentation was not chosen. Next's multi-runtime architecture drove this.",
+    "where": [
+     {
+      "path": "packages/nextjs/src",
+      "what": "all SDK source"
+     },
+     {
+      "path": "packages/nextjs/src/config",
+      "what": "build config wrapper and loaders"
+     },
+     {
+      "path": "packages/nextjs/src/server",
+      "what": "server runtime code"
+     }
+    ],
+    "shaped_by": "The only history is a 2025 fix by Charly Gomez, handling async params in URL extraction, written alone [human]."
+   }
+  },
+  {
+   "unit_id": "nextjs",
+   "level": 1,
+   "question": "Where does the route name that the Next.js build-time wrapper attaches to a wrapped server page come from?",
+   "variants": [
+    "How does the Next.js build-time wrapper work out the route name for a wrapped server page?",
+    "What is the source of the parameterized route name given to a wrapped server component?"
+   ],
+   "reference_answer": "It is derived from the file's location inside the app directory: the path is normalized, the file name is dropped, and the root route is used for the homepage.",
+   "evidence": [
+    "packages/nextjs/src/config/loaders/wrappingLoader.ts:132-144"
+   ],
+   "orientation": {
+    "purpose": "The Next.js SDK. It provides client, server and edge entry points, build config wrapping for webpack/turbopack, route wrapping and use-cache instrumentation.",
+    "decision": "A build-time config wrapper, with loaders that wrap routes and components, plus separate client, server and edge runtimes. Runtime-only instrumentation was not chosen. Next's multi-runtime architecture drove this.",
+    "where": [
+     {
+      "path": "packages/nextjs/src",
+      "what": "all SDK source"
+     },
+     {
+      "path": "packages/nextjs/src/config",
+      "what": "build config wrapper and loaders"
+     },
+     {
+      "path": "packages/nextjs/src/server",
+      "what": "server runtime code"
+     }
+    ],
+    "shaped_by": "The only history is a 2025 fix by Charly Gomez, handling async params in URL extraction, written alone [human]."
+   }
+  },
+  {
+   "unit_id": "nextjs",
+   "level": 2,
+   "question": "The Next.js SDK wraps the user's Next config at build time and injects wrapping into routes and components, rather than relying only on runtime instrumentation. What constraint of Next.js made that the better choice?",
+   "variants": [
+    "Why does the Next.js SDK modify the user's build configuration to wrap routes and components instead of relying purely on runtime instrumentation?",
+    "What about how Next.js builds and runs apps made build-time wrapping preferable to runtime-only instrumentation for the Next.js SDK?"
+   ],
+   "reference_answer": "Next.js runs code in several separate runtimes (client, Node server, edge) and bundles each separately, so there is no single runtime hook point. Wrapping at build time lets the SDK instrument each route/component per bundle and know its parameterized route, which runtime-only patching cannot do reliably.",
+   "evidence": [
+    "packages/nextjs/src/config/webpack.ts:287-315",
+    "packages/nextjs/src/config/loaders/wrappingLoader.ts:126-167"
+   ]
+  },
+  {
+   "unit_id": "nextjs",
+   "level": 2,
+   "question": "The Next.js SDK derives route names for wrapped server code from file locations at build time instead of discovering them while requests are being served. What constraint makes that the better choice?",
+   "variants": [
+    "Why does the Next.js SDK compute parameterized route names from the file layout during the build rather than at request time?",
+    "What makes build-time route-name derivation from file paths better than runtime discovery for the Next.js SDK?"
+   ],
+   "reference_answer": "At runtime the code only sees concrete URLs, which would produce high-cardinality transaction names. The file-based app directory layout gives the parameterized route, and the build step is where the file path is known.",
+   "evidence": [
+    "packages/nextjs/src/config/loaders/wrappingLoader.ts:132-144"
+   ]
+  },
+  {
+   "unit_id": "nextjs",
+   "level": 2,
+   "question": "The Next.js config wrapper accepts either a plain config object or a config function and handles both, instead of supporting only objects. What constraint of Next.js forced this?",
+   "variants": [
+    "Why must the Next.js build-config wrapper support user configs that are functions, including ones returning promises, rather than only plain objects?",
+    "What Next.js behavior required the SDK's config wrapper to handle both object and function (possibly async) configs?"
+   ],
+   "reference_answer": "Next.js lets users export their config as an object or as a function that may return a promise. The SDK must wrap whichever form the user has, applying its changes to the final resolved config.",
+   "evidence": [
+    "packages/nextjs/src/config/withSentryConfig/index.ts:18-42"
+   ]
+  },
+  {
+   "unit_id": "nextjs",
+   "level": 3,
+   "question": "If the Next.js SDK dropped its build-time configuration wrapper and relied only on runtime instrumentation, what first other part of the system would have to change to still capture route-level spans?",
+   "variants": [
+    "If the Next.js SDK stopped transforming user code at build time and used only runtime hooks, which other part would first need to change to still get per-route tracing?",
+    "What would have to change first elsewhere in the Next.js SDK if automatic wrapping of routes and components at build time were replaced by runtime-only instrumentation?"
+   ],
+   "reference_answer": "The route and component wrapping would have to be done some other way, since the build-time loaders that wrap server components and route handlers would be gone. Route names, now derived from file paths at build time, would need to come from the framework at runtime, and wrapping would have to be applied manually by users or via runtime hooks.",
+   "evidence": [
+    "packages/nextjs/src/config/webpack.ts:287-315",
+    "packages/nextjs/src/config/loaders/wrappingLoader.ts:126-167"
+   ]
+  },
+  {
+   "unit_id": "ai-instrumentation",
+   "level": 1,
+   "question": "What does the OpenAI instrumentation give back to the user in place of their original client so that calls produce spans?",
+   "variants": [
+    "When a user instruments their OpenAI client, what object do they get back to use instead?",
+    "What stands in front of the user's OpenAI client so its calls get traced?"
+   ],
+   "reference_answer": "It returns a proxy that wraps the client, including nested objects. Calls to registered methods are traced, and everything else passes through to the original.",
+   "evidence": [
+    "packages/server-utils/src/ai/openai/index.ts:227-281"
+   ],
+   "orientation": {
+    "purpose": "Creates spans for AI and LLM libraries such as OpenAI, Anthropic, Vercel AI, LangChain, Mastra and MCP.",
+    "decision": "Each library gets its own wrapper or subscriber that emits gen-ai semantic-convention spans. Generic HTTP-only tracing was not used. Beyond the growing AI surface, the code and history don't show why.",
+    "where": [
+     {
+      "path": "packages/server-utils/src/ai",
+      "what": "shared AI helpers and types"
+     },
+     {
+      "path": "packages/server-utils/src/integrations/vercel-ai",
+      "what": "Vercel AI integration"
+     },
+     {
+      "path": "packages/core/src/integrations/mcp-server",
+      "what": "MCP server instrumentation"
+     }
+    ],
+    "shaped_by": "The history list does not say."
+   }
+  },
+  {
+   "unit_id": "ai-instrumentation",
+   "level": 1,
+   "question": "What happens when a user calls an OpenAI client method that is not in the set of tracked operations?",
+   "variants": [
+    "How does the instrumented OpenAI client treat a method call that is not a registered operation?",
+    "What does the OpenAI wrapper do with calls to methods it does not track?"
+   ],
+   "reference_answer": "The call is not turned into a span. The method is passed through bound to the original client so it behaves as it did before.",
+   "evidence": [
+    "packages/server-utils/src/ai/openai/index.ts:243-262",
+    "packages/server-utils/src/ai/openai/constants.ts:8-17"
+   ],
+   "orientation": {
+    "purpose": "Creates spans for AI and LLM libraries such as OpenAI, Anthropic, Vercel AI, LangChain, Mastra and MCP.",
+    "decision": "Each library gets its own wrapper or subscriber that emits gen-ai semantic-convention spans. Generic HTTP-only tracing was not used. Beyond the growing AI surface, the code and history don't show why.",
+    "where": [
+     {
+      "path": "packages/server-utils/src/ai",
+      "what": "shared AI helpers and types"
+     },
+     {
+      "path": "packages/server-utils/src/integrations/vercel-ai",
+      "what": "Vercel AI integration"
+     },
+     {
+      "path": "packages/core/src/integrations/mcp-server",
+      "what": "MCP server instrumentation"
+     }
+    ],
+    "shaped_by": "The history list does not say."
+   }
+  },
+  {
+   "unit_id": "ai-instrumentation",
+   "level": 1,
+   "question": "Why does the OpenAI instrumentation leave the model out of the span name when the model is unknown and span streaming is on?",
+   "variants": [
+    "With span streaming on and no known model, why is the model dropped from the OpenAI span name?",
+    "Why does an OpenAI span use only the operation as its name when streaming spans and the model is unknown?"
+   ],
+   "reference_answer": "Span names must stay low-cardinality when spans are streamed. An unknown-model placeholder would add noise to the name, so only the operation is used.",
+   "evidence": [
+    "packages/server-utils/src/ai/openai/index.ts:163-171"
+   ],
+   "orientation": {
+    "purpose": "Creates spans for AI and LLM libraries such as OpenAI, Anthropic, Vercel AI, LangChain, Mastra and MCP.",
+    "decision": "Each library gets its own wrapper or subscriber that emits gen-ai semantic-convention spans. Generic HTTP-only tracing was not used. Beyond the growing AI surface, the code and history don't show why.",
+    "where": [
+     {
+      "path": "packages/server-utils/src/ai",
+      "what": "shared AI helpers and types"
+     },
+     {
+      "path": "packages/server-utils/src/integrations/vercel-ai",
+      "what": "Vercel AI integration"
+     },
+     {
+      "path": "packages/core/src/integrations/mcp-server",
+      "what": "MCP server instrumentation"
+     }
+    ],
+    "shaped_by": "The history list does not say."
+   }
+  },
+  {
+   "unit_id": "ai-instrumentation",
+   "level": 2,
+   "question": "AI client tracing is done with wrappers specific to each AI library that emit generative-AI span data, instead of generic HTTP-only tracing. What constraint made that better?",
+   "variants": [
+    "Why instrument each AI library with its own wrapper rather than rely on generic HTTP request tracing?",
+    "What limitation of HTTP-level tracing led to per-library AI instrumentation emitting gen-AI spans?"
+   ],
+   "reference_answer": "HTTP spans can't see model names, token usage, prompts/responses or streamed chunks, which live at the SDK-call level. Library-aware wrappers can extract these and map them to a common gen-AI span convention.",
+   "evidence": [
+    "packages/server-utils/src/ai/openai/index.ts:147-201",
+    "packages/server-utils/src/ai/openai/constants.ts:8-17"
+   ]
+  },
+  {
+   "unit_id": "ai-instrumentation",
+   "level": 2,
+   "question": "The OpenAI instrumentation wraps the client instance in a proxy instead of patching the library's modules via Node import hooks. What constraint made that the better choice?",
+   "variants": [
+    "Why is the OpenAI client instrumented by wrapping an instance rather than by patching the module at import time?",
+    "What deployment constraint favored instance wrapping over module patching for the OpenAI instrumentation?"
+   ],
+   "reference_answer": "The instrumentation must work across Node.js, Cloudflare Workers and Vercel Edge, where import-hook module patching isn't available. Wrapping the client the user creates works in any runtime.",
+   "evidence": [
+    "packages/server-utils/src/ai/openai/index.ts:275-281"
+   ]
+  },
+  {
+   "unit_id": "ai-instrumentation",
+   "level": 2,
+   "question": "The OpenAI instrumentation uses a registry of specific API methods to trace instead of tracing every call on the client. What constraint made that the better choice?",
+   "variants": [
+    "Why does the OpenAI wrapper only create spans for a registered set of methods rather than for all client calls?",
+    "What made an allowlist of traced methods better than instrumenting every client method?"
+   ],
+   "reference_answer": "Only certain calls (chat, responses, embeddings, etc.) are model operations that deserve gen-AI spans with a known operation type. Tracing everything would create noisy, meaningless spans for helper calls.",
+   "evidence": [
+    "packages/server-utils/src/ai/openai/constants.ts:8-17",
+    "packages/server-utils/src/ai/openai/index.ts:227-272"
+   ]
+  },
+  {
+   "unit_id": "ai-instrumentation",
+   "level": 3,
+   "question": "If AI client tracing were replaced by generic HTTP-only tracing, what first piece of the span data produced for AI calls would no longer be available?",
+   "variants": [
+    "If only generic HTTP request tracing were used for LLM calls instead of per-library wrappers, what AI-specific information on spans would be lost first?",
+    "What would be missing from spans first if per-library AI wrappers were swapped for plain HTTP tracing?"
+   ],
+   "reference_answer": "The gen-ai semantic data, such as the operation type, model name, and recorded inputs, outputs and token usage, would be lost. HTTP spans only see URLs and status codes, and streamed responses couldn't be tied to a single span.",
+   "evidence": [
+    "packages/server-utils/src/ai/openai/index.ts:147-201",
+    "packages/server-utils/src/ai/openai/constants.ts:8-17"
+   ]
+  },
+  {
+   "unit_id": "framework-sdks",
+   "level": 1,
+   "question": "Why does the SvelteKit server SDK turn on OpenTelemetry setup by default when most Node-based SDKs do not?",
+   "variants": [
+    "What reason does the SvelteKit server SDK have for registering the Sentry tracer provider by default?",
+    "Why is OpenTelemetry setup enabled by default for SvelteKit on the server?"
+   ],
+   "reference_answer": "SvelteKit emits its own OpenTelemetry spans, so Sentry must register a tracer provider to capture them. A user can still override the default.",
+   "evidence": [
+    "packages/sveltekit/src/server/sdk.ts:12-31"
+   ],
+   "orientation": {
+    "purpose": "Thin packages that adapt Sentry to each framework: React, Vue, Svelte(Kit), Angular, Nuxt, Remix, Astro, Nest and others. They add router and error hooks.",
+    "decision": "Each framework package layers on the browser, node or cloudflare SDKs with framework-specific router and error hooks. One universal SDK was not chosen, because each framework has its own lifecycle and routing.",
+    "where": [
+     {
+      "path": "packages/react",
+      "what": "React error boundary and router integrations"
+     },
+     {
+      "path": "packages/sveltekit",
+      "what": "SvelteKit client and server"
+     },
+     {
+      "path": "packages/nestjs",
+      "what": "Nest server integration"
+     }
+    ],
+    "shaped_by": "Lukas Stracke, a human working alone, switched SvelteKit to the OTel-based @sentry/node in March 2024 [human]."
+   }
+  },
+  {
+   "unit_id": "framework-sdks",
+   "level": 1,
+   "question": "Why does the SvelteKit server request hook treat a nested internal request differently from a top-level request?",
+   "variants": [
+    "What is different about how the SvelteKit request hook handles a same-origin server fetch that re-enters it?",
+    "Why does the SvelteKit hook not start a fresh trace for a sub-request?"
+   ],
+   "reference_answer": "SvelteKit re-enters the hook for a same-origin fetch inside a load function without a network call. The nested span should therefore be a child of the active span, not a new root.",
+   "evidence": [
+    "packages/sveltekit/src/server-common/handle.ts:328-338",
+    "packages/sveltekit/src/server-common/handle.ts:340-358"
+   ],
+   "orientation": {
+    "purpose": "Thin packages that adapt Sentry to each framework: React, Vue, Svelte(Kit), Angular, Nuxt, Remix, Astro, Nest and others. They add router and error hooks.",
+    "decision": "Each framework package layers on the browser, node or cloudflare SDKs with framework-specific router and error hooks. One universal SDK was not chosen, because each framework has its own lifecycle and routing.",
+    "where": [
+     {
+      "path": "packages/react",
+      "what": "React error boundary and router integrations"
+     },
+     {
+      "path": "packages/sveltekit",
+      "what": "SvelteKit client and server"
+     },
+     {
+      "path": "packages/nestjs",
+      "what": "Nest server integration"
+     }
+    ],
+    "shaped_by": "Lukas Stracke, a human working alone, switched SvelteKit to the OTel-based @sentry/node in March 2024 [human]."
+   }
+  },
+  {
+   "unit_id": "framework-sdks",
+   "level": 1,
+   "question": "Why does the SvelteKit server request hook skip its own trace continuation when SvelteKit's built-in tracing is enabled?",
+   "variants": [
+    "What makes SvelteKit trace continuation by the Sentry hook unnecessary when Kit tracing is enabled?",
+    "Why does the Sentry SvelteKit hook not continue the incoming trace itself when Kit tracing is on?"
+   ],
+   "reference_answer": "When SvelteKit's tracing is enabled, SvelteKit continues the incoming trace itself before the hook runs. Doing it again would be redundant.",
+   "evidence": [
+    "packages/sveltekit/src/server-common/handle.ts:351-357"
+   ],
+   "orientation": {
+    "purpose": "Thin packages that adapt Sentry to each framework: React, Vue, Svelte(Kit), Angular, Nuxt, Remix, Astro, Nest and others. They add router and error hooks.",
+    "decision": "Each framework package layers on the browser, node or cloudflare SDKs with framework-specific router and error hooks. One universal SDK was not chosen, because each framework has its own lifecycle and routing.",
+    "where": [
+     {
+      "path": "packages/react",
+      "what": "React error boundary and router integrations"
+     },
+     {
+      "path": "packages/sveltekit",
+      "what": "SvelteKit client and server"
+     },
+     {
+      "path": "packages/nestjs",
+      "what": "Nest server integration"
+     }
+    ],
+    "shaped_by": "Lukas Stracke, a human working alone, switched SvelteKit to the OTel-based @sentry/node in March 2024 [human]."
+   }
+  },
+  {
+   "unit_id": "framework-sdks",
+   "level": 2,
+   "question": "Sentry ships separate thin packages per framework layered on the browser, Node or Cloudflare SDKs instead of one universal SDK. What constraint made that the better choice?",
+   "variants": [
+    "Why are there per-framework SDK packages on top of base SDKs rather than a single universal SDK?",
+    "What about web frameworks led Sentry to layer thin framework packages over base runtime SDKs instead of one SDK?"
+   ],
+   "reference_answer": "Each framework has its own routing, request lifecycle and error-handling hooks, which need framework-specific integration. Layering reuses the shared runtime SDK while keeping framework code and dependencies out of the others.",
+   "evidence": [
+    "packages/sveltekit/src/server/sdk.ts:12-31",
+    "packages/sveltekit/src/server-common/handle.ts:315-358"
+   ]
+  },
+  {
+   "unit_id": "framework-sdks",
+   "level": 2,
+   "question": "The SvelteKit server SDK was moved onto the OpenTelemetry-based Node SDK rather than a custom non-OTel server layer. What constraint made that the better choice?",
+   "variants": [
+    "Why does the SvelteKit server SDK build on the OTel-based Node SDK?",
+    "What made reusing the OpenTelemetry-based Node SDK preferable for SvelteKit's server side?"
+   ],
+   "reference_answer": "SvelteKit itself emits OpenTelemetry spans and runs on Node, so building on the OTel-based Node SDK lets it reuse tracing, context isolation and integrations instead of duplicating them.",
+   "evidence": [
+    "packages/sveltekit/src/server/sdk.ts:12-31"
+   ]
+  },
+  {
+   "unit_id": "framework-sdks",
+   "level": 2,
+   "question": "The SvelteKit request hook isolates each top-level request but treats internal sub-requests as children of the current span. What framework behavior forced this choice?",
+   "variants": [
+    "Why does the SvelteKit hook not start a fresh isolated request for same-origin fetches inside load functions?",
+    "What SvelteKit behavior makes the SDK nest sub-request spans under the active span instead of isolating them?"
+   ],
+   "reference_answer": "SvelteKit re-enters the request hook for same-origin fetches in server load functions without a real network call. Treating them as new roots would misrepresent one request as several unrelated traces.",
+   "evidence": [
+    "packages/sveltekit/src/server-common/handle.ts:328-358"
+   ]
+  },
+  {
+   "unit_id": "framework-sdks",
+   "level": 3,
+   "question": "If the separate framework packages were replaced by one universal SDK, what first part of the system would have to take on the framework-specific work?",
+   "variants": [
+    "If one universal SDK replaced the per-framework packages, which part would first have to absorb the routing and request lifecycle handling each framework needs?",
+    "What would have to change first if the thin per-framework layers on top of the core platform SDKs were merged into a single SDK?"
+   ],
+   "reference_answer": "The single SDK would have to contain all framework-specific hooks, including request handling, router instrumentation and error capture, and decide at runtime which to use. Today each framework package owns these, such as the server handle hook and default integrations for SvelteKit, on top of the Node SDK.",
+   "evidence": [
+    "packages/sveltekit/src/server/sdk.ts:12-31",
+    "packages/sveltekit/src/server-common/handle.ts:315-358"
+   ]
+  },
+  {
+   "unit_id": "replay-feedback",
+   "level": 1,
+   "question": "Why does replay keep a simple uncompressed buffer while the compression worker is still loading?",
+   "variants": [
+    "What is the plain in-memory buffer for during replay's startup before the compression worker is ready?",
+    "Why does replay not just wait for the compression worker before accepting events?"
+   ],
+   "reference_answer": "It lets recording start immediately with no events lost. If the worker is ready, buffered events are moved into it. If the worker fails to load, replay keeps using the simple buffer.",
+   "evidence": [
+    "packages/replay-internal/src/eventBuffer/EventBufferProxy.ts:14-26",
+    "packages/replay-internal/src/eventBuffer/EventBufferProxy.ts:97-141"
+   ],
+   "orientation": {
+    "purpose": "Records user sessions with rrweb and compresses them in a worker. It also provides the feedback widget and screenshots.",
+    "decision": "Replay lives in replay-internal, with fflate compression in a web worker. The feedback UI is built on preact. pako and a React UI were not used. The reason given is size and performance.",
+    "where": [
+     {
+      "path": "packages/replay-internal/src",
+      "what": "replay recording logic"
+     },
+     {
+      "path": "packages/replay-worker/src",
+      "what": "compression worker"
+     },
+     {
+      "path": "packages/feedback/src",
+      "what": "feedback widget"
+     }
+    ],
+    "shaped_by": "Humans alone: Francesco Novy switched to fflate in November 2023, and Sigrid Huemer moved the replay code to replay-internal in March 2024 [human]."
+   }
+  },
+  {
+   "unit_id": "replay-feedback",
+   "level": 1,
+   "question": "Why does replay discard recorded events whose timestamps are long in the past when a user returns to an idle page?",
+   "variants": [
+    "What is the reason replay throws out very old events after a page has been idle?",
+    "Why are stale events dropped when a user comes back to a long-idle tab during a replay?"
+   ],
+   "reference_answer": "Some events, such as performance entries, are timed from when the page first opened. After a long idle period they would be stale and would not belong in the new session.",
+   "evidence": [
+    "packages/replay-internal/src/util/addEvent.ts:119-142"
+   ],
+   "orientation": {
+    "purpose": "Records user sessions with rrweb and compresses them in a worker. It also provides the feedback widget and screenshots.",
+    "decision": "Replay lives in replay-internal, with fflate compression in a web worker. The feedback UI is built on preact. pako and a React UI were not used. The reason given is size and performance.",
+    "where": [
+     {
+      "path": "packages/replay-internal/src",
+      "what": "replay recording logic"
+     },
+     {
+      "path": "packages/replay-worker/src",
+      "what": "compression worker"
+     },
+     {
+      "path": "packages/feedback/src",
+      "what": "feedback widget"
+     }
+    ],
+    "shaped_by": "Humans alone: Francesco Novy switched to fflate in November 2023, and Sigrid Huemer moved the replay code to replay-internal in March 2024 [human]."
+   }
+  },
+  {
+   "unit_id": "replay-feedback",
+   "level": 1,
+   "question": "In buffer mode, what happens to the already-buffered events when a new full snapshot checkpoint arrives?",
+   "variants": [
+    "When replay is in buffer mode and a new checkout arrives, what becomes of the previously buffered events?",
+    "How does the replay buffer behave in buffer mode when a fresh full snapshot is recorded?"
+   ],
+   "reference_answer": "The buffer is cleared and restarted from the new checkpoint. This keeps a rolling window that always begins with a full snapshot.",
+   "evidence": [
+    "packages/replay-internal/src/util/addEvent.ts:51-82"
+   ],
+   "orientation": {
+    "purpose": "Records user sessions with rrweb and compresses them in a worker. It also provides the feedback widget and screenshots.",
+    "decision": "Replay lives in replay-internal, with fflate compression in a web worker. The feedback UI is built on preact. pako and a React UI were not used. The reason given is size and performance.",
+    "where": [
+     {
+      "path": "packages/replay-internal/src",
+      "what": "replay recording logic"
+     },
+     {
+      "path": "packages/replay-worker/src",
+      "what": "compression worker"
+     },
+     {
+      "path": "packages/feedback/src",
+      "what": "feedback widget"
+     }
+    ],
+    "shaped_by": "Humans alone: Francesco Novy switched to fflate in November 2023, and Sigrid Huemer moved the replay code to replay-internal in March 2024 [human]."
+   }
+  },
+  {
+   "unit_id": "replay-feedback",
+   "level": 2,
+   "question": "Replay compresses recorded events in a web worker instead of on the main thread. What constraint made that the better choice?",
+   "variants": [
+    "Why does Replay do its compression in a web worker rather than on the main thread?",
+    "What constraint favors off-main-thread compression for recorded session events?"
+   ],
+   "reference_answer": "Replay records a constant stream of DOM events and compressing them is CPU-heavy, which would hurt the host page's responsiveness. A worker keeps that cost off the main thread while shrinking upload size.",
+   "evidence": [
+    "packages/replay-internal/src/eventBuffer/EventBufferProxy.ts:14-26"
+   ]
+  },
+  {
+   "unit_id": "replay-feedback",
+   "level": 2,
+   "question": "Replay starts with a simple in-memory buffer and switches to the compression worker once it is ready, instead of waiting for the worker before recording. What constraint made that the better choice?",
+   "variants": [
+    "Why does Replay record into a plain buffer first and move to the worker later?",
+    "What constraint led Replay to use a fallback buffer until the compression worker loads?"
+   ],
+   "reference_answer": "The worker loads asynchronously and may fail, but events start immediately and must not be lost. A fallback buffer captures them, hands them to the worker when ready, and remains in use if the worker fails.",
+   "evidence": [
+    "packages/replay-internal/src/eventBuffer/EventBufferProxy.ts:97-141"
+   ]
+  },
+  {
+   "unit_id": "replay-feedback",
+   "level": 2,
+   "question": "Replay drops events older than a few minutes or beyond a maximum replay duration instead of recording everything. What constraint made that the better choice?",
+   "variants": [
+    "Why does Replay discard stale events and events past a maximum duration?",
+    "What constraint justifies Replay's limits on event age and total replay length?"
+   ],
+   "reference_answer": "Replays are tied to sessions, and idle pages or long-lived tabs would otherwise produce stale or unbounded data with misaligned timestamps. Limits keep replays bounded in size and coherent with the session.",
+   "evidence": [
+    "packages/replay-internal/src/util/addEvent.ts:119-142"
+   ]
+  },
+  {
+   "unit_id": "replay-feedback",
+   "level": 3,
+   "question": "If replay compression moved from a background web worker to the main thread, what first part of the replay event-storage design would become unnecessary?",
+   "variants": [
+    "If compression ran on the main thread rather than in a worker, which part of replay's event buffering would first lose its purpose?",
+    "What piece of the replay buffering design would first be removable if the compression worker were dropped?"
+   ],
+   "reference_answer": "The fallback buffer that holds events in memory until the worker loads, along with the logic that switches over to the worker, would be unnecessary. Compression would be available immediately, with no need to handle worker load failures.",
+   "evidence": [
+    "packages/replay-internal/src/eventBuffer/EventBufferProxy.ts:14-26",
+    "packages/replay-internal/src/eventBuffer/EventBufferProxy.ts:97-141"
+   ]
+  },
+  {
+   "unit_id": "bundler-plugins",
+   "level": 1,
+   "question": "What does the thin Vite package contribute of its own beyond the shared plugin core?",
+   "variants": [
+    "How much plugin logic lives in the Vite wrapper package itself?",
+    "What does the Vite package do besides exposing the shared core's Vite adapter?"
+   ],
+   "reference_answer": "Nothing of its own. It just re-exports the Vite adapter from the shared core, so the logic lives in one place.",
+   "evidence": [
+    "packages/vite-plugin/src/index.ts:1",
+    "packages/bundler-plugins/src/vite/index.ts:25-35"
+   ],
+   "orientation": {
+    "purpose": "Provides the plugin logic for debug IDs and source map upload across rollup, vite, webpack, esbuild and rolldown, with thin per-bundler wrapper packages.",
+    "decision": "One core plugin manager with per-bundler adapters, instead of separate implementations. It was consolidated from an external plugin repo and is tested with many fixtures.",
+    "where": [
+     {
+      "path": "packages/bundler-plugins",
+      "what": "shared plugin core"
+     },
+     {
+      "path": "packages/vite-plugin",
+      "what": "example thin wrapper"
+     },
+     {
+      "path": "dev-packages/bundler-plugin-integration-tests",
+      "what": "fixture-based tests"
+     }
+    ],
+    "shaped_by": "The history list does not say."
+   }
+  },
+  {
+   "unit_id": "bundler-plugins",
+   "level": 1,
+   "question": "Where does the main Vite plugin run relative to other plugins?",
+   "variants": [
+    "In which phase of Vite's plugin ordering is the main Sentry plugin placed?",
+    "Does the main Sentry Vite plugin run before or after the user's other plugins?"
+   ],
+   "reference_answer": "It runs early, before other plugins. An optional second plugin can be added to run after the others.",
+   "evidence": [
+    "packages/bundler-plugins/src/vite/index.ts:25-35"
+   ],
+   "orientation": {
+    "purpose": "Provides the plugin logic for debug IDs and source map upload across rollup, vite, webpack, esbuild and rolldown, with thin per-bundler wrapper packages.",
+    "decision": "One core plugin manager with per-bundler adapters, instead of separate implementations. It was consolidated from an external plugin repo and is tested with many fixtures.",
+    "where": [
+     {
+      "path": "packages/bundler-plugins",
+      "what": "shared plugin core"
+     },
+     {
+      "path": "packages/vite-plugin",
+      "what": "example thin wrapper"
+     },
+     {
+      "path": "dev-packages/bundler-plugin-integration-tests",
+      "what": "fixture-based tests"
+     }
+    ],
+    "shaped_by": "The history list does not say."
+   }
+  },
+  {
+   "unit_id": "bundler-plugins",
+   "level": 1,
+   "question": "Once a bundle has been written, what must the plugin do before it uploads the source maps?",
+   "variants": [
+    "What step does the plugin complete first after a bundle is written, before source map upload?",
+    "Before source maps are uploaded after the build output is written, what does the plugin create?"
+   ],
+   "reference_answer": "It creates the release, so the uploaded artifacts can be associated with it. After that it uploads the JS and source map files.",
+   "evidence": [
+    "packages/bundler-plugins/src/rollup/index.ts:268-308"
+   ],
+   "orientation": {
+    "purpose": "Provides the plugin logic for debug IDs and source map upload across rollup, vite, webpack, esbuild and rolldown, with thin per-bundler wrapper packages.",
+    "decision": "One core plugin manager with per-bundler adapters, instead of separate implementations. It was consolidated from an external plugin repo and is tested with many fixtures.",
+    "where": [
+     {
+      "path": "packages/bundler-plugins",
+      "what": "shared plugin core"
+     },
+     {
+      "path": "packages/vite-plugin",
+      "what": "example thin wrapper"
+     },
+     {
+      "path": "dev-packages/bundler-plugin-integration-tests",
+      "what": "fixture-based tests"
+     }
+    ],
+    "shaped_by": "The history list does not say."
+   }
+  },
+  {
+   "unit_id": "bundler-plugins",
+   "level": 2,
+   "question": "Bundler plugins use one shared core manager with thin per-bundler adapters instead of separate implementations per bundler. What constraint made that the better choice?",
+   "variants": [
+    "Why share one core plugin manager across bundlers rather than reimplementing for each?",
+    "What made a single core with thin adapters better than separate per-bundler plugins?"
+   ],
+   "reference_answer": "Debug-ID injection, release creation and source map upload are the same logic regardless of bundler; only the hook wiring differs. One core avoids duplicated logic and divergent behavior across bundlers.",
+   "evidence": [
+    "packages/bundler-plugins/src/rollup/index.ts:93-119",
+    "packages/vite-plugin/src/index.ts:1-1"
+   ]
+  },
+  {
+   "unit_id": "bundler-plugins",
+   "level": 2,
+   "question": "The Vite plugin is built by reusing the Rollup plugin internals instead of having its own implementation. What constraint made that the better choice?",
+   "variants": [
+    "Why does the Vite plugin delegate to the Rollup plugin's internals?",
+    "What relationship between Vite and Rollup makes reusing the Rollup plugin logic better for Vite?"
+   ],
+   "reference_answer": "Vite uses Rollup's plugin API for production builds, so the same hooks work. Only Vite-specific ordering needs adding on top.",
+   "evidence": [
+    "packages/bundler-plugins/src/vite/index.ts:25-35",
+    "packages/bundler-plugins/src/rollup/index.ts:93-119"
+   ]
+  },
+  {
+   "unit_id": "bundler-plugins",
+   "level": 2,
+   "question": "The per-bundler wrapper packages simply re-export from the consolidated core package instead of containing logic. What constraint made that better?",
+   "variants": [
+    "Why do the vite and similar packages just re-export the core package?",
+    "What made keeping thin re-export packages over a consolidated core better than putting logic in each package?"
+   ],
+   "reference_answer": "Users already install and import the existing per-bundler package names, so those must keep working. Logic lives once in the core after consolidating from the external repo, keeping packages compatible without duplication.",
+   "evidence": [
+    "packages/vite-plugin/src/index.ts:1-1"
+   ]
+  },
+  {
+   "unit_id": "bundler-plugins",
+   "level": 3,
+   "question": "If each bundler had its own separate plugin implementation instead of a shared core, what first part of the system would have to be duplicated in every wrapper package?",
+   "variants": [
+    "If the shared plugin core were replaced by independent per-bundler implementations, which logic would first have to be copied into each bundler's package?",
+    "What would each bundler package first need to reimplement itself if the common plugin manager were removed?"
+   ],
+   "reference_answer": "The shared build-plugin logic would be duplicated: release creation, debug ID injection, source map upload, and artifact cleanup. Today the thin wrappers just re-export or adapt the core, which handles these.",
+   "evidence": [
+    "packages/vite-plugin/src/index.ts:1",
+    "packages/bundler-plugins/src/vite/index.ts:25-35",
+    "packages/bundler-plugins/src/rollup/index.ts:93-119",
+    "packages/bundler-plugins/src/rollup/index.ts:268-308"
+   ]
+  }
+ ]
+}

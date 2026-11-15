@@ -9,9 +9,9 @@
    "license": "Apache-2.0",
    "sha": "2c61ae8c11eedb1b79e262dd9eb5e68962cac063",
    "analysis": "huggingface_hub.json",
-   "quizzes": null,
+   "quizzes": "huggingface_hub.quizzes.json",
    "units": 18,
-   "questions": null
+   "questions": 159
   },
   {
    "name": "sentry-javascript",
@@ -19,9 +19,9 @@
    "license": "MIT",
    "sha": "6bee2f2ccccdac123199d1b610c70a3bad5c8194",
    "analysis": "sentry-javascript.json",
-   "quizzes": null,
+   "quizzes": "sentry-javascript.quizzes.json",
    "units": 15,
-   "questions": null
+   "questions": 125
   },
   {
    "name": "mlflow",
