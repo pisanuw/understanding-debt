@@ -262,7 +262,11 @@ the walkthroughs add one per unit.
       secret app key in `x-hintwise-app-key`. The key is `HINTWISE_APP_KEY`, a Netlify secret for
       Functions only; the owner sets it and gives Plabs only its sha256. A key without its header
       would let anyone spend the allowance, so browsers cannot send that header.
-    - udebt's side is built and switched off until then (`VITE_UDEBT_ANON_MODEL=1` turns it on).
+    - Live since 15 Nov 2026, 17:22 Lisbon (main 770ecec, owner's yes): the gateway side is Plabs runs
+      43740094171, 43740125339 and 43740274228; the page flag is in `netlify.toml`, and the functions
+      turn on with `HINTWISE_APP_KEY`. A tokenless allowance check answered 200 with `anonymous: true`
+      and a $1.00 `user-day` cap.
+    - udebt's side:
       - Visitors on the HintWise key by default, with the model's quiz first, on the samples at
         their pins only.
       - Calls are made from the Netlify functions with the anon key and the app key, never a
