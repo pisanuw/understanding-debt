@@ -759,6 +759,13 @@ acceptable.
   precomputed samples or `udebt worker run` locally then `udebt push`; (5) the spaced review
   queue is ported next, the tutor (needs streaming and the `claude` CLI) after.
 
+- **ClaudeCLI isolation (2026-11-15, 15-minute rule):** every `claude -p` call passes
+  `--setting-sources user --strict-mcp-config`, and a call that reads code `--tools Read Glob
+  Grep` as well as `--allowedTools`, so the analysed repository's `.claude/settings.json`
+  hooks, permissions and `.mcp.json` never load (found by the testbeds session: sentry-javascript's
+  SessionStart hook installed and built the clone on every call). Reproduced with a one-hook
+  repository: the hook ran without the flags, not with them. The hosted worker is unaffected.
+
 ## Open questions
 
 - Phase 4b review: a review sitting writes no `quiz_sessions` row (the table has no kind column,

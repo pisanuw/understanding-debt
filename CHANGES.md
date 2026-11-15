@@ -142,3 +142,5 @@
 2026-11-15 [code] Hosted review: each record carries data.review; /api/grade takes source review and folds it from earlier records; Review tab with due list, badge, one-call sittings.
 2026-11-15 [decision] Hosted review: no schema change (records.data), port in web/src/core beside ladder and scoring (brief said src/model), no quiz_sessions row for a review sitting.
 2026-11-15 [note] Review tested with fakes: vitest 218 tests (98.2% statements, 88.4% branches), Playwright 11 with a miss due next day on the fake clock; 28 hosted-review screenshots.
+
+2026-11-15 [code] ClaudeCLI isolation (15-minute rule): every claude call adds --setting-sources user --strict-mcp-config, read calls --tools Read Glob Grep; a clone's hooks and MCP config no longer run.

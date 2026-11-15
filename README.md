@@ -52,6 +52,12 @@ uv pip install -e ".[dev]"
 Requires Python 3.11+, git, and the [`claude` CLI](https://docs.anthropic.com/en/docs/claude-code)
 on your PATH and logged in.
 
+Every `claude` call udebt makes runs inside the analysed repository with only your own
+settings (`--setting-sources user`), no MCP server (`--strict-mcp-config`) and exactly the
+tools udebt names (`--tools Read Glob Grep` on a call that reads code, none otherwise), so the
+repository's `.claude/settings.json` hooks and `.mcp.json` never run. Before this, a clone's
+SessionStart hook installed and built the repository on every call (TESTBEDS.md).
+
 ## Use
 
 ```bash

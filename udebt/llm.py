@@ -52,6 +52,14 @@ class LLM(Protocol):
 # grades questions may read it. The CLI is told so in the prompt and denied it by a permission
 # rule (a Read deny rule, which Claude Code also applies to Grep and Glob).
 UDEBT_DENY = ["Read(./.udebt/**)"]
+
+# `claude -p` runs with its working directory inside the analysed repository, and Claude Code
+# would load that repository's own `.claude/settings.json` (hooks, permissions, environment)
+# and `.mcp.json` with it: sentry-javascript's SessionStart hook installs and builds the
+# repository on every call (TESTBEDS.md, "Sample prep"). Every udebt call therefore loads only
+# the user's settings and no MCP server, and names the tools it offers, so a clone can add
+# nothing to the process that reads it.
+ISOLATION = ["--setting-sources", "user", "--strict-mcp-config"]
 UDEBT_NOTE = (
     "\n\n(Never open, list or search anything under `.udebt/`: it holds udebt's own records, "
     "earlier answers and grades, not the code.)"
@@ -86,13 +94,17 @@ class ClaudeCLI:
             "--no-session-persistence",
             "--max-turns",
             str(max_turns),
+            *ISOLATION,
         ]
         if self.model:
             cmd += ["--model", self.model]
         if schema is not None:
             cmd += ["--json-schema", json.dumps(schema)]
         if read_tools:
-            cmd += ["--allowedTools", *self.READ_TOOLS, "--disallowedTools", *UDEBT_DENY]
+            # The tools offered and the tools allowed without asking are the same three;
+            # with --allowedTools alone the CLI still offers Bash, Edit and Write.
+            cmd += ["--tools", *self.READ_TOOLS, "--allowedTools", *self.READ_TOOLS]
+            cmd += ["--disallowedTools", *UDEBT_DENY]
             prompt += UDEBT_NOTE
         else:
             cmd += ["--tools", ""]
@@ -135,6 +147,7 @@ class ClaudeCLI:
         both as the tools available and as the tools allowed without asking. The session is
         persisted by the CLI (no `--no-session-persistence`), or it could not be resumed."""
         cmd = ["claude", "-p", "--output-format", "json", "--max-turns", str(max_turns)]
+        cmd += ISOLATION
         if self.model:
             cmd += ["--model", self.model]
         if resume:
