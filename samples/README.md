@@ -13,6 +13,17 @@ export and no commit emails.
 | `sentry-javascript.sql` | getsentry/sentry-javascript | `6bee2f2ccccd` | MIT | 17,695 | 15 | 12 | `e0e87f26…4ed8a7` |
 | `mlflow.sql` | mlflow/mlflow | `f6ff35427d7e` | Apache-2.0 | 14,477 | 30 | 12 | `57a6b311…aab6d9` |
 
+## Loaded (2026-11-15)
+
+The Plabs session loaded all three into production with the owner's yes, from claude-built-apps
+6ff0efc (copied byte for byte; the hashes match):
+- `migrate udebt` (run 43706780478): 2 migrations applied;
+- `expose-schema app_udebt` (43706833269);
+- `sql` huggingface_hub (43706890759), sentry-javascript (43706915139), mlflow (43706949963);
+- `check-schema app_udebt` (43706985331): the security check passed. 3 repositories and 3
+  analyses, readable by everyone by design (`SHARED_TABLES`); the other four tables are empty,
+  with RLS on.
+
 ## How they were made (2026-11-15, the "UDebt: Nov 12" session)
 
 1. `udebt worker run https://github.com/<repo> --rev <pin> --out <dir> --llm --walkthroughs 12

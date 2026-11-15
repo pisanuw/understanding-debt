@@ -147,3 +147,4 @@
 
 2026-11-15 [decision] Owner: cheaper gateway model as the hosted default (web DEFAULT_MODEL, supabase/ops/udebt-llm-caps.sql); directory fallback for file-less units; production steps approved.
 2026-11-15 [decision] Owner: yes to the llm.py isolation fix (f294414), udebt default_model = cheaper model with default caps, Plabs loads samples/*.sql (after app_udebt migrations).
+2026-11-15 [note] Plabs loaded the 3 samples into production (migrate, expose-schema, 3 sql, check-schema passed; claude-built-apps 6ff0efc). Owner told Plabs: yes to all DEPLOY.md steps.
