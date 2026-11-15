@@ -1,8 +1,9 @@
 /**
- * One repository: the header (name, licence, pinned commit, debt index), the tabs, and the
- * specs view (the tour, the units and sub-units) or one unit's page (orientation, decision,
- * alternatives and why, the commits that shaped it, connections, the walkthrough with its
- * code fetched from GitHub at the pinned sha, and the person's answers on it).
+ * One repository: the header (name, licence, pinned commit, debt index), the tabs (the Review
+ * tab with the number of items due), and the specs view (the tour, the units and sub-units) or
+ * one unit's page (orientation, decision, alternatives and why, the commits that shaped it,
+ * connections, the walkthrough with its code fetched from GitHub at the pinned sha, and the
+ * person's answers and review items on it).
  */
 import { label, nextLevel } from '../../core/ladder';
 import { decayNote, debtOf } from '../../core/scoring';
@@ -10,8 +11,10 @@ import { childrenOf, connections, githubLink, orientationOf, parseGitHubUrl, top
 import { repoHref, unitHref, type App, type RepoView, type Route } from '../app';
 import { add, badge, button, day, extLink, fmt, h } from '../dom';
 import { renderMarkdown } from '../markdown';
+import { items as reviewItems } from '../../core/review';
 import { debtTab } from './debt';
 import { quizTab } from './quiz';
+import { countBadge, dueText, queue, reviewTab } from './review';
 import { walkthroughCard } from './walkthrough';
 
 function header(app: App, v: RepoView, tab: string): HTMLElement {
@@ -21,9 +24,10 @@ function header(app: App, v: RepoView, tab: string): HTMLElement {
   for (const [key, text] of [
     ['specs', 'Specs'],
     ['quiz', 'Quiz'],
+    ['review', 'Review'],
     ['debt', 'Your debt'],
   ] as const) {
-    tabs.append(h('a', { href: repoHref(v.repo.id, key), 'aria-current': tab === key ? 'page' : undefined }, text));
+    tabs.append(h('a', { href: repoHref(v.repo.id, key), 'aria-current': tab === key ? 'page' : undefined, 'data-tab': key }, text, key === 'review' ? countBadge(queue(v).due.length) : null));
   }
   return h(
     'div',
@@ -185,7 +189,16 @@ function unitPage(app: App, v: RepoView, unitId: string): HTMLElement {
   for (const r of [...recs].reverse()) {
     al.append(h('li', null, h('div', { class: 'small muted' }, `${day(r.ts)} · level ${r.level} · `, badge(r.verdict, r.verdict), r.revealed ? ' · answer shown' : ''), h('div', null, r.question)));
   }
-  box.append(h('div', { class: 'card' }, h('h3', null, 'Your answers on this unit'), recs.length ? al : h('p', { class: 'muted' }, 'None yet.')));
+  const inReview = reviewItems(recs);
+  box.append(
+    h(
+      'div',
+      { class: 'card' },
+      h('h3', null, 'Your answers on this unit'),
+      inReview.length ? h('p', { class: 'small' }, h('a', { href: repoHref(v.repo.id, 'review') }, 'In review'), `: ${inReview.map((it) => `level ${it.level}, ${dueText(it)}`).join('; ')}.`) : null,
+      recs.length ? al : h('p', { class: 'muted' }, 'None yet.'),
+    ),
+  );
   return box;
 }
 
@@ -200,9 +213,10 @@ export async function repoScreen(app: App, route: Extract<Route, { name: 'repo' 
   const s = h('section', { class: 'repo' }, header(app, v, tab));
   if (route.name === 'unit') s.append(unitPage(app, v, route.unit));
   else if (tab === 'quiz') s.append(quizTab(app, v));
+  else if (tab === 'review') s.append(reviewTab(app, v));
   else if (tab === 'debt') s.append(debtTab(app, v));
   else s.append(specsTab(v));
   const u = route.name === 'unit' && v.analysis ? unitById(v.analysis.specs.units, route.unit) : undefined;
-  s.dataset.title = u ? `${u.name} · ${v.repo.name}` : `${v.repo.name}${tab === 'specs' ? '' : tab === 'quiz' ? ' quiz' : ' debt'}`;
+  s.dataset.title = u ? `${u.name} · ${v.repo.name}` : `${v.repo.name}${{ specs: '', quiz: ' quiz', review: ' review', debt: ' debt' }[tab]}`;
   return s;
 }

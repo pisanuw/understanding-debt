@@ -44,6 +44,7 @@ h3 { font-size: 16px; margin: 0 0 6px; }
 .sub { color: var(--ink-2); margin: 0 0 12px; }
 .lead { font-size: 17px; color: var(--ink-2); max-width: 44rem; }
 .muted { color: var(--muted); }
+.nb { white-space: nowrap; }
 .small { font-size: 13px; }
 .mono, code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
 .error { color: var(--critical); }
@@ -73,6 +74,8 @@ a.repo-card:hover { box-shadow: 0 0 0 2px var(--accent); }
 nav.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--grid); margin: 10px 0 4px; overflow-x: auto; }
 nav.tabs a { padding: 8px 12px 9px; color: var(--ink-2); text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; }
 nav.tabs a[aria-current='page'] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+nav.tabs a .count { display: inline-block; min-width: 1.6em; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 650; line-height: 1.6; text-align: center; font-variant-numeric: tabular-nums; vertical-align: 1px; }
+.repo-stats .due { color: var(--accent); font-weight: 600; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
 .tile { background: var(--surface); border-radius: 10px; box-shadow: 0 0 0 1px var(--ring); padding: 10px 12px; min-width: 0; }
 .tile .label { color: var(--ink-2); font-size: 12px; }

@@ -1,8 +1,10 @@
 /**
  * The main flow with fakes: sign in, open the sample, read the specs and a unit's walkthrough
  * (code fetched through /api/excerpt from the fake GitHub), take a two-question level-1 quiz
- * through the fake gateway, see the debt fall, then delete the account. Fails on any
- * Content-Security-Policy violation: the preview sends the live site's headers.
+ * through the fake gateway, see the debt fall, then delete the account; and the spaced review:
+ * a missed question comes back in Review the next day (the browser's clock moved by
+ * Playwright's fake clock, not by waiting) and a correct answer moves its state on. Fails on
+ * any Content-Security-Policy violation: the preview sends the live site's headers.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -81,4 +83,73 @@ test('"I don\'t know" at level 1 shows the answer with no call and records a kno
   await expect(page.locator('.answer strong', { hasText: 'The answer' })).toBeVisible();
   await page.getByRole('button', { name: 'Grade my answers' }).click();
   await expect(page.getByText('(no call: every answer was blank)')).toBeVisible();
+});
+
+test('a missed question comes back in Review the next day, and a correct answer moves it on', async ({ page }) => {
+  const csp = watchCsp(page);
+  await page.clock.setFixedTime(new Date('2026-11-15T10:00:00Z'));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue with Google' }).click();
+  await page.goto('/#/settings');
+  await page.getByLabel(/The HintWise key/).check();
+  await page.goto('/#/r/1/review');
+  await expect(page.getByRole('heading', { name: 'Nothing due now' })).toBeVisible();
+  await expect(page.getByText(/Nothing to review yet/)).toBeVisible();
+  await expect(page.getByTestId('review-count')).toBeHidden();
+
+  // A one-question quiz answered wrong: graded wrong through the fake gateway, the answer shown (level 1).
+  await page.getByRole('link', { name: 'Quiz' }).click();
+  await page.getByLabel('Questions').selectOption('1');
+  await page.getByRole('button', { name: 'Start' }).click();
+  await expect(page.getByText('[1/1]')).toBeVisible();
+  const asked = await page.locator('p.q-text').textContent();
+  await page.getByLabel('Your answer').fill('It is wrong on purpose: it renders the slides.');
+  await page.getByRole('button', { name: 'Answer and grade' }).click();
+  await expect(page.getByText('1 wrong (one grading call).')).toBeVisible();
+  await expect(page.locator('.result .answer strong', { hasText: 'The answer' })).toBeVisible();
+  await expect(page.locator('.result').getByText(/back in review on/)).toBeVisible();
+
+  // Not due yet: it is coming up, and there is no badge.
+  await page.getByRole('link', { name: /^Review/ }).click();
+  await expect(page.getByRole('heading', { name: 'Nothing due now' })).toBeVisible();
+  await expect(page.getByTestId('review-later').locator('li')).toHaveCount(1);
+  await expect(page.getByTestId('review-count')).toBeHidden();
+
+  // A day later on the fake clock: due, with the badge on the tab and the repository card.
+  await page.clock.setFixedTime(new Date('2026-11-16T11:00:00Z'));
+  await page.getByRole('link', { name: 'Repositories' }).click();
+  await expect(page.getByTestId('repo-review-due')).toHaveText('1 to review');
+  await page.locator('a.repo-card', { hasText: 'digitalme' }).click();
+  await expect(page.getByTestId('review-count')).toHaveText('1');
+  await page.getByRole('link', { name: /^Review/ }).click();
+  await expect(page.getByRole('heading', { name: 'Due now: 1' })).toBeVisible();
+  await expect(page.getByTestId('review-due').locator('li')).toContainText('level 1 of 5: purpose and placement · due since');
+  const before = Number(await page.getByTestId('debt-index').textContent());
+
+  // The review asks a stored phrasing, not the one asked last; one grading call, none for questions.
+  await page.getByRole('button', { name: 'Review what is due' }).click();
+  await expect(page.getByText('[1/1]')).toBeVisible();
+  const again = await page.locator('p.q-text').textContent();
+  expect(again).not.toBe(asked);
+  await page.getByLabel('Your answer').fill('It streams the reply to the browser as it is written.');
+  await page.getByLabel('certain').check();
+  await page.getByRole('button', { name: 'Answer and grade' }).click();
+  await expect(page.getByText('1 correct (one grading call).')).toBeVisible();
+  await expect(page.locator('.result').getByText(/back in review on/)).toBeVisible();
+  await expect(page.getByTestId('review-count')).toBeHidden();
+  expect(Number(await page.getByTestId('debt-index').textContent())).toBeLessThan(before);
+
+  // The state moved on: nothing due, the item back the next day (SM-2: 1 day after the first pass).
+  await page.getByRole('link', { name: 'Back to Review' }).click();
+  await expect(page.getByRole('heading', { name: 'Nothing due now' })).toBeVisible();
+  await expect(page.getByTestId('review-later').locator('li')).toHaveCount(1);
+  const saved = (await page.evaluate(() => JSON.parse(sessionStorage.getItem('udebt.preview') ?? '{}'))) as { records: { source: string; verdict: string; question: string; data: { review: unknown } }[] };
+  expect(saved.records.map((r) => [r.source, r.verdict, r.data.review])).toEqual([
+    ['quiz', 'wrong', { ease: 2.3, interval: 1, reps: 0, due: '2026-11-16T10:00:00+00:00' }],
+    ['review', 'correct', { ease: 2.4, interval: 1, reps: 1, due: '2026-11-17T11:00:00+00:00' }],
+  ]);
+  expect(saved.records[1].question).toBe(again);
+  await page.getByRole('link', { name: 'Your debt' }).click();
+  expect(Number(await page.getByTestId('debt-tile').textContent())).toBeLessThan(before);
+  expect(csp).toEqual([]);
 });

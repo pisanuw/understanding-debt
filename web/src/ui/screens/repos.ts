@@ -2,6 +2,7 @@
 import { parseGitHubUrl } from '../../core/specs';
 import { repoHref, type App } from '../app';
 import { badge, fmt, h } from '../dom';
+import { queue } from './review';
 
 export async function reposScreen(app: App): Promise<HTMLElement> {
   const { repos } = await app.deps.store.repositories();
@@ -11,6 +12,7 @@ export async function reposScreen(app: App): Promise<HTMLElement> {
     const g = parseGitHubUrl(r.url);
     const a = view?.analysis;
     const units = a ? a.specs.units.filter((u) => !u.parent).length : 0;
+    const due = view ? queue(view).due.length : 0;
     const card = h(
       'a',
       { class: 'card repo-card', href: repoHref(r.id) },
@@ -22,6 +24,7 @@ export async function reposScreen(app: App): Promise<HTMLElement> {
             { class: 'repo-stats' },
             h('span', null, h('span', { class: 'big' }, fmt(view?.scores?.index ?? 100, 1)), ' debt index'),
             h('span', { class: 'muted small' }, `${units} units · ${view?.scores?.basis.measured ?? 0} measured · at ${a.sha.slice(0, 8)}`),
+            due ? h('span', { class: 'small due', 'data-testid': 'repo-review-due' }, `${due} to review`) : null,
           )
         : h('div', { class: 'muted small' }, 'No analysis yet.'),
     );

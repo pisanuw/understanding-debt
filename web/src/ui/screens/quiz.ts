@@ -3,19 +3,22 @@
  * one fact per question, the orientation before a level 1 question until level 1 is passed,
  * "I don't know" with no call (at levels 1-2 the answer is shown at once), a stored variant of
  * a question just missed before a new one, and the sitting graded in one call at its end,
- * then recorded and the debt recomputed.
+ * then recorded (each record with its spaced-review state) and the debt recomputed. The Review
+ * tab (review.ts) asks its items through the same flow.
  */
 import type { QuestionUnit } from '../../core/prompts';
 import { label, levelOf } from '../../core/ladder';
 import { refsForUnit } from '../../core/excerpts';
-import { markRevealed, mergeGrades, orientationWanted, pickUnits, recordRows, revealText, revealedOn, revealedVariant, reveals, levelsFor, sittingTs, type Answered, type Graded, type Question } from '../../core/quiz';
+import { markRevealed, mergeGrades, orientationWanted, pickUnits, revealText, revealedOn, revealedVariant, reveals, levelsFor, sittingTs, type Answered, type Graded, type Question } from '../../core/quiz';
+import { sittingRows, stateAt } from '../../core/review';
 import { orientationOf, orientationText, unitById, type Orientation, type SpecUnit } from '../../core/specs';
 import { CapError, capMessage } from '../../model/client';
 import { getMode } from '../../model/prefs';
-import { repoHref, unitHref, type App, type RepoView } from '../app';
-import { badge, busy, button, clear, fmt, h } from '../dom';
+import { repoHref, unitHref, type App, type RepoTab, type RepoView } from '../app';
+import { badge, busy, button, clear, day, fmt, h } from '../dom';
+import { queue, showCount } from './review';
 
-interface Served extends Question {
+export interface Served extends Question {
   id: string;
   unit_name: string;
   orientation: Orientation | null;
@@ -96,6 +99,17 @@ export async function prepare(app: App, v: RepoView, n: number, only: string | n
   return out;
 }
 
+/** A link to a tab that draws it again even when it is the current address (a new sitting). */
+function tabLink(app: App, v: RepoView, tab: RepoTab, text: string): HTMLElement {
+  const href = repoHref(v.repo.id, tab);
+  const a = h('a', { href }, text);
+  a.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    app.go(href);
+  });
+  return a;
+}
+
 function resultCard(v: RepoView, r: Graded, next: number): HTMLElement {
   const card = h('div', { class: 'card result' });
   card.append(
@@ -104,12 +118,13 @@ function resultCard(v: RepoView, r: Graded, next: number): HTMLElement {
     h('p', { class: 'verdict' }, badge(r.verdict, r.verdict), ` ${r.feedback}`),
   );
   if (r.revealed && revealText(r)) card.append(h('div', { class: 'answer' }, h('strong', null, 'The answer'), revealText(r)));
-  card.append(h('p', { class: 'small muted' }, `Next on this unit: level ${next}.`));
+  const again = stateAt(v.records, r.unit_id, levelOf(r));
+  card.append(h('p', { class: 'small muted' }, `Next on this unit: level ${next}`, again ? '; back in review on ' : '', again ? h('span', { class: 'nb' }, day(again.due)) : null, '.'));
   return card;
 }
 
-/** Asks the questions one by one, then grades and records the sitting. */
-export function askFlow(app: App, view: RepoView, box: HTMLElement, questions: Served[], sessionId: number | null): void {
+/** Asks the questions one by one, then grades and records the sitting (`source`: a quiz or a review sitting). */
+export function askFlow(app: App, view: RepoView, box: HTMLElement, questions: Served[], sessionId: number | null, source: 'quiz' | 'review' = 'quiz'): void {
   let i = 0;
   const answers = new Map<string, Answered>();
   const order: string[] = [];
@@ -142,12 +157,12 @@ export function askFlow(app: App, view: RepoView, box: HTMLElement, questions: S
             sha: a.sha,
             items: given.map((x) => ({ unit_id: x.unit_id, level: x.level, question: x.question, reference_answer: x.reference_answer, evidence: x.evidence, answer: x.answer, variants: x.variants, revealed: !!x.revealed, confidence: x.confidence })),
           },
-          { repo_id: v.repo.id, ts },
+          { repo_id: v.repo.id, ts, source },
         );
       }
       const results = markRevealed(mergeGrades(given, outcome.grades));
       if (outcome.recorded) await app.deps.store.records(v.repo.id).then((all) => app.refresh(v, all));
-      else app.refresh(v, [...v.records, ...(await app.deps.store.addRecords(recordRows(results, { repoId: v.repo.id, sha: a.sha, ts })))]);
+      else app.refresh(v, [...v.records, ...(await app.deps.store.addRecords(sittingRows(results, v.records, { repoId: v.repo.id, sha: a.sha, ts, source })))]);
       if (sessionId !== null) await app.deps.store.finishSession(sessionId).catch(() => undefined);
       const after = (await app.repoView(v.repo.id)) ?? v;
       clear(box);
@@ -156,6 +171,7 @@ export function askFlow(app: App, view: RepoView, box: HTMLElement, questions: S
       const index = after.scores?.index ?? before;
       const stat = box.ownerDocument.querySelector('[data-testid="debt-index"]');
       if (stat) stat.textContent = fmt(index, 1);
+      showCount(box.ownerDocument, queue(after).due.length);
       box.append(
         h(
           'div',
@@ -163,7 +179,7 @@ export function askFlow(app: App, view: RepoView, box: HTMLElement, questions: S
           h('h3', null, 'Graded'),
           h('p', null, `${[...counts].map(([k, n]) => `${n} ${k}`).join(', ')}${typed ? ' (one grading call).' : ' (no call: every answer was blank).'}`),
           h('p', { class: 'delta', 'data-testid': 'debt-delta' }, 'Debt index ', h('strong', null, fmt(before, 1)), ' → ', h('strong', null, fmt(index, 1)), index < before ? ' ↓' : ''),
-          h('p', { class: 'row' }, h('a', { href: repoHref(v.repo.id, 'debt') }, 'See your debt per unit'), h('a', { href: repoHref(v.repo.id, 'quiz') }, 'Another sitting')),
+          h('p', { class: 'row' }, h('a', { href: repoHref(v.repo.id, 'debt') }, 'See your debt per unit'), source === 'review' ? tabLink(app, v, 'review', 'Back to Review') : tabLink(app, v, 'quiz', 'Another sitting')),
         ),
       );
       for (const r of results) box.append(resultCard(after, r, levelsFor([{ id: r.unit_id }], after.records).get(r.unit_id) ?? 1));

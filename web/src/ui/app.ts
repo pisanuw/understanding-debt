@@ -43,9 +43,11 @@ export interface RepoView {
   scores: RepoScores | null;
 }
 
+export type RepoTab = 'specs' | 'quiz' | 'review' | 'debt';
+
 export type Route =
   | { name: 'repos' }
-  | { name: 'repo'; id: number; tab: 'specs' | 'quiz' | 'debt' }
+  | { name: 'repo'; id: number; tab: RepoTab }
   | { name: 'unit'; id: number; unit: string }
   | { name: 'settings' }
   | { name: 'add' };
@@ -57,13 +59,13 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'r' && /^\d+$/.test(parts[1] ?? '')) {
     const id = Number(parts[1]);
     if (parts[2] === 'u' && parts[3]) return { name: 'unit', id, unit: decodeURIComponent(parts.slice(3).join('/')) };
-    if (parts[2] === 'quiz' || parts[2] === 'debt') return { name: 'repo', id, tab: parts[2] };
+    if (parts[2] === 'quiz' || parts[2] === 'review' || parts[2] === 'debt') return { name: 'repo', id, tab: parts[2] };
     return { name: 'repo', id, tab: 'specs' };
   }
   return { name: 'repos' };
 }
 
-export function repoHref(id: number, tab: 'specs' | 'quiz' | 'debt' = 'specs'): string {
+export function repoHref(id: number, tab: RepoTab = 'specs'): string {
   return tab === 'specs' ? `#/r/${id}` : `#/r/${id}/${tab}`;
 }
 
