@@ -806,12 +806,22 @@ changes between analysed commits (k 0.2 at levels 1-3, 1.0 at 4-5). You are a le
 author: there is no own-commit prior, so every repository starts at a debt index of 100 and
 your answers earn it down.
 
+**Review.** A question you miss (wrong, partial or "I don't know", whether the answer was shown
+or not) comes back in the Review tab the next day, and at growing intervals once you answer it
+right (1 day, 3 days, then the last interval times an ease factor that a confident answer raises
+and a miss lowers): the SM-2 queue of `udebt review`, one item per unit and level, ported to
+TypeScript and checked against `udebt/review.py` case by case. An item is asked in one of its
+stored phrasings that you were not asked last time, with the reference answer kept from the
+miss, so a review sitting costs one grading call and none to write questions; a review answer
+counts on the ladder like any other. The tab and the repository card show how many are due.
+
 **What is stored, and where.** In HintWise's database (Supabase, US East), schema `app_udebt`:
 
 - for each answer: the unit, the ladder level, the question, the verdict, your confidence,
-  whether the answer was shown, and the question's other phrasings, reference answer and cited
-  files (so a missed question can come back in other words). Never the text of your answer,
-  and not the grader's feedback;
+  whether the answer was shown, the question's other phrasings, reference answer and cited
+  files (so a missed question can come back in other words), and the review state after it
+  (ease, interval, repetitions and when it is next due). Never the text of your answer, and not
+  the grader's feedback;
 - the repositories you added, your quiz sessions (the questions as asked) and your analysis
   jobs;
 - shared with every signed-in person: the repositories in udebt and their analyses (units,

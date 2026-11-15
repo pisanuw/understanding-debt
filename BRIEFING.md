@@ -702,13 +702,40 @@ acceptable.
     (the platform runs files in name order and names them `NNNN_`), content unchanged; the 4b
     changes in `0002_hosted.sql`, including the `platform.llm_apps` row. Shared tables need two
     `SHARED_TABLES` entries (supabase/README.md).
-  - **Not ported in v1**: the tutor (it needs read tools over a clone per conversation), the
-    spaced review queue (records do not keep `review` state yet), teach-back, digests (they need
-    the commits since an answer, which an analysis does not keep), decision records, team views
-    and pull-request checks.
+  - **Not ported in v1**: the tutor (it needs read tools over a clone per conversation),
+    teach-back, digests (they need the commits since an answer, which an analysis does not
+    keep), decision records, team views and pull-request checks. The spaced review queue was
+    ported the same day (below).
   - **Samples**: `python -m udebt.hosted.samples` checks each output against the pins in
     `testbeds.json` and writes the public SQL; tested on a digitalme output made without a model
     call. The UDebt session generated no sample and made no model call.
+
+- **Phase 4b, the review queue (2026-11-15)**: Phase 3.3's spaced review in the hosted app, v1's
+  next feature (Phase 4b answer 5). Tested with fakes only; no model call, nothing deployed.
+  - **Where**: `web/src/core/review.ts`, beside the ladder and scoring ports. The brief said
+    `web/src/model/`, which holds the clients; the page and `/api/grade` both need the fold, and
+    `src/core` is the code they share.
+  - **Parity**: the fold, the stamped states, the items with their phrasing and the due lists
+    are checked case by case against `udebt/review.py` (`web/test/fixtures/review-parity.json`,
+    20 record sets, written by `tests/test_hosted_review_parity.py`). Python's `round` (half to
+    even on the exact double) and `timedelta(days=x)` (the fraction to the nearest microsecond,
+    then truncated to the second) are reproduced, so due times agree to the second.
+  - **No schema change**: the state after each answer is on `records.data.review` (`ease`,
+    `interval`, `reps`, `due`, as the CLI's `review`); the column's comment already named it.
+    The fold over the records stays the source of truth (the page never reads `data.review`);
+    the stamp is there for an export or import.
+  - **Stamping**: `/api/grade` reads the person's earlier records on the sitting's units (one
+    PostgREST read with their token, by time then id) and folds them; if the read fails it
+    writes nothing and the page records the sitting with its own fold, as when the write is
+    refused. The page path (fakes, own key) stamps from the records it holds. The live store
+    reads records by time then id, so a sitting's answers on one key fold in the order written.
+  - **The tab**: items on units the current analysis has (as `udebt serve`), most overdue
+    first; a sitting of 5 by default (1 to 10) through the quiz's flow (confidence, "I don't
+    know" with no call, the answer shown on a miss at levels 1-2, one grading call at the end),
+    `source: review`; no orientation before a review question and no `quiz_sessions` row (as
+    serve); serve's "include items not yet due" is not offered. The number due shows on the tab
+    and on the repository card, a unit's page lists its items, and each graded answer says when
+    it is back in review.
 
 - **Phase 4a answers (2026-11-15, 15-minute rule)**: the hosted app v1 has no own-commit
   prior (learner, not author); a soft-block acknowledgement carries over later pushes on the
@@ -734,6 +761,13 @@ acceptable.
 
 ## Open questions
 
+- Phase 4b review: a review sitting writes no `quiz_sessions` row (the table has no kind column,
+  and the conservative choice was no schema change). Keep it so, or add a `kind` in a
+  `0003_review.sql` so a person's sessions list their reviews too?
+- Phase 4b review: PostgREST's row cap (Supabase's default 1000) would cut a person's records on
+  one repository, both in the page's read (scores, ladder, review) and in `/api/grade`'s read
+  for the review state. Page through them, or accept it for v1 (about 500 two-question
+  sittings on one repository)?
 - Phase 3.5: k_low (0.2) comes from huggingface_hub alone, a library whose architecture has
   been stable for years; digitalme decayed fastest on pre-ladder questions (k 2.72) and its
   June refactor changed its architecture. Calibrate levels 1-3 per repository from human

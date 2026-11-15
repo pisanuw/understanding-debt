@@ -659,7 +659,8 @@ needs and dropped the rest. No model call.
 **Status 2026-11-15: built, partial until deployed.** The owner approved the build on
 2026-11-15 (HOSTING.md, "Owner decisions"). Everything the UDebt session can do is done and
 tested locally with fakes; the production steps belong to the owner and the Plabs session
-(docs/DEPLOY.md, in order). No model call was made and no sample generated.
+(docs/DEPLOY.md, in order). No model call was made and no sample generated. The spaced review
+queue followed the same day as v1's next feature (Phase 4b answer 5), also tested with fakes.
 
 | item | status |
 |---|---|
@@ -671,7 +672,8 @@ tested locally with fakes; the production steps belong to the owner and the Plab
 | 6 runbook | done: docs/DEPLOY.md (owner steps, Plabs steps, env vars, checks, caps estimate, limits, untested), `netlify.toml`, README "Hosted app" |
 | 7 local end-to-end | done: Playwright with fakes (sign in, digitalme sample, unit and walkthrough, two-question level-1 quiz, debt falls, account deleted, no CSP violation); 52 screenshots (13 screens) at 1280/390 px, light/dark, in `.udebt/dashboard/hosted-*.png` |
 | digest | deferred: an analysis keeps no commits since an answer; the worker would have to precompute digests per unit |
-| tutor, review, teach-back | not ported in v1 (BRIEFING, Phase 4b) |
+| 8 spaced review | done: `web/src/core/review.ts` (SM-2 per unit and level as `udebt/review.py` folds it, checked case by case against `web/test/fixtures/review-parity.json`, 20 record sets written by `tests/test_hosted_review_parity.py`); each record carries its state on `data.review` (no schema change); `/api/grade` takes `source: review` and folds the state from the person's earlier records on the sitting's units; a Review tab (due items, coming up, a sitting of up to N items through the quiz's flow, one grading call, reveal at levels 1-2, gateway or own key), the number due on the tab and the repository card; vitest 218 tests, coverage 98.2% statements, 88.4% branches; Playwright: a miss due a day later on the fake clock, reviewed, its state moved; 28 screenshots `hosted-review-*.png` |
+| tutor, teach-back | not ported in v1 (BRIEFING, Phase 4b): the tutor is next (Phase 4b answer 5) |
 
 **Remaining, in order (each production step after the owner's yes):**
 
@@ -1217,6 +1219,12 @@ also in supabase/README.md. Open questions are at the top of BRIEFING's list (sh
 written by people, caps and the default model, own-row evidence, the free instance's limits,
 what to port next).
 
+**The spaced review queue is ported** (three commits after the Phase 4b answers, `999b1c1`,
+`48a5da6`, `94e0d60`): the TypeScript SM-2 in `web/src/core/review.ts`, the review state on
+each record's `data.review`, `/api/grade` for review sittings, the Review tab. Tested with fakes
+only (vitest, Playwright with the fake clock); no model call, no schema change, nothing
+deployed. Decisions and the open question in BRIEFING (Phase 4b review).
+
 Earlier in the day: Phase 3.4 and Phase 3.5 done, Phase 4a done as re-scoped (see their
 sections).
 
@@ -1231,6 +1239,9 @@ For the next session:
   browsers; `UDEBT_SHOTS=1` for the screenshots). After changing `udebt/prompts.py`,
   `udebt/scoring.py` or `udebt/ladder.py`, regenerate `web/src/core/prompt-parts.json`
   (`python -m udebt.hosted.prompt_parts`) and `web/test/fixtures/parity.json`
-  (`UDEBT_WRITE_PARITY=1 pytest tests/test_hosted_parity.py`).
+  (`UDEBT_WRITE_PARITY=1 pytest tests/test_hosted_parity.py`); after changing `udebt/review.py`,
+  `web/test/fixtures/review-parity.json` (`UDEBT_WRITE_PARITY=1 pytest
+  tests/test_hosted_review_parity.py`). In this container `pytest` needs `PYTHONPATH=.` (the
+  package is not installed in pytest's tool environment).
 - When the sample outputs arrive: `python -m udebt.hosted.samples <dirs> --out <sql dir>` and
   hand the files to the Plabs session.

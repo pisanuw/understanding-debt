@@ -138,3 +138,7 @@
 2026-11-15 [decision] Phase 4b answers (15-minute rule): shared analyses stay labelled, $0.25/day default cap, self-assessment records, large repos as samples or local run + push, review queue ported next.
 2026-11-15 [note] Three hosted samples made (15 calls each) and checked; load SQL in samples/ for Plabs. Usage and limits in HOSTING.md 'Measured on the samples'.
 2026-11-15 [note] Security: udebt's claude -p calls run the analysed repo's .claude hooks (sentry-javascript ran pnpm install + build). Fix flags in TESTBEDS.md; code fix is UDebt's, needs owner's yes.
+2026-11-15 [code] web/src/core/review.ts: udebt review's SM-2 queue in TypeScript, checked case by case against udebt/review.py (tests/test_hosted_review_parity.py writes the fixture).
+2026-11-15 [code] Hosted review: each record carries data.review; /api/grade takes source review and folds it from earlier records; Review tab with due list, badge, one-call sittings.
+2026-11-15 [decision] Hosted review: no schema change (records.data), port in web/src/core beside ladder and scoring (brief said src/model), no quiz_sessions row for a review sitting.
+2026-11-15 [note] Review tested with fakes: vitest 218 tests (98.2% statements, 88.4% branches), Playwright 11 with a miss due next day on the fake clock; 28 hosted-review screenshots.

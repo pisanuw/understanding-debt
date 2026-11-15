@@ -12,7 +12,7 @@ explicit yes; the UDebt session made none of them.
 | part | in this repository | runs on |
 |---|---|---|
 | the web app (Vite + TypeScript, from the platform template) | `web/` (`web/README.md`) | Netlify, built by `netlify.toml` at the root |
-| the functions `/api/questions`, `/api/grade`, `/api/excerpt` | `web/netlify/functions/` | Netlify Functions in the same site |
+| the functions `/api/questions`, `/api/grade` (also for review sittings), `/api/excerpt` | `web/netlify/functions/` | Netlify Functions in the same site |
 | the analysis service | `udebt/hosted/worker_service.py` (`python -m udebt.hosted.worker_service`) | Render, `render.yaml` |
 | the migrations and the Plabs notes | `supabase/migrations/0001_app_udebt.sql`, `0002_hosted.sql`, `supabase/README.md` | the Supabase admin workflow in claude-built-apps |
 | the sample load | `python -m udebt.hosted.samples` | anywhere with Python 3.11+, then the admin workflow's `sql` |
@@ -27,10 +27,14 @@ worker, used for that job and dropped).
 - The app, the functions, the worker service, the migrations, the sample loader, and their
   tests: Python `ruff` and `pytest` (the schema and sample tests on Postgres 16 with
   `UDEBT_TEST_PG`), web `npm run lint && npm run typecheck && npm run coverage && npm run
-  build` (coverage 98% statements, 87% branches) and a Playwright walkthrough with fakes
+  build` (coverage 98% statements, 88% branches) and a Playwright walkthrough with fakes
   (sign in, open the digitalme sample, read a unit and its walkthrough, take a two-question
-  level-1 quiz, see the debt fall, delete the account) under the same Content-Security-Policy
-  the live site sends.
+  level-1 quiz, see the debt fall, delete the account; miss a question, find it due in Review
+  a day later on Playwright's fake clock, review it, see its state move) under the same
+  Content-Security-Policy the live site sends.
+- The spaced review queue (Review tab): no migration, no new function and no new variable; the
+  review state rides in `records.data`, and `/api/grade` reads the person's earlier records on
+  a sitting's units with their token to stamp it.
 - The footer: the exact `footerHtml('udebt')` (2231 bytes, sha256
   `dc713ce9950e2cb7cabc6a20f439d96e2c1e39666b483c3e9acb65f6cd4685c8`) in `web/index.html`,
   pinned by `web/test/csp.test.ts`; `FOOTER_STYLE_CSP` in the CSP; the HintWise favicon.
@@ -91,8 +95,9 @@ curl -s -o /dev/null -w '%{http_code}\n' https://udebt.hintwise.org/api/excerpt 
 
 Then by hand: sign in with Google and with an email link; open each sample; read a unit's
 walkthrough (the code comes from GitHub); take a two-question quiz on the HintWise key; see the
-debt fall; switch to an own key and take one more; add a small public repository with an own
-key and watch the job; delete a test account.
+debt fall; switch to an own key and take one more; the next day, review a question missed the
+day before from the Review tab (one grading call) and see when it comes back; add a small public
+repository with an own key and watch the job; delete a test account.
 
 ## Environment variables (placeholders only)
 
@@ -124,9 +129,10 @@ and 3,700 input tokens at four characters a token) and 61 KB and 36 KB for five 
 code excerpts are capped at 60,000 characters a call; the answers are a few hundred to 1,500
 output tokens. At the gateway's default model price ($4 in, $20 out per million) that is about
 $0.07 for a two-question sitting and $0.16 for five, so the default $0.25 per person per day is
-three short sittings. Choosing a cheaper `default_model` for udebt in `platform.llm_apps`, or
-call caps per person (photo2pgn's pattern), are the owner's levers. Measure on the live gateway
-before settling (`usage` in the admin workflow).
+three short sittings. A review sitting is one call, the grading (its questions are stored
+phrasings), about the size of a quiz's grading call. Choosing a cheaper `default_model` for
+udebt in `platform.llm_apps`, or call caps per person (photo2pgn's pattern), are the owner's
+levers. Measure on the live gateway before settling (`usage` in the admin workflow).
 
 A new analysis runs on the person's own key: a map (one call plus up to seven read turns),
 orientations, the tour and three walkthroughs, each a short tool loop; roughly 10 to 30 calls.
@@ -152,6 +158,9 @@ pause waits for it to start).
   4096-token limit on a large map through the worker, Edge Function time limits.
 - Netlify: the build, the functions' bundling (esbuild, TypeScript importing `web/src/core`),
   the headers, the run-time environment variables.
+- PostgREST as `/api/grade` reads earlier records for the review state (`unit_id=in.(...)`,
+  `order=ts.asc,id.asc`), and its row cap (Supabase's default 1000): a person with more records
+  than that on one repository would get a cut list there and in the page's own read.
 - Render: the build, the start command, memory and time on the free instance, the custom domain,
   a token that expires during a long job (the worker refuses tokens with under 15 minutes left).
 - GitHub: raw.githubusercontent.com and api.github.com rate limits for many users.
