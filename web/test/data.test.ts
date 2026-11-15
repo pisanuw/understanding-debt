@@ -97,6 +97,7 @@ describe('the Supabase store', () => {
     expect((await s.records(2))[0].ts).toBe('2026-11-15T10:00:00.000Z');
     expect(await s.jobs()).toEqual([{ id: 1, status: 'done' }]);
     expect(log).toContain('analyses.select(id,repo_id,sha,user_id,created_at,manifest,specs).eq(repo_id,2).order(created_at).limit(20)');
+    expect(log).toContain('records.select(*).eq(repo_id,2).order(ts).order(id)');
   });
 
   it('writes records without the scoring alias, sessions without references, and joins a repository once', async () => {

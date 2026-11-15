@@ -17,7 +17,7 @@ import { callGateway, gatewayBody } from '../netlify/functions/lib/gateway';
 import { excerpt, fetchFile } from '../netlify/functions/lib/github';
 import { handleExcerpt, handleGrade, handleQuestions } from '../netlify/functions/lib/handlers';
 import { HttpError, bearer, errorResponse, readJson } from '../netlify/functions/lib/http';
-import { insertRecords, tableRow } from '../netlify/functions/lib/records';
+import { inList, insertRecords, priorRecords, tableRow } from '../netlify/functions/lib/records';
 
 const SHA = 'f93102b121f1da9055c148e8eccde275ccf18236';
 const REPO = 'https://github.com/acme/demo';
@@ -29,11 +29,12 @@ interface Call {
   init?: RequestInit;
 }
 
-function liveFetch(over: Partial<Record<'repo' | 'gateway' | 'raw' | 'records', () => Response>> = {}, calls: Call[] = []): typeof fetch {
+function liveFetch(over: Partial<Record<'repo' | 'gateway' | 'raw' | 'records' | 'prior', () => Response>> = {}, calls: Call[] = []): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     calls.push({ url, init });
     if (url.includes('/rest/v1/repositories')) return over.repo?.() ?? Response.json([{ id: 7 }]);
+    if (url.includes('/rest/v1/records') && (init?.method ?? 'GET') === 'GET') return over.prior?.() ?? Response.json([]);
     if (url.includes('/rest/v1/records')) return over.records?.() ?? Response.json(JSON.parse(String(init?.body)).map((r: object, i: number) => ({ ...r, id: i + 1 })));
     if (url.includes('/functions/v1/llm-gateway')) return over.gateway?.() ?? Response.json(fakeGateway(JSON.parse(String(init?.body))));
     if (url.startsWith('https://raw.githubusercontent.com/')) return over.raw?.() ?? new Response(FILE, { status: 200 });
@@ -89,6 +90,41 @@ describe('the functions in live mode', () => {
     expect(rows[0]).not.toHaveProperty('answer');
     expect(rows[1].revealed).toBe(true);
     expect(rows[0].ts).toBe('2026-11-15T10:00:00.000Z');
+  });
+
+  it('stamps each recorded row with its review state, folded from the earlier records on its units', async () => {
+    const calls: Call[] = [];
+    const prior = [{ ts: '2026-11-14T10:00:00+00:00', unit_id: 'storage', level: 1, verdict: 'unknown', confidence: 1 }];
+    const items = [
+      { unit_id: 'storage', level: 1, question: 'Why is it needed?', reference_answer: 'R', evidence: [], answer: 'It keeps the records.', variants: ['What does it keep?'], confidence: 3 },
+      { unit_id: 'cache', level: 2, question: 'What was chosen?', reference_answer: 'R2', evidence: [], answer: '', revealed: true },
+    ];
+    const res = await handleGrade(post('/api/grade', { repo: REPO, sha: SHA, items, record: { repo_id: 7, ts: '2026-11-15T10:00:00Z', source: 'review' } }), { env: LIVE, fetch: liveFetch({ prior: () => Response.json(prior) }, calls) });
+    const out = (await res.json()) as { recorded: { source: string; data: { review?: { reps: number; due: string; ease: number } } }[] };
+    expect(out.recorded.map((r) => r.source)).toEqual(['review', 'review']);
+    expect(out.recorded[0].data.review).toEqual({ ease: 2.4, interval: 1, reps: 1, due: '2026-11-16T10:00:00+00:00' });
+    expect(out.recorded[1].data.review).toEqual({ ease: 2.3, interval: 1, reps: 0, due: '2026-11-16T10:00:00+00:00' });
+    const read = calls.find((c) => c.url.includes('/rest/v1/records?'));
+    const q = new URL(read?.url ?? 'http://x').searchParams;
+    expect(Object.fromEntries(q)).toEqual({ select: 'ts,unit_id,level,verdict,confidence', repo_id: 'eq.7', unit_id: 'in.("storage","cache")', order: 'ts.asc,id.asc' });
+    expect((read?.init?.headers as Record<string, string>)['accept-profile']).toBe('app_udebt');
+    expect((read?.init?.headers as Record<string, string>).authorization).toBe('Bearer user-token');
+    const odd = await handleGrade(post('/api/grade', { repo: REPO, sha: SHA, items: items.slice(0, 1), record: { repo_id: 7, ts: '2026-11-15T10:00:00Z', source: 'admin' } }), { env: LIVE, fetch: liveFetch() });
+    expect(((await odd.json()) as { recorded: { source: string; data: object }[] }).recorded[0]).toMatchObject({ source: 'quiz', data: {} });
+  });
+
+  it('leaves recording to the page when the earlier records cannot be read', async () => {
+    const calls: Call[] = [];
+    const items = [{ unit_id: 'u', level: 1, question: 'Q?', answer: 'A' }];
+    const res = await handleGrade(post('/api/grade', { repo: REPO, sha: SHA, items, record: { repo_id: 7, ts: '2026-11-15T10:00:00Z' } }), { env: LIVE, fetch: liveFetch({ prior: () => new Response('no', { status: 500 }) }, calls) });
+    expect(((await res.json()) as { recorded: unknown }).recorded).toBeNull();
+    expect(calls.some((c) => c.init?.method === 'POST' && c.url.endsWith('/rest/v1/records'))).toBe(false);
+    expect(await priorRecords(7, ['u'], 't', LIVE, (async () => Response.json({ not: 'a list' })) as typeof fetch)).toBeNull();
+    expect(await priorRecords(7, ['u'], 't', LIVE, (async () => { throw new Error('down'); }) as typeof fetch)).toBeNull();
+    expect(await priorRecords(7, [], 't', LIVE, liveFetch())).toEqual([]);
+    expect(await priorRecords(7, ['u'], 't', { ...LIVE, fakes: true })).toBeNull();
+    expect(await priorRecords(7, ['u'], 't', LIVE, (async () => Response.json([{ ts: 'soon', unit_id: 'u' }])) as typeof fetch)).toEqual([{ ts: 'soon', unit_id: 'u' }]);
+    expect(inList(['a', 'b "c"', 'd\\e'])).toBe('("a","b \\"c\\"","d\\\\e")');
   });
 
   it('records nothing for another repository id, and leaves recording to the page when PostgREST refuses', async () => {

@@ -72,7 +72,8 @@ export class SupabaseStore implements UdebtStore {
   }
 
   async records(repoId: number): Promise<EvidenceRow[]> {
-    return check<EvidenceRow[]>('records', await this.client.from('records').select('*').eq('repo_id', repoId).order('ts')).map(normalRecord);
+    // By time, then as inserted: the review fold (review.ts) reads one sitting's answers on a key in order.
+    return check<EvidenceRow[]>('records', await this.client.from('records').select('*').eq('repo_id', repoId).order('ts').order('id')).map(normalRecord);
   }
 
   async addRecords(rows: EvidenceRow[]): Promise<EvidenceRow[]> {

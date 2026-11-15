@@ -24,6 +24,8 @@ export interface GradeOutcome {
 export interface RecordHint {
   repo_id: number;
   ts: string;
+  /** Where the questions came from: a quiz (the default) or a review sitting. */
+  source?: 'quiz' | 'review';
 }
 
 export interface QuizClient {

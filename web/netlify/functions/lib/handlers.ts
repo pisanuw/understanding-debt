@@ -6,14 +6,15 @@
  */
 import { gradeAnswers, readGradeRequest, readQuestionsRequest, writeQuestions, type Deps } from '../../../src/core/assemble';
 import { MAX_LINES, parseRef, safeSha } from '../../../src/core/excerpts';
-import { markRevealed, mergeGrades, recordRows, type Answered } from '../../../src/core/quiz';
+import { markRevealed, mergeGrades, type Answered } from '../../../src/core/quiz';
+import { sittingRows } from '../../../src/core/review';
 import { parseGitHubUrl } from '../../../src/core/specs';
 import { authorize } from './auth';
 import { readEnv, type FnEnv } from './env';
 import { callGateway } from './gateway';
 import { excerpt } from './github';
 import { HttpError, bearer, errorResponse, json, readJson } from './http';
-import { insertRecords } from './records';
+import { insertRecords, priorRecords } from './records';
 
 export interface HandlerDeps {
   env?: FnEnv;
@@ -42,10 +43,16 @@ export async function handleQuestions(req: Request, opts: HandlerDeps = {}): Pro
   }
 }
 
+/** Where a graded sitting's questions came from, as a record's `source` says. */
+const SOURCES = ['quiz', 'review', 'dig'] as const;
+
 /**
  * POST /api/grade: {repo, sha, items, record?: {repo_id, ts, source?}} -> {grades,
  * recorded}. With `record`, the graded sitting is written to app_udebt.records with the
- * person's token and `recorded` holds the rows; null means the page records them itself.
+ * person's token, each row carrying its spaced-review state after it (`data.review`, folded
+ * from their earlier records on the sitting's units), and `recorded` holds the rows; null
+ * means the page records them itself (the fakes, or a read or write PostgREST refused).
+ * `source` is `quiz` (the default), `review` (a review sitting) or `dig`.
  */
 export async function handleGrade(req: Request, opts: HandlerDeps = {}): Promise<Response> {
   const env = opts.env ?? readEnv();
@@ -66,13 +73,16 @@ export async function handleGrade(req: Request, opts: HandlerDeps = {}): Promise
         confidence: Number(items[i]?.confidence) || 2,
         revealed: items[i]?.revealed === true,
       }));
-      const rows = recordRows(markRevealed(mergeGrades(answered, grades)), {
-        repoId,
-        sha: body.sha,
-        ts: new Date(record.ts).toISOString(),
-        source: record.source === 'dig' ? 'dig' : 'quiz',
-      });
-      recorded = await insertRecords(rows, token, env, doFetch);
+      const prior = await priorRecords(repoId, answered.map((a) => a.unit_id), token, env, doFetch);
+      if (prior) {
+        const rows = sittingRows(markRevealed(mergeGrades(answered, grades)), prior, {
+          repoId,
+          sha: body.sha,
+          ts: new Date(record.ts).toISOString(),
+          source: SOURCES.find((s) => s === record.source) ?? 'quiz',
+        });
+        recorded = await insertRecords(rows, token, env, doFetch);
+      }
     }
     return json(200, { grades, recorded });
   } catch (e) {
