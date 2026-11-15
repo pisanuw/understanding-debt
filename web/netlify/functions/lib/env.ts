@@ -23,6 +23,12 @@ export interface FnEnv {
    * Off until the gateway's anonymous mode exists.
    */
   anonModel?: boolean;
+  /**
+   * The app key the gateway's anonymous mode checks (x-hintwise-app-key; claude-built-apps
+   * d5bd864): HINTWISE_APP_KEY, a Netlify secret for Functions only, set by the owner, whose
+   * sha256 the Plabs session registers. Never logged, never sent to the page.
+   */
+  appKey?: string | null;
 }
 
 export { PREVIEW_TOKEN as FAKE_TOKEN } from '../../../src/core/preview';
@@ -49,5 +55,6 @@ export function readEnv(env: Record<string, string | undefined> = process.env): 
     fakeRepos: parseRepos(env.UDEBT_FAKE_REPOS),
     fakeCap: env.UDEBT_FAKES === '1' && !onNetlify && env.UDEBT_FAKE_CAP === '1',
     anonModel: env.VITE_UDEBT_ANON_MODEL === '1',
+    appKey: env.HINTWISE_APP_KEY?.trim() || null,
   };
 }

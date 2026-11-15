@@ -254,12 +254,19 @@ the walkthroughs add one per unit.
     for users who are not signed in as well. All unsigned users are considered "one user" in terms
     of quota". The owner chose option A ("1a"): an anonymous mode in llm-gateway, per app. It is
     the Plabs session's to build, and deploying it needs the owner's yes there.
-    - The gateway counts every visitor of udebt who is not signed in as one stand-in user: one
-      `cap_user_day_usd` ($1.00 today), inside the app's caps.
+    - The gateway counts every visitor of udebt who is not signed in as one stand-in user,
+      `visitors+udebt@hintwise.org`: one `cap_user_day_usd` ($1.00 today), inside the app's caps.
+      Its 429 answers carry `anonymous: true`.
+    - Plabs' spec (claude-built-apps d5bd864 and 4965c98; built and reviewed, not yet deployed):
+      the call is server to server only. It carries the project's anon key as the bearer and a
+      secret app key in `x-hintwise-app-key`. The key is `HINTWISE_APP_KEY`, a Netlify secret for
+      Functions only; the owner sets it and gives Plabs only its sha256. A key without its header
+      would let anyone spend the allowance, so browsers cannot send that header.
     - udebt's side is built and switched off until then (`VITE_UDEBT_ANON_MODEL=1` turns it on).
       - Visitors on the HintWise key by default, with the model's quiz first, on the samples at
         their pins only.
-      - Calls are made from the Netlify functions, marked anonymous and carrying no token.
+      - Calls are made from the Netlify functions with the anon key and the app key, never a
+        person's token. A refused or missing app key answers 503, a server setting, not "sign in".
       - Progress stays in the browser.
       - The cap notice names the shared allowance and suggests signing in for one's own.
     - Option B was rejected: a shared udebt account would need a password secret on Netlify.

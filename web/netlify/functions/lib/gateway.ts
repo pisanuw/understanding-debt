@@ -13,16 +13,23 @@ import { HttpError, upstreamDetail } from './http';
 export const APP = 'udebt';
 
 /**
- * How a call for a visitor who is not signed in is marked to the gateway's anonymous mode, which
- * counts every such visitor of the app as one stand-in user (owner's choice A, 2026-11-15). The
- * exact mark is the Plabs session's to define; until the gateway has the mode, VITE_UDEBT_ANON_MODEL
- * stays off and no anonymous call is made.
+ * The gateway's anonymous mode (owner's choice A, 2026-11-15; Plabs' spec, claude-built-apps
+ * d5bd864): server to server only, the project's anon key as the bearer (the platform checks a
+ * project JWT before the function runs) and the app key in this header, which browsers cannot
+ * send (not in the gateway's CORS list). The gateway then acts as the app's stand-in user
+ * (visitors+udebt@hintwise.org), so every visitor who is not signed in shares its allowance.
  */
-export const ANON_HEADER = 'x-hintwise-anonymous';
+export const APP_KEY_HEADER = 'x-hintwise-app-key';
 
-/** The gateway's headers: the person's token, or the anonymous mark when there is none. */
-function gatewayHeaders(token: string | null): Record<string, string> {
-  return { ...(token ? { authorization: `Bearer ${token}` } : { [ANON_HEADER]: '1' }), 'content-type': 'application/json' };
+/** The gateway's headers: the person's token, or for a visitor the anon key and the app key. */
+function gatewayHeaders(token: string | null, env: FnEnv): Record<string, string> {
+  const who: Record<string, string> = token ? { authorization: `Bearer ${token}` } : { authorization: `Bearer ${env.anonKey ?? ''}`, [APP_KEY_HEADER]: env.appKey ?? '' };
+  return { ...who, 'content-type': 'application/json' };
+}
+
+/** The gateway refused the app key: the server's setting (HINTWISE_APP_KEY or its registration), not the visitor's doing. */
+function appKeyRefused(data: unknown): HttpError {
+  return new HttpError(503, 'The gateway refused the app key.', { error: 'The HintWise key for visitors who are not signed in is not set up correctly on the server. Sign in, or use your own Anthropic key in Settings.', detail: upstreamDetail('gateway', 401, data) });
 }
 
 /** The gateway body: `app` and the five fields it passes, nothing else. */
@@ -45,7 +52,7 @@ export async function callGateway(req: ModelRequest, token: string | null, env: 
   try {
     res = await doFetch(`${env.supabaseUrl}/functions/v1/llm-gateway`, {
       method: 'POST',
-      headers: gatewayHeaders(token),
+      headers: gatewayHeaders(token, env),
       body: text,
     });
   } catch {
@@ -53,6 +60,7 @@ export async function callGateway(req: ModelRequest, token: string | null, env: 
   }
   const data: unknown = await res.json().catch(() => ({}));
   if (res.status === 429 && data && typeof data === 'object' && (data as { error?: unknown }).error === 'cap') throw new HttpError(429, 'cap', data);
+  if (res.status === 401 && token === null) throw appKeyRefused(data);
   if (res.status === 401) throw new HttpError(401, 'Sign in again.', { error: 'Your sign-in has expired. Sign in again.', detail: upstreamDetail('gateway', 401, data) });
   if (!res.ok) {
     const m = data && typeof data === 'object' ? (data as { message?: unknown; error?: unknown }).message ?? (data as { error?: unknown }).error : undefined;
@@ -83,13 +91,14 @@ export async function checkAllowance(token: string | null, env: FnEnv, doFetch: 
   try {
     res = await doFetch(`${env.supabaseUrl}/functions/v1/llm-gateway`, {
       method: 'POST',
-      headers: gatewayHeaders(token),
+      headers: gatewayHeaders(token, env),
       body: JSON.stringify({ app: APP, check: true }),
     });
   } catch {
     throw new HttpError(502, 'Gateway unreachable.', { error: 'Could not reach the HintWise gateway. Try again in a moment.' });
   }
   const data: unknown = await res.json().catch(() => ({}));
+  if (res.status === 401 && token === null) throw appKeyRefused(data);
   if (res.status === 401) throw new HttpError(401, 'Sign in again.', { error: 'Your sign-in has expired. Sign in again.', detail: upstreamDetail('gateway', 401, data) });
   if (!res.ok || !data || typeof data !== 'object' || typeof (data as { allowed?: unknown }).allowed !== 'boolean') {
     throw new HttpError(502, 'Gateway error.', { error: `The HintWise gateway answered ${res.status} to the allowance check.` });

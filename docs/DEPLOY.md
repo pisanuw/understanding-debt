@@ -164,7 +164,8 @@ repository with an own key and watch the job; delete a test account.
 | Netlify build (`netlify.toml`) | `VITE_SUPABASE_URL` | `https://auth.hintwise.org` |
 | | `VITE_SUPABASE_ANON_KEY` | the public anon key (platform/supabase.json; in `netlify.toml`) |
 | | `VITE_UDEBT_WORKER_URL` | `https://udebt-api.hintwise.org` (the API base URL) |
-| Netlify site env, scopes Builds and Functions | `VITE_UDEBT_ANON_MODEL` | unset or `0`. Set `1` only after llm-gateway has its anonymous mode (owner's choice A, HOSTING.md decision 12); then visitors who are not signed in use the HintWise key on the samples, all counted as one user. Needs a redeploy. |
+| Netlify site env, scopes Builds and Functions | `VITE_UDEBT_ANON_MODEL` | unset or `0`. Set `1` only after llm-gateway has its anonymous mode (owner's choice A, HOSTING.md decision 12) and `HINTWISE_APP_KEY` is set; then visitors who are not signed in use the HintWise key on the samples, all counted as one user. Needs a redeploy. |
+| Netlify site env, scope Functions only, marked secret | `HINTWISE_APP_KEY` | the app key the gateway's anonymous mode checks (header `x-hintwise-app-key`). The owner generates it, sets it here, and gives the Plabs session only its sha256 for `anon-setup udebt --key-sha256=<hex>`. |
 | Netlify functions (site env) | `SUPABASE_URL` | `https://auth.hintwise.org` |
 | | `SUPABASE_ANON_KEY` | `<public anon key>` |
 | Render (`render.yaml`) | `PYTHON_VERSION` | `3.12.7` |

@@ -47,6 +47,10 @@ async function mayRead(req: Request, repoUrl: string, sha: string, env: FnEnv, d
  */
 function anonymousModel(env: FnEnv): void {
   if (!env.anonModel) throw new HttpError(401, 'Sign in first.', { error: 'Sign in first.' });
+  // Switched on without the app key (or the anon key) on the functions: the server's setting.
+  if (!env.fakes && (!env.appKey || !env.anonKey)) {
+    throw new HttpError(503, 'No app key.', { error: 'The HintWise key for visitors who are not signed in is not set up on the server yet. Sign in, or use your own Anthropic key in Settings.' });
+  }
 }
 
 function anonymousRepo(repoUrl: string, sha: string, open: (u: string, s: string) => boolean): void {

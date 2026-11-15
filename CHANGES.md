@@ -181,3 +181,4 @@
 2026-11-15 [code] Quiz tab: when the allowance check is refused even after a refresh (session ended elsewhere), say so up front, keep advance quizzes, offer sign in again.
 2026-11-15 [note] Root cause of the grading 401: Netlify SUPABASE_ANON_KEY is wrong (PostgREST 'Invalid API key'); a wrong key now answers 503, and token refreshes no longer redraw a sitting.
 2026-11-15 [code] Model use without sign-in, owner's choice A: udebt side built behind VITE_UDEBT_ANON_MODEL (off), visitors share one allowance on the samples; gateway part is Plabs'.
+2026-11-15 [code] Visitor model calls follow Plabs' anonymous-mode spec: anon-key bearer plus x-hintwise-app-key (HINTWISE_APP_KEY, Netlify secret); refused or missing key answers 503.
