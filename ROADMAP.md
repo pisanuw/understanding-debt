@@ -1251,6 +1251,18 @@ default), the choice kept per browser. Review checks each item the way its lates
 checked. Tested with fakes; no model call, nothing deployed. The rule for Review and the open
 questions are in BRIEFING ("Phase 4b, advance quizzes for everybody").
 
+**Deployed** (owner, 2026-11-15, 15:18 Lisbon): Netlify builds `main` (`dc75449` at the time);
+https://udebt.hintwise.org and https://udebt.netlify.app answer with the footer and the CSP, the
+Render worker answers at https://udebt-api.hintwise.org/healthz, the four analyses are loaded in
+production, the static sample and advance-quiz files are served, the anonymous excerpt and tree
+functions work for a sample at its pin and refuse other commits (401), and a headless-browser pass
+over the home page and a sample page found no console, page or request error. Not yet exercised
+live: a signed-in sitting through the gateway. Still with Plabs: `supabase/ops/udebt-llm-caps.sql`
+(after the owner's yes there) and the `udebt` entry in `EXTERNAL_APP_LABELS` with the sign-in-link
+and delete-account redeploys. The build session (branch `claude/eloquent-lamport-afzr0o`) was
+archived at the owner's request on 2026-11-15; **the "UDebt: Nov 12" session carries everything
+from here**, this branch included (`main` is a fast-forward of it).
+
 Earlier in the day: Phase 3.4 and Phase 3.5 done, Phase 4a done as re-scoped (see their
 sections).
 
