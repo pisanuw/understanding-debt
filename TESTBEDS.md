@@ -385,6 +385,45 @@ The refit curve (k = 1.0) predicts 0.62 for this snapshot.
   worktree, where `.udebt/` is absent. A guard: run the HEAD-side calls in a clean worktree
   too, or keep reports outside the repository the model reads.
 
+### The same snapshot at level 5 (bb0c580, 2026-11-15)
+
+Three more owner-approved runs, `--at bb3d3b55 --level 5` (9 calls, 9 minutes), on the same
+map and code as the level-3 runs. Both bugs were worked around in the scratchpad clone:
+before each run every earlier report was moved out of `.udebt/experiments/` (it held 0 files
+when each run started), and each new report was moved aside under its own name.
+
+| question set | mean score | share vs wrongness | mass vs wrongness |
+|---|--:|---|---|
+| 1 | 0.58 | **0.64, p 0.014** | 0.10, p 0.37 |
+| 2 | 0.83 | **0.56, p 0.030** | 0.09, p 0.40 |
+| 3 | 0.65 | **0.81, p 0.001** | 0.41, p 0.09 |
+
+Pooled per unit over the three sets (6 questions per unit, 12 units):
+
+| level | set means (sd) | share vs wrongness | within-unit sd |
+|---|---|---|--:|
+| 3 | 0.81 / 0.88 / 0.96 (0.07) | 0.29, p 0.18 | 0.11 |
+| 5 | 0.58 / 0.83 / 0.65 (0.13) | **0.74, p 0.005** | 0.16 |
+
+The refit curve (k = 1.0) predicts 0.62 at both levels.
+
+- **Decay depends on the level.** Level 5 (implementation) fades with the share changed;
+  level 3 (consequence across units) barely does at this snapshot. Per unit, the level-3
+  minus level-5 gap grows with the share changed (rho 0.80, p 0.001). `cli` (share 1.34)
+  scores 0.92 at level 3 and 0.25 at level 5, while `inference-client` (0.25) scores 1.00 at
+  both. One k fits level 5 roughly (0.62 predicted against 0.69 observed) and over-decays
+  level 3 (0.88 observed). Since the ladder score weights levels 1–3 most, the decay should
+  be per level: steep for levels 4–5, shallow or none for levels 1–3, with the level-3 rate
+  still to be measured on older snapshots.
+- **A fixed level does not remove question-set variance.** Level 5's set means spread more
+  (sd 0.13) than level 3's (0.07). Each snapshot and level needs several question sets, or
+  more questions per unit, before a curve's level can be fitted.
+- **No rising sequence with isolation.** The isolated level-5 sets scored 0.58, 0.83, 0.65.
+  This does not settle whether the level-3 rise was leakage, since those runs were not
+  isolated, but the guard costs nothing.
+- Question set 2 graded 22 of its 24 answers (15 correct, 6 partial, 1 wrong). The report
+  `synthetic-bb3d3b55-2026-11-15_L5_qs2.json` in the scratchpad archive has the details.
+
 ## Caveats
 
 - **Disclosure-only.** Every AI share is a lower bound. Zed (2%), Ruff (2%) and openai/codex

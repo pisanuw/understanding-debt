@@ -105,3 +105,4 @@
 2026-11-15 [note] digitalme digest --since 2026-07-01: 11 units, 66 commits, 1 call of 32 s, 6 decisions held, 5 extended. Sample in .udebt/samples/digitalme-digest.md.
 2026-11-15 [doc] README digest section, serve batch grading and tutor persistence, why reference answers stay in map.json; BRIEFING and ROADMAP Phase 3.4.
 2026-11-15 [plan] HOSTING.md: hosted udebt on the HintWise platform (Google/email via Supabase, gateway or BYOK, option B footer), 3 cached samples, 7 owner decisions.
+2026-11-15 [note] Level-5 synthetic on hf bb3d3b55, 3 isolated sets: pooled share vs wrongness rho 0.74 p 0.005 (level 3: 0.29); the L3-L5 gap tracks share (rho 0.80): decay per level.
