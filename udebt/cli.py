@@ -73,7 +73,7 @@ from .quiz import (
     revealed_on,
 )
 from .quiz import record as record_results
-from .store import Store
+from .store import Config, Store
 from .weights import apply_refinement, save_cache
 
 
@@ -483,7 +483,7 @@ def _top(counts: dict[str, int], n: int = 6) -> list[tuple[str, int]]:
     return sorted(counts.items(), key=lambda kv: -kv[1])[:n]
 
 
-def _note(s_, u, prov, by_score) -> str:
+def _note(s_, u, prov, by_score, cfg=None) -> str:
     """The status note for one row: why the understanding is what it is."""
     if s_.scope != "architectural":
         who = "for you" if s_.scope_origin == "you" else "team-wide"
@@ -511,14 +511,9 @@ def _note(s_, u, prov, by_score) -> str:
         if prov.others_since_dev:
             note += f", {prov.others_since_dev} commits ({by}) by others since"
         return pre + note
-    if s_.share_since is not None and (s_.share_since or s_.commits_since):
-        return pre + (
-            f"quiz, decayed from {s_.verified:.2f} by share {s_.share_since:.2f} "
-            f"(mass {s_.commits_since})"
-        )
-    if s_.commits_since:
-        return pre + f"quiz, decayed from {s_.verified:.2f} by mass {s_.commits_since}"
-    return pre + "quiz"
+    cfg = cfg or Config()
+    faded = scoring.decay_note(s_, cfg.decay, cfg.evidence_model)
+    return pre + (f"quiz, {faded}" if faded else "quiz")
 
 
 def _depth(s_: scoring.UnitScore) -> str:
@@ -527,12 +522,25 @@ def _depth(s_: scoring.UnitScore) -> str:
 
 def _decay_line(d: scoring.Decay) -> str:
     if d.model == "share":
-        fade = f"exp(-{d.rate:g} x share of the unit changed since)"
+        fade = "exp(-k x share of the unit changed since)"
         if d.floor:
             fade = f"({d.floor:g} + {1 - d.floor:g} x {fade})"
+        if len(set(d.rates)) == 1:
+            return (
+                f"Decay: understanding x {fade}, k {d.rate_at():g} at every level and for the "
+                "own-commit prior, a commit counting at most the unit's size (config "
+                + ("decay_k_by_level" if d.by_level is not None else "decay_k")
+                + (", decay_floor)." if d.floor else ").")
+            )
+        ks = []
+        for i, (ns, k) in enumerate(scoring.rate_groups(d, list(ladder.LEVELS))):
+            word = "level" if len(ns) == 1 else "levels"
+            prior = " and the own-commit prior" if scoring.PRIOR_LEVEL in ns else ""
+            ks.append(f"{'k ' if i == 0 else ''}{k:g} at {word} {scoring.span(ns)}{prior}")
         return (
-            f"Decay: understanding x {fade}, a commit counting at most the unit's size "
-            "(config decay_k" + (", decay_floor)." if d.floor else ").")
+            f"Decay: each ladder level's value x {fade}, then the levels are combined; "
+            f"{', '.join(ks)}; a commit counting at most the unit's size (config "
+            "decay_k_by_level" + (", decay_floor)." if d.floor else ").")
         )
     return f"Decay: understanding x {d.per_mass:g} per unit of mass landed since (model mass)."
 
@@ -610,7 +618,7 @@ def cmd_status(args) -> int:
             f"{label:<{w}} {mark:>3} {s_.importance:>5.2f} {int(100 * prov.ai_share):>4} "
             f"{int(100 * prov.dev_share):>4} {s_.understanding:>5.2f} {_depth(s_):>5}  "
             f"{s_.basis:<9} {s_.debt:>5.2f}  "
-            f"{_bar(1 - s_.understanding):<10} {_note(s_, u, prov, by_score)}  "
+            f"{_bar(1 - s_.understanding):<10} {_note(s_, u, prov, by_score, cfg)}  "
             f"[{u['name']}]{extra}"
         )
     level_ids = {u["id"] for u in hier.level(units, deep)}
@@ -2155,7 +2163,7 @@ def cmd_experiment(args) -> int:
             by, rest = "mass", spec
         spec = rest
         targets = [float(x) for x in spec.split(",") if x.strip()]
-        rows = synthetic.suggest(root, store, targets, args.units, by)
+        rows = synthetic.suggest(root, store, targets, args.units, by, args.level)
         print(
             f"\n{'target':>6} {'sha':<9} {'date':<10} {'commits':>7} {'mass':>6} {'share':>5} "
             f"{'median':>6} {'mshare':>6} {'pred':>5}  units unchanged"
@@ -2172,8 +2180,9 @@ def cmd_experiment(args) -> int:
             "\nmass = landed weight of <sha>..HEAD (first-parent commits from HEAD); share, "
             "median = the units' mean and median share changed since (weighted changed lines / "
             "size at HEAD); mshare = mean mass since / unit mass; pred = the decay model's mean "
-            "predicted score for a developer frozen there. Targets are mass, or share:S,... or "
-            "mshare:S,... No LLM."
+            f"predicted score at level {args.level} (k {store.config.decay.rate_at(args.level):g})"
+            " for a developer frozen there. Targets are mass, or share:S,... or mshare:S,... "
+            "No LLM."
         )
         return 0
     revs = [args.at] if args.at else [r.strip() for r in (args.snapshots or "").split(",")]
@@ -2212,8 +2221,9 @@ def cmd_experiment(args) -> int:
     print(
         "\nsince = weighted mass landed on the unit after the snapshot; share = share of the "
         "unit changed since (weighted changed lines, each commit's capped at the unit's size "
-        "after it, / size at HEAD); pred = the decay model's "
-        "score for a developer who knew the unit at the snapshot; score = mean of correct 1,"
+        "after it, / size at HEAD); pred = the decay model's score at the run's level (k "
+        f"{report['decay'].get('level_rate', report['decay']['rate']):g}) "
+        "for a developer who knew the unit at the snapshot; score = mean of correct 1,"
         " partial 0.5, wrong and unknown 0; cw = confidently wrong (confidence 3); change = "
         "where the lines since went (files the snapshot had: edited; files it lacked: new)."
     )

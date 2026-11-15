@@ -36,8 +36,12 @@ def test_decay_models():
     assert scoring.prior_understanding(1.0, 10.0, d, 0.0) == 0.5
     assert abs(scoring.prior_understanding(1.0, 0.0, d, math.log(2)) - 0.25) < 1e-9
     assert abs(scoring.prior_understanding(1.0, 2.0, 0.9) - 0.405) < 1e-12
+    # levels 1-3 fade at their own, slower rate (Phase 3.5)
     s = scoring.score_unit({"id": "u"}, understood(), 3.0, decay=d, share_since=1.0)
-    assert s.share_since == 1.0 and abs(s.understanding - math.exp(-1)) < 1e-12
+    assert s.share_since == 1.0 and abs(s.understanding - math.exp(-scoring.K_LOW)) < 1e-12
+    single = scoring.Decay(by_level=None)
+    s = scoring.score_unit({"id": "u"}, understood(), 3.0, decay=single, share_since=1.0)
+    assert abs(s.understanding - math.exp(-1)) < 1e-12, "one k for every level: the old rule"
 
 
 def test_line_counts_and_unit_sizes(tmp_path):
@@ -140,8 +144,9 @@ def test_the_same_mass_fades_a_small_unit_more(tmp_path):
     small, big = by["small"], by["big"]
     assert abs(small.commits_since - big.commits_since) < 0.01, "the same mass landed"
     assert math.isclose(small.share_since, 100 * big.share_since, rel_tol=0.2), "sizes 5, 500"
-    assert small.understanding < 0.9 < 0.99 < big.understanding
-    assert math.isclose(small.understanding, math.exp(-scoring.DECAY_K * small.share_since))
+    assert small.understanding < 0.97 < 0.99 < big.understanding
+    # levels 1-3 passed: they fade at their own rate
+    assert math.isclose(small.understanding, math.exp(-scoring.K_LOW * small.share_since))
 
     cfg = store.config
     cfg.decay_model = "mass"

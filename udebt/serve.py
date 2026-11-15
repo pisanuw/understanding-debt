@@ -326,6 +326,10 @@ class App:
             "score": {
                 "understanding": round(s.understanding, 3),
                 "verified": None if s.verified is None else round(s.verified, 3),
+                "share_since": None if s.share_since is None else round(s.share_since, 3),
+                "decay": scoring.decay_note(
+                    s, self.store.config.decay, self.store.config.evidence_model
+                ),
                 "basis": s.basis,
                 "source": s.source,
                 "depth": s.depth,

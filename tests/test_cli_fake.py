@@ -1,10 +1,11 @@
 """End-to-end through the CLI with the FakeLLM (UDEBT_LLM=fake)."""
 
 import json
+import math
 
 import pytest
 
-from udebt import cli, repo
+from udebt import cli, repo, scoring
 from udebt.store import Store
 
 
@@ -72,6 +73,7 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
     subprocess.run(["git", "commit", "-q", "-am", "tweak"], cwd=root, check=True)
     rc, out = run(root, "status", capsys=capsys)
     assert "decayed from 0.33 by share" in out
+    assert f"at level 1 (k {scoring.K_LOW:g})" in out, "a level-1 pass fades at level 1's rate"
 
     # blackbox scope removes a unit from the index; by default only for you
     rc, out = run(root, "scope", "scoring", "blackbox", capsys=capsys)
@@ -80,8 +82,9 @@ def test_full_flow(fixture_repo, monkeypatch, capsys):
     assert "blackbox for you (excluded)" in out
     idx = float(out.split("Debt index: ")[1].split(" ")[0])
     # only storage left: the tweak rewrote its one line of code, the whole unit, which counts
-    # once (a commit's lines are capped at the unit's size), at the tweak's small weight
-    assert 100 * (1 - 1 / 3 * 0.9) < idx < 100 * (1 - 1 / 3 * 0.2)
+    # once (a commit's lines are capped at the unit's size), at the tweak's small weight; the
+    # level-1 pass fades at level 1's rate, so by at most exp(-K_LOW) for one unit's worth
+    assert 100 * (1 - 1 / 3) < idx < 100 * (1 - 1 / 3 * math.exp(-scoring.K_LOW))
     # the mass model decays it only a little: one small commit is little mass
     cfg = json.loads((root / ".udebt" / "config.json").read_text())
     (root / ".udebt" / "config.json").write_text(json.dumps({**cfg, "decay_model": "mass"}))

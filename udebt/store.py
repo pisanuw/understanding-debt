@@ -35,7 +35,11 @@ def now_iso() -> str:
 class Config:
     model: str | None = None
     decay_model: str = "share"  # share: by the share of a unit changed; mass: per unit of mass
-    decay_k: float = 1.0  # share model: exp(-k x share changed); fitted (ROADMAP Phase 5)
+    decay_k: float = 1.0  # share model's single k: every level's when no per-level table
+    # share model: k per ladder level, {"1": k, ..., "5": k}; levels left out keep the defaults
+    # (scoring.LEVEL_K). Unset: the defaults, unless decay_k was set to something other than
+    # 1.0 (the single rate before Phase 3.5), which then applies to every level
+    decay_k_by_level: dict[str, float] | None = None
     decay_floor: float = 0.0  # share model: the part of an understanding no change removes
     decay_per_commit: float = 0.9  # mass model: the factor per unit of weighted mass
     evidence_window: int = 5  # the flat evidence model: mean over the last N answers
@@ -62,7 +66,28 @@ class Config:
         """The decay rule these settings describe (scoring.Decay)."""
         from .scoring import Decay
 
-        return Decay(self.decay_model, self.decay_k, self.decay_per_commit, self.decay_floor)
+        return Decay(
+            self.decay_model,
+            self.decay_k,
+            self.decay_per_commit,
+            self.decay_floor,
+            self.level_rates(),
+        )
+
+    def level_rates(self) -> tuple[float, ...] | None:
+        """k for ladder levels 1..5: decay_k_by_level over the defaults (scoring.LEVEL_K);
+        without it the defaults, or None (decay_k at every level) when decay_k was chosen.
+        decay_k = 1.0 is read as not chosen: it was the default every config saved from
+        Phase 3.1 to 3.4 wrote."""
+        from .scoring import DECAY_K, level_rates
+
+        if self.decay_k_by_level is not None:
+            if not isinstance(self.decay_k_by_level, dict):
+                raise ValueError('decay_k_by_level must map levels 1-5 to k, e.g. {"3": 0.2}')
+            return level_rates(self.decay_k_by_level)
+        if float(self.decay_k) != DECAY_K:
+            return None
+        return level_rates()
 
     def primary(self, email: str) -> str:
         """The developer key for `email`: the identity group's primary address, else itself."""
@@ -116,6 +141,8 @@ class Config:
             "handles": self.handles,
             "directed": self.directed,
         }
+        if self.decay_k_by_level is not None:  # unset stays unset, so a refit's defaults apply
+            d["decay_k_by_level"] = self.decay_k_by_level
         if self.decisions_dir:
             d["decisions_dir"] = self.decisions_dir
         d.update(self.extra)

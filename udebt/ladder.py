@@ -13,8 +13,9 @@ implementation detail only once the developer has shown the levels above.
     5      implementation: code paths, specific functions  any
 
 Levels 1-3 are architectural understanding and drive the score; 4 and 5 are optional depth
-(scoring.ladder_verified). A developer's place on a unit's ladder is derived from their
-records, never kept apart: every record carries `level`.
+(scoring.ladder_verified). Each level fades at its own rate as the unit changes (Phase 3.5,
+scoring.Decay): levels 1-3 slowly, 4-5 fast. A developer's place on a unit's ladder is
+derived from their records, never kept apart: every record carries `level`.
 
 A *sitting* is the answers one quiz run gave on a unit at one level (usually one answer;
 `--per-unit N` gives N). They share a timestamp (quiz.record writes one per run). A level is

@@ -95,6 +95,7 @@ def test_state_path_unit_and_excerpts(server):
     assert st == 200 and p["steps"][0]["command"].startswith("udebt dig ")
     st, u, _ = call(app, "GET", "/api/unit?id=storage")
     assert st == 200 and u["score"]["basis"] == "estimated" and u["orientation"]["purpose"]
+    assert u["score"]["decay"] == "" and u["score"]["share_since"] is None, "no quiz: no fade"
     assert "<h1>" in u["decision_html"] and u["walkthrough"] is None
     assert call(app, "GET", "/api/unit?id=nope")[0] == 404
     st, x, _ = call(app, "GET", "/api/excerpt?file=udebt/scoring.py&start=1&end=99")

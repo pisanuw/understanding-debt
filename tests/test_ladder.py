@@ -89,12 +89,18 @@ def test_ladder_scoring_a_third_per_architectural_level_and_depth_on_top():
     full = scoring.score_unit(u, understood(), 0)
     assert full.understanding == 1.0 and full.depth == 3, "levels 1-3 are enough"
     deep = understood() + [r(4, "correct"), r(5, "correct")]
-    s = scoring.score_unit(u, deep, 0, decay=scoring.Decay(), share_since=0.15)
+    s = scoring.score_unit(u, deep, 0, decay=scoring.Decay(), share_since=0.5)
     assert abs(s.verified - 1.2) < 1e-9 and s.depth == 5
-    assert s.understanding == 1.0, "depth is headroom: 1.2 x exp(-0.15) is still over 1"
-    arch = scoring.score_unit(u, understood(), 0, decay=scoring.Decay(), share_since=0.6)
-    lifted = scoring.score_unit(u, deep, 0, decay=scoring.Decay(), share_since=0.6)
+    assert s.understanding == 1.0, "depth is headroom: exp(-0.1) + 0.2 x exp(-0.5) is over 1"
+    one_k = scoring.Decay(by_level=None)  # the single-k rule: verified x exp(-k x share)
+    s = scoring.score_unit(u, deep, 0, decay=one_k, share_since=0.15)
+    assert s.understanding == 1.0, "1.2 x exp(-0.15) is still over 1"
+    arch = scoring.score_unit(u, understood(), 0, decay=one_k, share_since=0.6)
+    lifted = scoring.score_unit(u, deep, 0, decay=one_k, share_since=0.6)
     assert arch.understanding < 0.6 <= lifted.understanding, "depth lifts over the threshold"
+    arch = scoring.score_unit(u, understood(), 0, decay=scoring.Decay(), share_since=2.6)
+    lifted = scoring.score_unit(u, deep, 0, decay=scoring.Decay(), share_since=2.6)
+    assert arch.understanding < 0.6 <= lifted.understanding, "per level too, barely"
     # the most recent sitting per level counts: a level re-taken and passed is passed
     again = [r(1, "wrong", t(1)), r(1, "correct", t(2))]
     assert abs(scoring.score_unit(u, again, 0).understanding - 1 / 3) < 1e-9

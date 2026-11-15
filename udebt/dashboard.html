@@ -293,9 +293,23 @@ footer p { margin: 4px 0; }
       ", " + top.length + " units"
     : "No points yet: run udebt snapshot.";
   var dec = D.settings.decay || {};
+  // k per ladder level (Phase 3.5), grouped: "k 0.2 at levels 1-3, 1 at 4-5"; one k before
+  function rates(d) {
+    var by = d.by_level;
+    if (!by) return "k " + d.rate;
+    var groups = [];
+    for (var n = 1; n <= 5; n++) {
+      var k = by[String(n)], g = groups[groups.length - 1];
+      if (g && g.k === k && g.to === n - 1) g.to = n; else groups.push({ k: k, from: n, to: n });
+    }
+    if (groups.length === 1) return "k " + groups[0].k + " at every level";
+    return "k " + groups.map(function (g) {
+      return g.k + " at " + (g.from === g.to ? "level " + g.from : "levels " + g.from + "-" + g.to);
+    }).join(", ");
+  }
   document.getElementById("meta").textContent = "HEAD " + String(D.head || "").slice(0, 8) +
     " · generated " + day(D.generated_at) + " · decay " + dec.model +
-    (dec.model === "share" ? " (" + (dec.floor ? dec.floor + " + " + (1 - dec.floor) + " x " : "") + "exp(-" + dec.rate + " x share changed))" : " (" + dec.per_mass + " per unit of mass)") +
+    (dec.model === "share" ? " (" + (dec.floor ? dec.floor + " + " + (1 - dec.floor) + " x " : "") + "exp(-k x share changed), " + rates(dec) + ")" : " (" + dec.per_mass + " per unit of mass)") +
     " · known threshold " + D.settings.known_threshold + " · bus target " + D.settings.bus_target;
 
   var devSel = document.getElementById("dev");

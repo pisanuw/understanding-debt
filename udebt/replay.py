@@ -57,8 +57,9 @@ NAME = "snapshots.json"
 VERSION = 1
 # the scoring rules a stored series was made with, beyond the settings the fingerprint names:
 # 2 = Phase 3.1 (each commit's changed lines capped at its unit's size; no CAUTION event when
-# the understanding is only the own-commit prior); 3 = Phase 3.2 (the question ladder's score)
-RULES = 3
+# the understanding is only the own-commit prior); 3 = Phase 3.2 (the question ladder's score);
+# 4 = Phase 3.5 (each ladder level fades at its own rate, the prior at level 5's)
+RULES = 4
 EVERY = "week"
 HEAVY = 0.5  # a commit this heavy by someone else is marked on that developer's line
 LEVELS = ("OUTSIDE", "HIGH", "CAUTION")
@@ -419,7 +420,7 @@ def fingerprint(h: History, every: str) -> dict[str, Any]:
         "every": every,
         "map": h.map.get("generated_at"),
         "units": hashlib.sha1(units.encode()).hexdigest()[:12],
-        "decay": [d.model, d.rate, d.per_mass, d.floor],
+        "decay": [d.model, d.rate, d.per_mass, d.floor, list(d.rates)],
         "window": h.cfg.evidence_window,
         "evidence": h.cfg.evidence_model,
         "rules": RULES,
@@ -633,6 +634,20 @@ def unit_table(h: History, last: dict[str, Any] | None) -> list[dict[str, Any]]:
     return rows
 
 
+def decay_settings(d: scoring.Decay) -> dict[str, Any]:
+    """The decay rule as the export, the dashboard and the synthetic report state it: `rate`
+    is the single k (config decay_k), `by_level` the k each ladder level fades at as applied
+    and `prior_rate` the own-commit prior's (level 5's)."""
+    return {
+        "model": d.model,
+        "rate": d.rate,
+        "by_level": {str(n): k for n, k in zip(sorted(ladder.LEVELS), d.rates, strict=True)},
+        "prior_rate": d.prior_rate,
+        "per_mass": d.per_mass,
+        "floor": d.floor,
+    }
+
+
 def export_data(
     h: History, res: Result, *, with_answers: bool = False, risk_levels=LEVELS
 ) -> dict[str, Any]:
@@ -655,7 +670,7 @@ def export_data(
         "generated_at": now_iso(),
         "settings": {
             "every": data["fingerprint"]["every"],
-            "decay": {"model": d.model, "rate": d.rate, "per_mass": d.per_mass, "floor": d.floor},
+            "decay": decay_settings(d),
             "known_threshold": cfg.known_threshold,
             "bus_target": cfg.bus_target,
             "heavy": HEAVY,

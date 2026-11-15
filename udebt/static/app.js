@@ -234,7 +234,7 @@
         if (note) add(t, el("div", { "class": "note" }, note));
         add(tiles, t);
       }
-      tile("Understanding", fmt(sc.understanding), sc.basis === "measured" ? "from your answers" : sc.basis === "estimated" ? "estimated from your commits (at most 0.5)" : "nothing yet", badge(sc.basis, sc.basis));
+      tile("Understanding", fmt(sc.understanding), sc.basis === "measured" ? "from your answers" + (sc.decay ? ", " + sc.decay : "") : sc.basis === "estimated" ? "estimated from your commits (at most 0.5)" : "nothing yet", badge(sc.basis, sc.basis));
       tile("Depth", depth(sc.depth), "levels passed on the ladder");
       tile("Next", "level " + sc.level, sc.label.replace(/^level \d of 5: /, ""));
       tile("Debt", fmt(sc.debt), "importance " + fmt(sc.importance));

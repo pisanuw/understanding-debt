@@ -289,12 +289,13 @@ def unit_rows(
     weights: dict[str, CommitWeight],
     sizes: dict[str, float] | None = None,
     decay: Decay | None = None,
+    level: int = LEVEL,
 ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     """The snapshot's header and one row per unit, before any question is answered. With
     `sizes` (unit id -> lines at HEAD) each row also carries the share of the unit changed
-    since the snapshot, as the share decay model counts it, and what `decay` predicts for a
-    developer who knew the unit fully at the snapshot (`predicted`, with the mass model's
-    0.9 per unit of mass beside it)."""
+    since the snapshot, as the share decay model counts it, and what `decay` predicts at
+    ladder `level` (that level's rate) for a developer who knew the unit fully at the
+    snapshot (`predicted`, with the mass model's 0.9 per unit of mass beside it)."""
     since_shas = set(_git(root, "rev-list", f"{at}..{head}").split())
     since = [c for c in commits if c.sha in since_shas]
     members = hier.Membership(all_units)
@@ -328,7 +329,7 @@ def unit_rows(
                 "lines_uncapped": round(uncapped, 1),
                 "size_lines": sizes.get(u["id"], 0.0),
                 "share_changed": s,
-                "predicted": round(decay.factor(m_since, s), 3),
+                "predicted": round(decay.factor(m_since, s, level), 3),
                 "predicted_mass": round(Decay("mass").factor(m_since), 3),
             }
         rows[u["id"]] = {
@@ -574,14 +575,14 @@ def run(
         "questions": None,
         "snapshots": [],
     }
-    report["decay"] = {
-        "model": decay.model,
-        "rate": decay.rate,
-        "per_mass": decay.per_mass,
-        "floor": decay.floor,
-    }
+    from .replay import decay_settings
+
+    # `predicted` is at the run's level: that level's rate (Phase 3.5; a single k before)
+    report["decay"] = {**decay_settings(decay), "level_rate": decay.rate_at(level)}
     for rev, at in snaps:
-        header, rows = unit_rows(root, at, head, picked, m["units"], commits, weights, sizes, decay)
+        header, rows = unit_rows(
+            root, at, head, picked, m["units"], commits, weights, sizes, decay, level
+        )
         report["snapshots"].append({"at": rev, **header, "graded": False, "units": rows})
 
     fresh = [resume is None]  # the first save of a new run creates its file, never replaces one
@@ -690,9 +691,11 @@ def suggest(
     targets: list[float],
     n_units: int | None = None,
     by: str = "mass",
+    level: int = LEVEL,
 ) -> list[dict[str, Any]]:
     """For each target, the first-parent commit from HEAD at which it is first reached, with
-    how many of the picked units have not moved since. `by` "mass": the landed weight of
+    how many of the picked units have not moved since, and the decay model's mean prediction
+    at ladder `level`. `by` "mass": the landed weight of
     `rev..HEAD`; "share": the picked units' mean share changed since (the share decay
     model's input, weighted changed lines over each unit's size at HEAD); "mshare": their
     mean mass since over their mass in all (the measure the Phase 1.2 and 1.3 runs report).
@@ -750,7 +753,7 @@ def suggest(
                 lo = mid + 1
         at = line[lo]
         header, rows = unit_rows(
-            root, at, head, picked, m["units"], commits, weights, sizes, store.config.decay
+            root, at, head, picked, m["units"], commits, weights, sizes, store.config.decay, level
         )
         out.append(
             {

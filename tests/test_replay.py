@@ -246,7 +246,7 @@ def test_depth_in_the_series_timeline_export_and_dashboard(fixture_repo, capsys)
     last = data["points"][-1]["devs"][dev]
     assert last["depth"] == {"scoring": 1, "storage": 3}
     assert last["und"]["storage"] == 1.0 and abs(last["und"]["scoring"] - 0.333) < 1e-3
-    assert data["fingerprint"]["evidence"] == "ladder" and data["fingerprint"]["rules"] == 3
+    assert data["fingerprint"]["evidence"] == "ladder" and data["fingerprint"]["rules"] == 4
     # timeline: per developer, depth now under the table; per unit, a depth column each
     rc, out = run(root, capsys, "timeline", "--dev", dev)
     assert "Depth now (highest level passed" in out and "storage 3" in out
