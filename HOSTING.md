@@ -215,6 +215,11 @@ the walkthroughs add one per unit.
 7. **Samples:** huggingface_hub, sentry-javascript and mlflow. Their specs are generated now
    on the owner's subscription, with `udebt worker run ... --llm --walkthroughs 12
    --no-excerpts`: references, no stored code.
+8. **After the measurements (2026-11-15):**
+   - yes to the `udebt/llm.py` isolation fix (f294414);
+   - yes to the cheaper `default_model` with the default caps;
+   - yes to the Plabs session loading `samples/*.sql` into production. The `app_udebt`
+     migrations must be applied first.
 
 ## Measured on the samples (2026-11-15)
 
@@ -259,8 +264,9 @@ it are in TESTBEDS.md, "Sample prep".
      over to the samples.
 3. **Per-person caps.** $0.25 a day is about three two-question sittings on the default model and
    about seven on the cheaper one.
-   - Recommendation, for the owner: set udebt's `default_model` to the cheaper model, and keep
-     $0.25 per person and $2 for the app per day until the gateway's `usage` shows real sittings.
+   - **Decided by the owner (2026-11-15):** udebt's `default_model` becomes the cheaper model;
+     the caps stay at $0.25 per person and $2 for the app per day, and `max_tokens` stays at
+     4096, until the gateway's `usage` shows real sittings. The Plabs session sets it.
    - The cheaper model made these samples, as every logged call shows. The synthetic experiments
      in TESTBEDS.md also ran on the CLI's default with no model set, though their reports do not
      record the model.
