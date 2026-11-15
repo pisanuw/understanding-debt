@@ -209,19 +209,21 @@ For each architectural unit `u` and developer `d`:
 | level of an answer | the question ladder's level it was asked at, 1 to 5 (below); an answer recorded before the ladder counts as level 5, the implementation questions the old prompt asked |
 | level value v_n | mean evidence of the latest sitting at level n on `u` (one quiz run's answers at that level, usually one), 0 with none: the most recent verdict per level counts |
 | verified understanding | max(0, (v_1 + v_2 + v_3) / 3 + 0.1 x (v_4 + v_5)): levels 1-3 (the architecture) a third each, levels 4-5 (optional depth) 0.1 each, so at most 1.2 |
-| understanding | min(1, verified x exp(-k x share of `u` changed since the last answer)), k = 1.0 (config `decay_k`, fitted on every recorded synthetic unit-snapshot, ROADMAP Phase 5): 37% is left once a unit's worth of change has landed, half at 69%. Passing levels 1-3 is full understanding; depth above 1 is headroom against the fade (a unit known to level 5 reads 1.0 until 18% of it has changed) and can lift a faded understanding back over the known threshold, but is never needed to reach it |
+| level fade f_n | exp(-k_n x share of `u` changed since the last answer on `u`), k_n by ladder level (config `decay_k_by_level`, Phase 3.5): **k 0.2 at levels 1-3**, the architecture (a level 1-3 pass keeps 82% after a unit's worth of change, falls to 0.6 at 2.55 units' worth); **k 1.0 at levels 4-5**, implementation (37% left after a unit's worth, half at 69%). Fitted on the synthetic runs, levels 1-3 on huggingface_hub's level 3 question sets, 4-5 on every pre-ladder and level 5 run (ROADMAP Phase 5) |
+| understanding | min(1, max(0, (v_1 f_1 + v_2 f_2 + v_3 f_3) / 3 + 0.1 x (v_4 f_4 + v_5 f_5))): each level's value fades at its own rate, then the levels combine as in verified, so a level-3 pass outlasts a level-5 pass on the same change. Passing levels 1-3 is full understanding; depth above 1 is headroom against the fade (a unit known to level 5 reads 1.0 until 59% of it has changed) and can lift a faded understanding back over the known threshold, but is never needed to reach it. With one k for every level this is min(1, verified x exp(-k x share)), the rule before Phase 3.5 |
+| one k for every level | `decay_k` (default 1.0) applies to every level when the config has no `decay_k_by_level` and sets `decay_k` to something other than 1.0 (the single rate every config written from Phase 3.1 to 3.4 carries, read as not chosen); `decay_k_by_level` with all five levels at one k does the same for any k. Levels a `decay_k_by_level` leaves out keep the defaults |
 | depth | the highest level n with every level 1..n passed (its latest sitting all correct); 0 when level 1 is not |
 | basis | `measured` when the understanding comes from quiz answers on `u` (or on its sub-units), `estimated` when from the own-commit prior or half the parent's quiz, `none` without either; it changes no number |
 | next level on `u` | depth + 1, at most 5; one lower when the latest sitting was confidently wrong at level 2 or more |
-| verified, flat model | mean evidence over the last 5 answers on `u`, clamped to [0, 1], levels ignored: config `evidence_model: "flat"` (`evidence_window`), the rule before the ladder |
+| verified, flat model | mean evidence over the last 5 answers on `u`, clamped to [0, 1], levels ignored, faded at level 5's k: config `evidence_model: "flat"` (`evidence_window`), the rule before the ladder |
 | share of `u` changed since t | weighted changed lines landed under `u` after t / size of `u` in lines; can pass 1 when code is rewritten more than once, though no single commit adds more than the unit's size |
 | weighted changed lines of a commit in `u` | its changed lines under `u` (insertions plus deletions; a deleted file counts its size once), counted as for line share (lockfile, generated and version-bump lines left out, a shared file split), **at most the size of `u` just after the commit**, times its line weight: the commit's weight, or for a commit a merged branch brought in, the whole branch's weight (at most 1); 0 for a bot |
 | size of `u` just after a commit | the running sum of every earlier commit's insertions minus deletions under `u` (the same files and split as the size), in history order: no tree is read; at HEAD it matches the blob count to a few lines on the testbeds |
 | size of `u` | lines of the tracked files under `u` at the cut-off (HEAD for `status`), without lockfiles, generated, media or binary files, a shared file split as above; counted once per blob, cached in `.udebt/sizes.json` (gitignored) |
-| understanding, mass model | verified x 0.9^(mass landed on `u` since the last answer): config `decay_model: "mass"` (`decay_per_commit`), the Phase 1 rule, kept to compare |
+| understanding, mass model | verified x 0.9^(mass landed on `u` since the last answer), the same at every level: config `decay_model: "mass"` (`decay_per_commit`), the Phase 1 rule, kept to compare |
 | line share of a commit in `u` | changed lines under `u` / all changed lines, lockfile, generated and version-bump lines left out; a file listed by k top-level units counts 1/k of its lines in each, and a parent's part is split again among the sub-units listing it |
 | attribution of a commit to `u` | weight x sqrt(line share); 0 for a bot commit |
-| prior (no quiz yet) | 0.5 x your weighted share of `u` x exp(-k x share of `u` others changed since your last commit) (mass model: 0.9^(mass others landed since)) |
+| prior (no quiz yet) | 0.5 x your weighted share of `u` x exp(-k_5 x share of `u` others changed since your last commit), at level 5's k: having typed the code is implementation-shaped knowledge (mass model: 0.9^(mass others landed since)) |
 | importance | 0.6 x centrality/5 + 0.4 x mass/max mass, centrality rated 1-5 by the mapper |
 | co-change edge (a, b) | sum over commits touching both, with at most 30 files, of weight / (files - 1) |
 | import edge (a, b) | 1 per direction in which a imports b; scaled so imports and co-change carry equal total weight |
@@ -248,10 +250,18 @@ it does not erode your prior. Four deliberate choices:
   repo starts at 100 and earns it down.
 - **Saying "I don't know" is free; being confidently wrong costs.** A known unknown is cheap to
   fix. A misconception causes bugs.
-- **Understanding decays when the code moves without you, by how much of the unit moved.**
-  Every changed line landed on a unit after you last verified it counts, at its commit's
-  weight, against the unit's size: once a tenth of the unit has changed you keep 90% of what
-  you knew, a half 61%, all of it 37%. So debt grows as the AI keeps building, and the same
+- **Understanding decays when the code moves without you, by how much of the unit moved,
+  and the code-level knowledge faster than the architecture.** Every changed line landed on a
+  unit after you last verified it counts, at its commit's weight, against the unit's size. An
+  answer about the code (levels 4-5, and the own-commit prior) fades fast: once a tenth of the
+  unit has changed you keep 90% of it, a half 61%, all of it 37%. An answer about the
+  architecture (levels 1-3: what the unit is for, the decision, what else depends on it)
+  fades at a fifth of that rate: 98%, 90% and 82%, because a unit's role and its decisions
+  outlast most rewrites of its code. In synthetic runs on huggingface_hub, level 3 answers
+  from a snapshot nine months old scored 0.88 where level 5 answers scored 0.69, and the gap
+  grew with the share changed (ROADMAP Phase 5). `udebt status` names the levels and rates
+  behind each faded score ("quiz, decayed from 1.00 by share 0.52 at levels 1-3 (k 0.2)"), and
+  so does the unit page in `udebt serve`. So debt grows as the AI keeps building, and the same
   change costs more in a small unit than in a large one. One commit counts at most the
   unit's size just after it: rewriting a unit counts it once (not its old plus its new
   lines), and deleting most of one (data files moved out of git) counts what is left, not
@@ -296,9 +306,10 @@ unit by unit:
   it, an answer from before the ladder (level 5) or at a forced level never moves anyone past
   a level they have not shown; both still count in the score at their level.
 - **Levels 1-3 are the understanding** (the table above): a third each, the latest answer
-  per level counting, decayed as before. Levels 4 and 5 are depth: 0.1 each on top, so a
-  developer who knows a unit down to its code keeps 1.0 through the first changes, and depth
-  can lift a faded understanding back over the threshold, but nobody needs it to get there. A
+  per level counting, each faded at its level's rate (k 0.2 at levels 1-3, 1.0 at 4-5, since
+  Phase 3.5). Levels 4 and 5 are depth: 0.1 each on top, so a developer who knows a unit down
+  to its code keeps 1.0 through the first changes, and depth can lift a faded understanding
+  back over the threshold, but nobody needs it to get there. A
   confidently wrong answer at any level is still negative evidence (-0.5 for that level).
 - **Level 1-3 questions name no function, variable, file or code block.** The question prompt
   says so for each level, and lets them name an external technology the decision is about (a
@@ -720,9 +731,11 @@ the understanding of each unit, its part of the debt index (the parts sum to the
 and the index over their set (over every existing unit for a developer without one). The
 series is kept in `.udebt/snapshots.json`, committed, one point per line; a run appends only
 the points newer than the last, so it is idempotent and its diff is an append. A series made
-with another map, decay model, evidence window, evidence model, interval or scoring rules
-(the ladder made them version 3), or whose last point a rewrite took off the first-parent
-line, is kept as it is with a note until `udebt snapshot --rebuild`.
+with another map, decay model or rates, evidence window, evidence model, interval or scoring
+rules (the ladder made them version 3, per-level decay version 4), or whose last point a
+rewrite took off the first-parent line, is kept as it is with a note until `udebt snapshot
+--rebuild`. The export's `settings.decay` names the single k (`rate`), the k of each level as
+applied (`by_level`) and the prior's (`prior_rate`); the dashboard's header shows them.
 
 **Risk events** are the "high-debt member landed a heavy change" moments: every commit a
 developer authored (or directed, for an agent commit) weighing at least 0.1 is assessed by
@@ -873,8 +886,10 @@ goes to `.udebt/records/`), records the `level` and gives per snapshot and per u
   its share of the unit's mass, and the files at the snapshot and now;
 - the share of the unit changed since (weighted changed lines over its size at HEAD, the
   decay model's input) and the score the model predicts for a developer who knew the unit
-  at the snapshot (`predicted`, with the mass model's `predicted_mass` beside it); the
-  summary compares their means and errors with the observed score;
+  at the snapshot, at the run's level and that level's k (`predicted`, with the mass model's
+  `predicted_mass` beside it; `decay.level_rate` in the report names the k, and `--suggest`
+  predicts at `--level` too); the summary compares their means and errors with the observed
+  score;
 - where the lines since went: the share in files that existed at the snapshot (`edited`)
   against files it lacked (`new`), which classes the unit `unchanged`, `mostly-edited` or
   `mostly-new`; edits to code a developer saw are where misconceptions come from, new code

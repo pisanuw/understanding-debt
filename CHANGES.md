@@ -117,3 +117,8 @@
 2026-11-15 [plan] HOSTING.md: hosted udebt on the HintWise platform (Google/email via Supabase, gateway or BYOK, option B footer), 3 cached samples, 7 owner decisions.
 2026-11-15 [note] Level-5 synthetic on hf bb3d3b55, 3 isolated sets: pooled share vs wrongness rho 0.74 p 0.005 (level 3: 0.29); the L3-L5 gap tracks share (rho 0.80): decay per level.
 2026-11-15 [doc] HOSTING.md checked with Plabs: udebt footer sha256, SHARED_TABLES for shared rows, worker at udebt-api.hintwise.org, no stored code (references + fetch at sha).
+2026-11-15 [decision] Phase 3.5: each ladder level fades by exp(-k_n x share) before levels combine; k 0.2 at 1-3, 1.0 at 4-5 (decay_k_by_level); prior and flat model at level 5's k.
+2026-11-15 [code] Status notes name levels and k; export settings.decay adds by_level, prior_rate; dashboard header, serve tile; synthetic predicts at its level; replay rules 4.
+2026-11-15 [note] Level 3 on hf bd209e71 (share 1.00), b60bdd6c (1.50), 2 sets each, 10 calls: 0.69/0.63, 0.88/0.90; oldest scored highest (no code there: reasoned from the question).
+2026-11-15 [decision] Fits: k_low 0.20 (RMSE 0.212, 95% 0.13-0.28; free-ceiling slope not distinct from 0), k_high 0.97 (RMSE 0.232). Defaults 0.2 and 1.0; digitalme prior-only status unchanged.
+2026-11-15 [doc] README model table and decay text, BRIEFING Phase 3.5, ROADMAP Phase 3.5 and Phase 5 fits, TESTBEDS Phase 3.5 re-check; dogfood series and dashboard rebuilt.

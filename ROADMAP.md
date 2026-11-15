@@ -538,6 +538,33 @@ conversation; no horizontal scroll at 390 px and no console error. Fixed from th
 digest's headline read like the change list (now bold) and its subtitle said "since your last
 answer" when a date was given.
 
+### Phase 3.5: decay per ladder level
+
+**Status 2026-11-15: done.** The level 3 and level 5 runs on huggingface_hub (TESTBEDS.md)
+showed the architecture fading far more slowly than the code: at `bb3d3b55` level 3 scored
+0.88 and level 5 0.69 where the single k = 1.0 predicted 0.62 for both, and the gap between
+the two tracked the share changed (rho 0.80). The ladder score weights levels 1-3 most, so a
+single steep k erased the part that barely fades. Ten `claude` CLI calls of the ten budgeted,
+all for the measurement.
+
+| item | status |
+|---|---|
+| 1 a rate per level | done: each level's value fades by exp(-k_n x share) before the levels are combined (`scoring.faded`); config `decay_k_by_level`, defaults k 0.2 at levels 1-3 and 1.0 at levels 4-5; the own-commit prior and the flat model fade at level 5's rate; one k everywhere (`decay_k` other than 1.0 without a table, or a table with one value) and `decay_model: "mass"` reproduce the old rules exactly |
+| 2 where it shows | done: status notes ("decayed from 1.00 by share 0.52 at levels 1-3 (k 0.2)") and the decay line, the browser's unit tile, the export's `settings.decay` (`by_level`, `prior_rate`), the dashboard header |
+| 3 replay | done: the same scoring path; the fingerprint carries the rates and rules version 4 makes stored series stale; this repository's series and dashboard rebuilt |
+| 4 synthetic prediction | done: `predicted` is at the run's level and that level's k (`decay.level_rate` in the report); `--suggest` predicts at `--level` |
+| 5 measure the shallow rate | done: two older huggingface_hub snapshots at level 3, two question sets each (Phase 5 below); k_low 0.20 and k_high 0.97 fitted, defaults 0.2 and 1.0 |
+| 6 show it | done: digitalme's status for pisan@uw.edu is prior-only and unchanged (the prior fades at level 5's rate, still 1.0); `tests/test_phase35.py` asserts that a levels 1-3 pass survives four rewrites by someone else (share 2.31: 0.63, still known) that leave a level 5 pass at a tenth of itself, and that one k for every level erases both |
+| 7 docs | done: README model table and decay text, BRIEFING, CHANGES, TESTBEDS, Phase 5 below |
+
+The fade is still anchored at the unit's last answer at any level (one share since then for
+every level), as before; anchoring each level at its own latest sitting is an open question
+(BRIEFING). On a hypothetical record of levels 1-3 passed on every digitalme unit at
+`f557893` (June), the index would read 6.5 instead of 27.6 under the single k, every unit
+still known; at `44f520b` (before the June refactor) 11.7 instead of 44.8. The pre-ladder runs
+on digitalme decayed fastest of the three repositories (k 2.72), and no level 1-3 question has
+been measured there, so this is the case to check first when real answers arrive.
+
 ## Phase 4: hosted (Netlify, Render, Supabase) with the CLI as the local twin
 
 **Status 2026-11-15: split.** 4a, the platform-agnostic core, is done (below the original
@@ -1015,6 +1042,73 @@ call):
   denied `.udebt/` by a permission rule (`--disallowedTools "Read(./.udebt/**)"`, which Claude
   Code also applies to Grep and Glob) and told so in the prompt.
 
+**Level 3 at older snapshots and a rate per level, 2026-11-15** (Phase 3.5; huggingface_hub at
+HEAD `2c61ae8`, today's map, 12 units, two questions each, `--level 3`, clean worktrees; two
+runs, each one question set shared by two snapshots, 5 calls each, 10 in all; reports
+`huggingface_hub/.udebt/experiments/synthetic-bd209e71_b60bdd6c-2026-11-15-073442.json` and
+`-074116.json`, not committed there). The brief asked for mean shares around 1.5-2 and 3 or
+more; the history tops out at 1.67 (the root commit, every unit new since) and anything past
+1.5 leaves nearly every unit mostly new, so the snapshots are the commits `--suggest
+share:1.0,1.5` gave: `bd209e71` (2024-08-26, 1,394 commits and mass 661 since, mean share
+1.00, mean mass share 0.60) and `b60bdd6c` (2022-09-14, 2,196 commits and mass 1,029 since,
+mean share 1.50, mean mass share 0.94).
+
+| snapshot | mean share | set 1 | set 2 | mean | k = 0.2 | k = 1.0 | share vs wrongness, sets pooled per unit |
+|---|--:|--:|--:|--:|--:|--:|---|
+| `bb3d3b55` (TESTBEDS.md; a third set 0.96) | 0.53 | 0.81 | 0.88 | 0.88 | 0.90 | 0.63 | 0.29, p 0.18 |
+| `bd209e71` | 1.00 | 0.69 | 0.63 | 0.66 | 0.82 | 0.40 | **0.63, p 0.016** |
+| `b60bdd6c` | 1.50 | 0.88 | 0.90 | 0.89 | 0.74 | 0.23 | 0.20, p 0.26 |
+
+No unknown and no confidently wrong answer in 96. The oldest snapshot scored highest: of its 12
+units 7 are mostly new since 2022 (`cli`, `inference-client`, `mcp-agents`, `sandbox`,
+`webhooks` among them), and on those the answerer, finding no code, reasoned from the question
+and was graded correct (wrongness 0.04 and 0.00), while at `bd209e71` it found older code for
+the same units, answered from it and was graded wrong or partial (`mcp-agents` 0.00 and 0.75,
+`sandbox` 0.25 and 0.75 on the same questions that scored 1.00 at `b60bdd6c`). Two graders
+treated "there is no such code here, my guess is ..." differently. Same unit, two snapshots:
+worse at the older one 3 and 0 times, better 2 and 6. The same unit and snapshot moved 0.21
+between question sets on average.
+
+Fits of exp(-k x share) by weighted least squares (unit points weight 1, an aggregate point
+the mean prediction over its 12 units with weight 12, bootstrap over points, 1,000 draws):
+
+| rate | data | n | k | RMSE | RMSE at k = 0 / 1.0 | bootstrap 95% |
+|---|---|--:|--:|--:|---|---|
+| **k_low** | the three `bb3d3b55` level 3 sets (aggregates) and the 48 new unit points | 84 | **0.20** | **0.212** | 0.281 / 0.443 | 0.13-0.28 |
+| | the 48 new unit points alone | 48 | 0.20 | 0.275 | 0.354 / 0.542 | 0.12-0.29 |
+| | `bd209e71` alone, `b60bdd6c` alone | 24, 24 | 0.45, 0.08 | 0.252, 0.179 | | 0.30-0.62, 0.03-0.15 |
+| | the aggregates and the mostly-edited unit points | 60 | 0.27 | 0.153 | 0.244 / 0.345 | 0.17-0.37 |
+| **k_high** | every pre-ladder unit point (digitalme 48, dsa-instructor 60, taken as level 5), huggingface_hub's 4 pre-ladder and 3 level 5 sets (aggregates) | 192 | **0.97** | **0.232** | 0.441 / 0.232 | 0.80-1.21 |
+| | the 3 level 5 sets alone | 36 | 0.80 | 0.105 | 0.331 / 0.118 | 0.37-1.22 |
+
+The Phase 3.1 pooled fit reproduces from the same recomputed shares (1.02, RMSE 0.251 on 156).
+In the model's own form a pass is worth 1.0 at no change, and in that form k_low is clearly
+above 0. That form also counts the gap between 1.0 and the answerer's ceiling: at level 3 the
+answerer never reaches 1.0, even at share 0.53. With the ceiling free (score = a x exp(-k x
+share)), the new points alone give k 0.04 (95% -0.20 to 0.29, F test p 0.77) and all level 3
+points 0.12 (-0.03 to 0.30): **a fall with the share at level 3 is not established**. The
+level 5 and pre-ladder slope is (free ceiling 0.82, 0.63 to 1.08).
+
+Chosen: **k 0.2 at levels 1-3, 1.0 at levels 4-5** (config `decay_k_by_level`). 0.2 is the
+level 3 fit in the form the product uses, rounded; it is small and positive, and a pass at
+levels 1-3 stays above the known threshold until 2.55 units' worth of change. 1.0 is the
+high-level fit (0.97) rounded to the constant already in use, at no cost in RMSE. Levels 1
+and 2 were not measured and take level 3's rate; level 4 takes level 5's. Reading it honestly:
+
+- **The synthetic method may not measure level 3 decay at all.** Level 3 questions say what
+  would change if a decision were reversed, and a capable answerer can often reason that out
+  from the question; the oldest snapshot's top score came from reasoning, not from code. What
+  the runs do show is that level 3 answers stay high where level 5 answers fall, which is
+  what the defaults encode. The rate itself needs human answers at levels 1-3.
+- **One repository.** k_low comes from huggingface_hub alone, a library whose architecture
+  has been stable for years. digitalme decayed fastest on pre-ladder questions (k 2.72), its
+  June refactor changed its architecture, and no level 1-3 question was asked there.
+- **Grader variance is large at level 3.** Two grading calls judged near-identical guesses
+  differently, and question sets moved a unit's score by 0.21 on average.
+- Caveats as before: an LLM as the developer, graded by the same family, and the pre-ladder
+  questions were half decision questions (roughly levels 2-4), so k_high from them may
+  understate pure level 5.
+
 ## Decisions assumed in this roadmap
 
 - Quiz evidence is primary; authorship is a decaying prior and may be removed.
@@ -1097,6 +1191,8 @@ with the owner's two additions (synthetic report names that never collide, the l
 guard); two `claude` calls of three. **Phase 4a is done** as re-scoped (the platform-agnostic
 core: contract, worker, `app_udebt` schema, push and pull, check runs and webhooks); no call.
 **Phase 4b waits on the owner's decisions in HOSTING.md**; nothing of it was started.
+**Phase 3.5 is done** (decay per ladder level: k 0.2 at levels 1-3, 1.0 at levels 4-5; ten
+`claude` calls of ten on huggingface_hub level 3 runs; fits in Phase 5).
 
 For the next session: read HOSTING.md on `claude/jolly-hamilton-pvos83` and `docs/DEPLOY.md`
 here. The Postgres schema tests need `UDEBT_TEST_PG` (a server where databases can be created;

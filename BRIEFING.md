@@ -22,7 +22,7 @@ acceptable.
 - **Decay per commit.** Understanding verified at commit X decays with the later commits
   touching the unit's paths. This is what makes debt grow while the AI builds. (First 0.9
   per commit, then per unit of weighted mass; since Phase 1.4 by the share of the unit
-  that changed, below.)
+  that changed, below; since Phase 3.5 at a rate per ladder level.)
 - **Decisions come from history as much as from code.** Cheap git heuristics pick
   decision-bearing commits (founding, dependencies, infra, new dirs, renames, big
   restructurings); the LLM reads code plus that list and links each unit to the commits that
@@ -565,6 +565,51 @@ acceptable.
     kept, untested, outside the package in `drafts/hosted-api/`, as the coordinator asked for
     already-built skipped work.
 
+- **Phase 3.5, decay per ladder level (2026-11-15)**: the huggingface_hub level 3 and level 5
+  runs at one snapshot showed the architecture fading far more slowly than the code (0.88
+  against 0.69 where k = 1.0 predicted 0.62 for both; the gap tracks the share changed, rho
+  0.80), and the ladder score weights levels 1-3 most.
+  - **Each level fades at its own rate before the levels are combined**: understanding =
+    min(1, max(0, (v_1 f_1 + v_2 f_2 + v_3 f_3) / 3 + 0.1 (v_4 f_4 + v_5 f_5))), f_n =
+    exp(-k_n x share since the unit's last answer). With equal rates this is exactly the
+    Phase 3.2 rule (verified x fade). A negative level value (confidently wrong) fades
+    towards 0 like a pass; the floor of 0 applies after combining.
+  - **Defaults k 0.2 at levels 1-3, 1.0 at levels 4-5** (config `decay_k_by_level`), from
+    the fits in ROADMAP Phase 5: level 3 0.20 (RMSE 0.212, bootstrap 95% 0.13-0.28; k = 1.0
+    gives 0.443), levels 4-5 0.97 (RMSE 0.232, 0.80-1.21) on every pre-ladder unit-snapshot
+    (taken as level 5) and the three level 5 sets. Levels 1 and 2 were not measured and take
+    level 3's rate; level 4 takes level 5's. With the ceiling free the level 3 slope is not
+    distinguishable from 0 on the new points (k 0.04, -0.20 to 0.29); 0.2 is the fit in the
+    form the product uses (a pass is worth 1.0 at no change), kept small and positive rather
+    than 0 because the level 3 runs at `bd209e71` still rank units by share (rho 0.63).
+  - **The own-commit prior and the flat evidence model fade at level 5's rate**: having typed
+    code is implementation-shaped knowledge, and the flat model is the rule for pre-ladder
+    answers, which count as level 5. The mass model is the same at every level.
+  - **The anchor is unchanged**: one share since the unit's last answer at any level, for
+    every level (the "single fade from the last answer" of Phase 3.2). Anchoring each level
+    at its own latest sitting would be truer but changes what a later answer restores; open
+    question.
+  - **Config**: a `decay_k_by_level` table (keys "1" to "5") over the defaults, levels left
+    out keeping them; without one, a `decay_k` other than 1.0 applies to every level (the
+    single-k rule stays reachable), while `decay_k` = 1.0 is read as not chosen because every
+    config written from Phase 3.1 to 3.4 carries it. `dump` writes the table only when set,
+    so a later refit's defaults reach every repository that did not choose its own (the
+    lesson of Phase 1.4's `share_decay_rate`).
+  - **Shown everywhere decay is**: status notes ("decayed from 1.00 by share 0.52 at levels
+    1-3 (k 0.2)"), the decay line, the browser's unit tile, the export's `settings.decay`
+    (`rate`, `by_level`, `prior_rate`), the dashboard header, the synthetic report
+    (`predicted` at the run's level; `decay.level_rate`; report version still 3, fields
+    added). Replay rules version 4 and the rates in the fingerprint make stored series stale;
+    this repository's series and dashboard were rebuilt.
+  - **Measurement** (10 calls of 10): `bd209e71` (2024-08, mean share 1.00) and `b60bdd6c`
+    (2022-09, 1.50), two level 3 question sets each: 0.69 and 0.63, then 0.88 and 0.90. The
+    brief's 3+ cannot be reached (the root reads 1.67). The oldest snapshot scored highest
+    because the answerer, finding no code for most units, reasoned from the questions and was
+    graded correct, while at 2024 it answered from older code and was graded wrong (TESTBEDS).
+  - **digitalme** for pisan@uw.edu is prior-only, so its status is unchanged but for the decay
+    line (the prior fades at level 5's rate, still 1.0). Hypothetically, levels 1-3 passed on
+    every unit at `f557893` would read 6.5 instead of 27.6.
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.
@@ -573,6 +618,20 @@ acceptable.
 - Storing source code in the hosted service. Metadata only (ROADMAP Phase 4).
 
 ## Open questions
+
+- Phase 3.5: k_low (0.2) comes from huggingface_hub alone, a library whose architecture has
+  been stable for years; digitalme decayed fastest on pre-ladder questions (k 2.72) and its
+  June refactor changed its architecture. Calibrate levels 1-3 per repository from human
+  answers once there are some, keeping 0.2 as the default?
+- Phase 3.5: the synthetic answerer scores level 3 questions higher with no code (it reasons
+  from the question) than with stale code, and two grading calls treated near-identical
+  guesses differently. Is the synthetic method usable for levels 1-3 at all, or should the
+  level 1-3 rate wait for human answers (or cue-free questions)?
+- Phase 3.5: each level fades from the unit's last answer at any level, so a later level 4
+  answer refreshes levels 1-3 too. Anchor each level at its own latest sitting instead?
+- Phase 3.5: levels 1, 2 and 4 have no measurement; they borrow level 3's and level 5's
+  rates. Measure level 1 and level 4 on the same snapshots (10 calls per level: two
+  question sets over the two snapshots)?
 
 - Phase 4a: v1 of the hosted app has no own-commit prior (HOSTING.md: the person is a learner,
   not an author). Keep the prior out of the hosted score entirely, or show it as `estimated`

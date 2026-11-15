@@ -424,6 +424,57 @@ The refit curve (k = 1.0) predicts 0.62 at both levels.
 - Question set 2 graded 22 of its 24 answers (15 correct, 6 partial, 1 wrong). The report
   `synthetic-bb3d3b55-2026-11-15_L5_qs2.json` in the scratchpad archive has the details.
 
+### Phase 3.5 re-check: level 3 at older snapshots (2c61ae8, 2026-11-15)
+
+Two owner-budgeted runs of `experiment synthetic --snapshots bd209e71,b60bdd6c --units 12
+--per-unit 2 --level 3` (10 `claude` calls, about 6 minutes in all), each writing its own
+question set shared by both snapshots, on the testbed's own map (`2c61ae8`, the Phase 3.1
+map) and the Phase 3.4 leakage guard (`clean_worktree: true`). The reports are
+`.udebt/experiments/synthetic-bd209e71_b60bdd6c-2026-11-15-073442.json` and `-074116.json`
+in the clone. `--suggest share:...` picked the snapshots: the units' mean share changed tops
+out at 1.67 at the root commit and passes 1.5 only where nearly every unit is new since, so
+3 or more cannot be reached here.
+
+| snapshot | commits / mass since | mean share (median) | mean mass share | set 1 | set 2 | k = 0.2 predicts | k = 1.0 predicts |
+|---|---|--:|--:|--:|--:|--:|--:|
+| `bd209e71` (2024-08-26) | 1,394 / 661 | 1.00 (1.01) | 0.60 | 0.69 | 0.63 | 0.82 | 0.40 |
+| `b60bdd6c` (2022-09-14) | 2,196 / 1,029 | 1.50 (1.45) | 0.94 | 0.88 | 0.90 | 0.74 | 0.23 |
+
+Per unit, share changed / score in set 1, set 2:
+
+| unit | `bd209e71` | `b60bdd6c` |
+|---|---|---|
+| cli | 1.94 / 0.25, 0.25 (new) | 1.94 / 1.00, 1.00 (new) |
+| inference-client | 1.42 / 0.50, 0.50 | 2.41 / 1.00, 1.00 (new) |
+| mcp-agents | 1.26 / 0.00, 0.75 (new) | 1.26 / 1.00, 1.00 (new) |
+| sandbox | 1.11 / 0.25, 0.75 (new) | 1.11 / 1.00, 1.00 (new) |
+| hffs-buckets | 1.02 / 0.75, 0.75 (new) | 1.25 / 1.00, 1.00 (new) |
+| auth-config | 1.02 / 1.00, 0.75 (new) | 1.53 / 0.75, 1.00 (new) |
+| download-cache | 1.01 / 1.00, 0.50 | 1.62 / 0.75, 0.50 |
+| http-errors | 1.00 / 1.00, 0.75 | 1.51 / 0.50, 1.00 |
+| hf-api | 0.81 / 1.00, 0.75 | 1.47 / 1.00, 0.75 |
+| upload-commit | 0.77 / 0.50, 0.25 | 1.42 / 0.50, 0.75 |
+| integrations | 0.47 / 1.00, 0.50 | 1.19 / 1.00, 0.75 |
+| webhooks | 0.19 / 1.00, 1.00 | 1.31 / 1.00, 1.00 (new) |
+
+(new) marks a mostly-new unit: under half of its changed lines since were in files the
+snapshot had.
+
+- **The older snapshot scored higher.** With no code for most units in 2022, the answerer
+  reasoned from the question ("this is a guess, since there is no sandbox here") and was
+  graded correct; in 2024 it found older code for the same units, answered from it, and was
+  graded wrong or partial, on the same questions. Same unit, two snapshots: worse at the
+  older one 3 and 0 times, better 2 and 6.
+- **Share changed ranks the units within the 2024 snapshot** (sets pooled per unit, rho 0.63,
+  p 0.016; set 1 alone 0.72, p 0.006), not within the 2022 one (0.20, p 0.26), and not
+  pooled over the 48 unit points (0.03).
+- No unknown and no confidently wrong answer in 96. Between question sets the same unit and
+  snapshot moved 0.21 on average (within-unit sd 0.10, as at `bb3d3b55`: 0.11).
+- With the three `bb3d3b55` level 3 sets (0.81, 0.88, 0.96 at share 0.53), level 3 fits
+  exp(-k x share) at k 0.20 (RMSE 0.212; k = 1.0 gives 0.443), the default for levels 1-3
+  since Phase 3.5 (ROADMAP Phase 5). With a free ceiling the slope is not distinguishable
+  from 0 (new points: k 0.04, 95% -0.20 to 0.29).
+
 ## Caveats
 
 - **Disclosure-only.** Every AI share is a lower bound. Zed (2%), Ruff (2%) and openai/codex
