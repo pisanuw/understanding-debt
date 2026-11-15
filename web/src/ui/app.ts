@@ -80,6 +80,10 @@ export class App {
   private stopAuth: (() => void) | null = null;
   /** The quiz unit the next quiz screen preselects (set by "Quiz this unit"). */
   quizUnit: string | null = null;
+  /** What the current screen asked to undo when it is replaced (a sign-in panel's subscription). */
+  private leaving: (() => void)[] = [];
+  /** The same for the screen being built. */
+  private building: (() => void)[] = [];
 
   constructor(
     readonly root: HTMLElement,
@@ -107,6 +111,11 @@ export class App {
     this.stopAuth?.();
   }
 
+  /** Runs `fn` when the screen drawn now is replaced. */
+  onLeave(fn: () => void): void {
+    this.building.push(fn);
+  }
+
   go(hash: string): void {
     if (this.win.location.hash === hash) void this.render();
     else this.win.location.hash = hash;
@@ -121,6 +130,8 @@ export class App {
   /** Draws the screen for the current address; a slower earlier draw never replaces a newer one. */
   async render(): Promise<void> {
     const seq = ++this.renderSeq;
+    const mine: (() => void)[] = [];
+    this.building = mine;
     this.header();
     const route = parseRoute(this.win.location.hash);
     let screen: HTMLElement;
@@ -133,7 +144,12 @@ export class App {
     } catch (e) {
       screen = h('section', null, h('h1', null, 'Something went wrong'), h('p', { class: 'error' }, e instanceof Error ? e.message : String(e)), h('p', null, h('a', { href: '#/' }, 'Back to the repositories')));
     }
-    if (seq !== this.renderSeq) return;
+    if (seq !== this.renderSeq) {
+      for (const fn of mine) fn();
+      return;
+    }
+    for (const fn of this.leaving.splice(0)) fn();
+    this.leaving = mine;
     clear(this.main).append(screen);
     this.root.ownerDocument.title = screen.dataset.title ? `${screen.dataset.title} · udebt` : 'udebt';
   }

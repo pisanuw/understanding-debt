@@ -40,7 +40,7 @@ export function settingsScreen(app: App): HTMLElement {
     fs.append(h('label', { class: 'mode' }, inp, h('span', null, h('strong', null, title), h('span', { class: 'small muted' }, text))));
   }
   const account = h('div', { id: 'account' });
-  mountSignIn(account, app.deps.signIn);
+  app.onLeave(mountSignIn(account, app.deps.signIn));
   const s = h(
     'section',
     { class: 'settings' },

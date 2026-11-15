@@ -334,6 +334,23 @@ describe('small pieces', () => {
     empty.stop();
   });
 
+  it("drops a sign-in panel's subscription when its screen is replaced", async () => {
+    await start();
+    const listeners = () => (app.deps.auth as unknown as { listeners: unknown[] }).listeners.length;
+    const base = listeners();
+    await go('#/settings');
+    expect(listeners()).toBe(base + 1);
+    await go('#/');
+    await go('#/settings');
+    expect(listeners()).toBe(base + 1);
+    await go('#/');
+    expect(listeners()).toBe(base);
+    const slow = app.render();
+    await go('#/settings');
+    await slow;
+    expect(listeners()).toBe(base + 1);
+  });
+
   it('shows an error screen when a screen fails', async () => {
     await start();
     app.deps.store.repositories = async () => {

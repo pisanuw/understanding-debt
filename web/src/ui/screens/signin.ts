@@ -5,7 +5,7 @@ import { h } from '../dom';
 
 export function signinScreen(app: App): HTMLElement {
   const panel = h('div', { id: 'signin', 'aria-label': 'Sign in' });
-  mountSignIn(panel, app.deps.signIn);
+  app.onLeave(mountSignIn(panel, app.deps.signIn));
   const s = h(
     'section',
     { class: 'hero' },
