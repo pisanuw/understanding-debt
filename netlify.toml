@@ -35,3 +35,11 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# The built scripts and styles are named by their content (index-<hash>.js), so a browser may keep
+# them for a year without asking again; a new build ships new names. Everything else (the page,
+# samples/*.json) keeps Netlify's default and is checked on each visit.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
