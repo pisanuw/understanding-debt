@@ -27,7 +27,7 @@ from typing import Any
 from ..loadsql import analysis_sql
 from ..topfiles import needs_tree
 
-SAMPLES: dict[str, dict[str, str]] = {
+SAMPLES: dict[str, dict[str, str | None]] = {
     "huggingface_hub": {"url": "https://github.com/huggingface/huggingface_hub",
                         "license": "Apache-2.0",
                         "sha": "2c61ae8c11eedb1b79e262dd9eb5e68962cac063"},
@@ -35,6 +35,9 @@ SAMPLES: dict[str, dict[str, str]] = {
                           "license": "MIT", "sha": "6bee2f2ccccdac123199d1b610c70a3bad5c8194"},
     "mlflow": {"url": "https://github.com/mlflow/mlflow", "license": "Apache-2.0",
                "sha": "f6ff35427d7e1134a83f8f9d8215d0049149162f"},
+    # udebt itself (owner, 2026-11-15, the fourth sample); no LICENSE file yet, so none is shown.
+    "understanding-debt": {"url": "https://github.com/pisanuw/understanding-debt", "license": None,
+                           "sha": "e9c1c8c5754f8f4e9061e4d0316c060bd8d1b788"},
 }  # fmt: skip
 
 

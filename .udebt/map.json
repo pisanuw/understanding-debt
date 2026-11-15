@@ -1,403 +1,254 @@
 {
   "version": 3,
-  "generated_at": "2026-11-12T12:15:44+00:00",
-  "head": "327f6b86c80201dd84e0c108277620546a92d7a4",
+  "generated_at": "2026-11-15T11:46:23+00:00",
+  "head": "103eb2bb6e534a77c8f3a248cf54f5ac2147682e",
   "repo_provenance": {
-    "total": 45,
-    "ai": 44,
+    "total": 108,
+    "ai": 107,
     "assisted": 0,
     "human": 1,
     "bot": 0,
     "agents": {
-      "claude-code": 44
+      "claude-code": 107
     },
     "bots": {},
     "dev": 0,
     "directed": 0
   },
   "structure": {
-    "nodes": 34,
-    "edges": 308,
-    "import_edges": 96,
-    "cochange_edges": 294,
+    "nodes": 186,
+    "edges": 1537,
+    "import_edges": 665,
+    "cochange_edges": 1251,
     "languages": {
-      ".py": 34
+      ".py": 100,
+      ".ts": 74,
+      ".js": 2
     },
-    "hubs": [],
-    "singletons": 0,
+    "hubs": [
+      "BRIEFING.md",
+      "CHANGES.md",
+      "README.md",
+      "ROADMAP.md"
+    ],
+    "singletons": 3,
     "seconds": {
-      "imports": 0.07,
+      "imports": 0.77,
       "cochange": 0.0,
-      "louvain": 0.0,
-      "summaries": 0.0
+      "louvain": 0.01,
+      "summaries": 0.02
     },
     "clusters": [
       {
         "id": "C1",
-        "label": "udebt/ cli prompts mapping",
-        "files": 24,
-        "mass": 9.19,
+        "label": "udebt/ synthetic provenance quiz",
+        "files": 41,
+        "mass": 41.28,
         "dirs": [
-          "udebt (12)"
+          "udebt (19)"
         ],
         "children": [
           {
             "id": "C1.1",
-            "label": "udebt/ cli prompts mapping",
-            "files": 17
+            "label": "udebt/ synthetic quiz mapping",
+            "files": 18
           },
           {
             "id": "C1.2",
-            "label": "udebt/ quiz scoring risk",
+            "label": "udebt/ weights history cache",
+            "files": 8
+          },
+          {
+            "id": "C1.3",
+            "label": "udebt/ provenance responsibility contributors",
+            "files": 8
+          },
+          {
+            "id": "C1.4",
+            "label": "udebt/ structure filekinds imports",
             "files": 7
           }
         ]
       },
       {
         "id": "C2",
-        "label": "udebt/ provenance structure weights",
-        "files": 13,
-        "mass": 5.46,
+        "label": "udebt/ cli worker udebt",
+        "files": 48,
+        "mass": 21.74,
         "dirs": [
-          "udebt (7)"
+          "udebt (10)",
+          "udebt/hosted (7)",
+          "supabase/migrations (2)"
         ],
         "children": [
           {
             "id": "C2.1",
-            "label": "udebt/ provenance history",
-            "files": 5
+            "label": "udebt/ cli replay contract",
+            "files": 9
           },
           {
             "id": "C2.2",
-            "label": "udebt/ structure weights filekinds",
-            "files": 4
+            "label": "udebt/hosted/ worker topfiles prompt",
+            "files": 10
           },
           {
             "id": "C2.3",
-            "label": "udebt/ imports graph",
-            "files": 4
+            "label": "supabase/migrations/ udebt loadsql samples",
+            "files": 11
+          },
+          {
+            "id": "C2.4",
+            "label": "udebt/hosted/ worker service messages",
+            "files": 6
+          },
+          {
+            "id": "C2.5",
+            "label": "udebt/ webhooks checks",
+            "files": 12
           }
         ]
       },
       {
         "id": "C3",
-        "label": "udebt/ responsibility contributors",
-        "files": 4,
-        "mass": 1.07,
+        "label": "web/src/core/ config auth llm",
+        "files": 86,
+        "mass": 18.33,
         "dirs": [
-          "udebt (2)"
+          "web/src/core (11)",
+          "web/src/ui/screens (9)",
+          "web/netlify/functions/lib (8)"
+        ],
+        "children": [
+          {
+            "id": "C3.1",
+            "label": "web/src/lib/ config llm auth",
+            "files": 27
+          },
+          {
+            "id": "C3.2",
+            "label": "web/src/ui/screens/ quiz repo review",
+            "files": 15
+          },
+          {
+            "id": "C3.3",
+            "label": "web/netlify/functions/lib/ handlers github records",
+            "files": 16
+          },
+          {
+            "id": "C3.4",
+            "label": "web/src/core/ excerpts client assemble",
+            "files": 10
+          },
+          {
+            "id": "C3.5",
+            "label": "web/src/core/ quiz review scoring",
+            "files": 10
+          },
+          {
+            "id": "C3.6",
+            "label": "web/src/data/ store supabase boot",
+            "files": 8
+          }
+        ]
+      },
+      {
+        "id": "C4",
+        "label": "udebt/ prompts llm serve",
+        "files": 27,
+        "mass": 17.4,
+        "dirs": [
+          "udebt (18)",
+          "udebt/static (1)"
+        ],
+        "children": [
+          {
+            "id": "C4.1",
+            "label": "udebt/ prompts llm orientation",
+            "files": 8
+          },
+          {
+            "id": "C4.2",
+            "label": "udebt/ serve tutor digest",
+            "files": 9
+          },
+          {
+            "id": "C4.3",
+            "label": "udebt/ tour review unitgraph",
+            "files": 10
+          }
+        ]
+      },
+      {
+        "id": "C5",
+        "label": "drafts/hosted-api/ schema jobs reads",
+        "files": 15,
+        "mass": 3.53,
+        "dirs": [
+          "drafts/hosted-api (11)",
+          "drafts/hosted-api/migrations/postgres (2)",
+          "drafts/hosted-api/migrations/sqlite (1)"
+        ],
+        "children": [
+          {
+            "id": "C5.1",
+            "label": "drafts/hosted-api/ reads importer auth",
+            "files": 7
+          },
+          {
+            "id": "C5.2",
+            "label": "drafts/hosted-api/ schema rls config",
+            "files": 5
+          },
+          {
+            "id": "C5.3",
+            "label": "drafts/hosted-api/ jobs github checks",
+            "files": 3
+          }
+        ]
+      },
+      {
+        "id": "C6",
+        "label": "samples/ huggingface hub mlflow",
+        "files": 5,
+        "mass": 0.8,
+        "dirs": [
+          "samples (3)"
         ]
       }
     ],
-    "coverage": 0.95
+    "coverage": 0.98
+  },
+  "paths": {
+    "given": 84,
+    "exact": 84,
+    "suffix": 0,
+    "unresolved": 0,
+    "empty_units": [],
+    "retried": false
   },
   "units": [
     {
-      "id": "prediction-scoring",
-      "name": "Prediction-based scoring model",
-      "kind": "decision",
-      "summary": "Understanding is measured by graded prediction answers per unit and developer, decayed by weighted commit mass, and turned into importance-weighted debt.",
-      "decision": "Measure by quiz evidence (1/0.5/0/-0.5), decay 0.9 per weighted commit landed on the unit, weak capped prior from own commits, debt = importance*(1-understanding), team view via bus factor; pure functions with no I/O.",
-      "alternatives": "Provenance-only (who typed it) scoring; time-based decay; self-reported understanding.",
-      "why": "BRIEFING argues provenance says nothing at the architectural level in AI-driven workflows, so prediction tests the actual mental model; math in a pure module is easy to test.",
-      "paths": [
-        "udebt/scoring.py",
-        "udebt/quiz.py",
-        "tests/test_scoring.py",
-        "README.md",
-        "BRIEFING.md"
-      ],
-      "centrality": 5,
-      "clusters": [
-        "C1.2"
-      ],
-      "scope": "architectural",
-      "history": [
-        {
-          "sha": "5fafc04",
-          "date": "2026-11-11",
-          "klass": "ai",
-          "agent": "claude-code",
-          "author": "Claude",
-          "email": "noreply@anthropic.com",
-          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
-        }
-      ],
-      "churn": 4.413,
-      "provenance": {
-        "total": 27,
-        "ai": 26,
-        "assisted": 0,
-        "human": 1,
-        "bot": 0,
-        "ai_share": 0.99,
-        "mass": 4.413,
-        "first": "2026-11-11",
-        "last": "2026-11-12"
-      },
-      "importance": 0.92
-    },
-    {
-      "id": "arch-map",
-      "name": "Architectural map and unit hierarchy",
+      "id": "cli-pipeline",
+      "name": "CLI and local analysis pipeline",
       "kind": "module",
-      "summary": "Builds a two-level map of decisions/modules/boundaries/flows from structural clusters, history candidates and an LLM, then attaches churn, importance and provenance.",
-      "decision": "Units are LLM-proposed architectural units (not files), stored as a versioned (v3) hierarchy with ids parent/child, capped in number, and rescorable without the LLM.",
-      "alternatives": "File- or directory-level units; purely algorithmic clustering; flat unit list.",
-      "why": "Package internals are out of scope by design and only architectural understanding counts as debt.",
-      "paths": [
-        "udebt/mapping.py",
-        "udebt/units.py",
-        "udebt/dig.py",
-        "tests/test_hierarchy.py"
-      ],
-      "centrality": 5,
-      "clusters": [
-        "C1",
-        "C1.1"
-      ],
-      "scope": "architectural",
-      "history": [
-        {
-          "sha": "5fafc04",
-          "date": "2026-11-11",
-          "klass": "ai",
-          "agent": "claude-code",
-          "author": "Claude",
-          "email": "noreply@anthropic.com",
-          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
-        },
-        {
-          "sha": "3b3f9a1",
-          "date": "2026-11-11",
-          "klass": "ai",
-          "agent": "claude-code",
-          "author": "Claude",
-          "email": "noreply@anthropic.com",
-          "subject": "Warn when dig returns no check question; enforce map unit cap"
-        }
-      ],
-      "churn": 2.772,
-      "provenance": {
-        "total": 12,
-        "ai": 12,
-        "assisted": 0,
-        "human": 0,
-        "bot": 0,
-        "ai_share": 1.0,
-        "mass": 2.772,
-        "first": "2026-11-11",
-        "last": "2026-11-12"
-      },
-      "importance": 0.801
-    },
-    {
-      "id": "llm-backend",
-      "name": "LLM backend via claude CLI and prompts",
-      "kind": "boundary",
-      "summary": "All LLM use goes through an LLM protocol that shells out to the claude CLI with read-only tools and JSON schemas, with a FakeLLM for offline tests.",
-      "decision": "Subprocess the subscription-billed claude CLI with --json-schema and Read/Glob/Grep only; prompts begin with a TASK: marker that FakeLLM keys on; UDEBT_LLM=fake selects the fake.",
-      "alternatives": "Anthropic API SDK with an API key; no tool access; mocking per test.",
-      "why": "No API key or billing setup, and LLM can verify claims against code; fake keeps tests deterministic.",
-      "paths": [
-        "udebt/llm.py",
-        "udebt/prompts.py"
-      ],
-      "centrality": 4,
-      "clusters": [
-        "C1.1"
-      ],
-      "scope": "architectural",
-      "history": [
-        {
-          "sha": "5fafc04",
-          "date": "2026-11-11",
-          "klass": "ai",
-          "agent": "claude-code",
-          "author": "Claude",
-          "email": "noreply@anthropic.com",
-          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
-        }
-      ],
-      "churn": 1.5,
-      "provenance": {
-        "total": 7,
-        "ai": 7,
-        "assisted": 0,
-        "human": 0,
-        "bot": 0,
-        "ai_share": 1.0,
-        "mass": 1.5,
-        "first": "2026-11-11",
-        "last": "2026-11-12"
-      },
-      "importance": 0.589
-    },
-    {
-      "id": "store-persistence",
-      "name": "JSON persistence under .udebt/",
-      "kind": "decision",
-      "summary": "All state lives as committed JSON files in .udebt/: shared map, per-developer append-only records, commit weights, responsibility, config.",
-      "decision": "File-based JSON in the repo, one jsonl file per developer so merges are conflict-free, committed by default.",
-      "alternatives": "A database; local-only untracked state; hosted store.",
-      "why": "Team sharing through git with no merge conflicts and no server; hosted is deferred to a later phase.",
-      "paths": [
-        "udebt/store.py",
-        ".udebt",
-        "udebt/repo.py"
-      ],
-      "centrality": 4,
-      "clusters": [
-        "C1.1"
-      ],
-      "scope": "architectural",
-      "history": [
-        {
-          "sha": "5fafc04",
-          "date": "2026-11-11",
-          "klass": "ai",
-          "agent": "claude-code",
-          "author": "Claude",
-          "email": "noreply@anthropic.com",
-          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
-        }
-      ],
-      "churn": 5.524,
-      "provenance": {
-        "total": 21,
-        "ai": 21,
-        "assisted": 0,
-        "human": 0,
-        "bot": 0,
-        "ai_share": 1.0,
-        "mass": 5.524,
-        "first": "2026-11-11",
-        "last": "2026-11-12"
-      },
-      "importance": 0.88
-    },
-    {
-      "id": "cli-contract",
-      "name": "CLI command surface",
-      "kind": "boundary",
-      "summary": "The argparse CLI (init, clusters, map, units, responsibility, scope, quiz, status, risk, dig) orchestrates every flow and resolves repo, identity and LLM.",
-      "decision": "One large cli.py module with subcommands as the only public interface, advisory outputs, optional --strict exit codes.",
-      "alternatives": "Library API; per-command modules; editor/Claude Code hook integration.",
-      "why": "Standalone CLI product over git is the stated scope; hooks are a non-goal for now.",
+      "summary": "The `udebt` CLI that maps a repo into units, weighs commits, scores understanding and writes records under .udebt/.",
+      "decision": "Stdlib-only Python CLI with file-based state in .udebt/ and git as the only data source.",
+      "alternatives": "A server-first app; a database; third-party dependencies.",
+      "why": "Local-first, zero-install tool; the hosted side was added later.",
       "paths": [
         "udebt/cli.py",
-        "tests/test_cli_fake.py"
-      ],
-      "centrality": 4,
-      "clusters": [
-        "C1",
-        "C1.1"
-      ],
-      "scope": "architectural",
-      "history": [
-        {
-          "sha": "5fafc04",
-          "date": "2026-11-11",
-          "klass": "ai",
-          "agent": "claude-code",
-          "author": "Claude",
-          "email": "noreply@anthropic.com",
-          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
-        },
-        {
-          "sha": "3b3f9a1",
-          "date": "2026-11-11",
-          "klass": "ai",
-          "agent": "claude-code",
-          "author": "Claude",
-          "email": "noreply@anthropic.com",
-          "subject": "Warn when dig returns no check question; enforce map unit cap"
-        }
-      ],
-      "churn": 3.808,
-      "provenance": {
-        "total": 16,
-        "ai": 16,
-        "assisted": 0,
-        "human": 0,
-        "bot": 0,
-        "ai_share": 1.0,
-        "mass": 3.808,
-        "first": "2026-11-11",
-        "last": "2026-11-12"
-      },
-      "importance": 0.756
-    },
-    {
-      "id": "quiz-flow",
-      "name": "Quiz and dig flow",
-      "kind": "flow",
-      "summary": "Pick the highest-debt units, generate verified prediction questions, grade free-text answers with the LLM, and append evidence records; dig walks the worst unit.",
-      "decision": "Five questions per session, misconceptions score negative, blank answers are no-penalty known unknowns, graded against the code by the LLM.",
-      "alternatives": "Multiple choice quizzes; static question bank; penalising blanks.",
-      "why": "Confident wrong beliefs are the real hazard; short sessions can be run often.",
-      "paths": [
+        "udebt/mapping.py",
+        "udebt/store.py",
+        "udebt/repo.py",
         "udebt/quiz.py",
         "udebt/dig.py",
-        "udebt/prompts.py",
-        "udebt/cli.py"
+        "udebt/sizes.py",
+        "udebt/units.py"
       ],
-      "centrality": 4,
+      "centrality": 5,
       "clusters": [
-        "C1.2"
-      ],
-      "scope": "architectural",
-      "history": [
-        {
-          "sha": "5fafc04",
-          "date": "2026-11-11",
-          "klass": "ai",
-          "agent": "claude-code",
-          "author": "Claude",
-          "email": "noreply@anthropic.com",
-          "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
-        },
-        {
-          "sha": "3b3f9a1",
-          "date": "2026-11-11",
-          "klass": "ai",
-          "agent": "claude-code",
-          "author": "Claude",
-          "email": "noreply@anthropic.com",
-          "subject": "Warn when dig returns no check question; enforce map unit cap"
-        }
-      ],
-      "churn": 3.997,
-      "provenance": {
-        "total": 16,
-        "ai": 16,
-        "assisted": 0,
-        "human": 0,
-        "bot": 0,
-        "ai_share": 1.0,
-        "mass": 3.997,
-        "first": "2026-11-11",
-        "last": "2026-11-12"
-      },
-      "importance": 0.769
-    },
-    {
-      "id": "provenance-history",
-      "name": "Commit provenance and history mining",
-      "kind": "module",
-      "summary": "Classifies commits as ai, assisted or human from configurable signatures, loads git history, and mines decision-bearing commits.",
-      "decision": "Signatures are data in config; three commit classes; cheap git heuristics (founding, dependencies, infra, renames) select candidate decision commits for the LLM.",
-      "alternatives": "Hardcoded Claude detection; LLM-only history reading; ignoring provenance.",
-      "why": "Mixed human/AI repos are the primary target and other agents will be added later.",
-      "paths": [
-        "udebt/provenance.py",
-        "udebt/history.py",
-        "tests/test_provenance.py",
-        "tests/conftest.py"
-      ],
-      "centrality": 4,
-      "clusters": [
-        "C2",
+        "C1",
+        "C1.1",
         "C2.1"
       ],
       "scope": "architectural",
@@ -410,175 +261,170 @@
           "author": "Claude",
           "email": "noreply@anthropic.com",
           "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
+        },
+        {
+          "sha": "3b3f9a1",
+          "date": "2026-11-11",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Warn when dig returns no check question; enforce map unit cap"
+        },
+        {
+          "sha": "dd26ff4",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Resolve the mapper's paths against the tracked files"
         }
       ],
-      "churn": 4.983,
+      "churn": 11.798,
       "provenance": {
-        "total": 14,
-        "ai": 14,
+        "total": 36,
+        "ai": 36,
         "assisted": 0,
         "human": 0,
         "bot": 0,
         "ai_share": 1.0,
-        "mass": 4.983,
+        "mass": 11.798,
         "first": "2026-11-11",
-        "last": "2026-11-12"
+        "last": "2026-11-15"
       },
-      "importance": 0.841
+      "importance": 1.0
     },
     {
-      "id": "commit-weights",
-      "name": "Commit weight model",
-      "kind": "decision",
-      "summary": "Each commit gets a weight in [0,1] from heuristics, optionally LLM-refined for the heaviest, cached in .udebt/commits.json, and split across units by line share.",
-      "decision": "Every former commit count (churn, decay, provenance, prior) is weighted mass; the top 40 commits are LLM-classified.",
-      "alternatives": "Raw commit counts; LLM weighting of all commits.",
-      "why": "Reformats and lockfile bumps should not create debt; refinement cost is paid once through caching.",
+      "id": "debt-model",
+      "name": "Debt scoring, weights and decay",
+      "kind": "module",
+      "summary": "Computes the understanding-debt score from commit weights, change risk, decay by share of unit changed, and per-ladder-level decay.",
+      "decision": "Heuristic math: weight commits (lockfile/manifest/major bumps), cap by unit size, decay understanding per ladder level.",
+      "alternatives": "Raw line counts; a single decay rate; learned model.",
+      "why": "Approximates how much understanding is lost as code changes; refit by experiments.",
       "paths": [
+        "udebt/scoring.py",
         "udebt/weights.py",
-        "udebt/filekinds.py",
-        "tests/test_weights.py"
-      ],
-      "centrality": 4,
-      "clusters": [
-        "C2.2"
-      ],
-      "scope": "architectural",
-      "history": [],
-      "churn": 4.102,
-      "provenance": {
-        "total": 10,
-        "ai": 10,
-        "assisted": 0,
-        "human": 0,
-        "bot": 0,
-        "ai_share": 1.0,
-        "mass": 4.102,
-        "first": "2026-11-12",
-        "last": "2026-11-12"
-      },
-      "importance": 0.777
-    },
-    {
-      "id": "structural-discovery",
-      "name": "Structural cluster discovery",
-      "kind": "module",
-      "summary": "Builds import and co-change graphs and partitions them with Louvain into candidate clusters fed to the map prompt.",
-      "decision": "Merge import and weighted co-change graphs, ignore huge commits, cluster only code files, attach docs/config afterwards; stdlib-only implementation.",
-      "alternatives": "LLM-only discovery; directory layout as units; third-party graph libraries.",
-      "why": "Gives the LLM grounded structure and keeps runtime dependencies at zero.",
-      "paths": [
-        "udebt/structure.py",
-        "udebt/graph.py",
-        "udebt/imports.py",
-        "tests/test_structure.py",
-        "tests/test_graph.py",
-        "tests/test_imports.py"
-      ],
-      "centrality": 3,
-      "clusters": [
-        "C2.2",
-        "C2.3"
-      ],
-      "scope": "architectural",
-      "history": [],
-      "churn": 0.946,
-      "provenance": {
-        "total": 2,
-        "ai": 2,
-        "assisted": 0,
-        "human": 0,
-        "bot": 0,
-        "ai_share": 1.0,
-        "mass": 0.946,
-        "first": "2026-11-12",
-        "last": "2026-11-12"
-      },
-      "importance": 0.429
-    },
-    {
-      "id": "risk-gating",
-      "name": "Change risk and advisory gating",
-      "kind": "flow",
-      "summary": "Scores a change's weight per unit against the author's understanding and reports OUTSIDE/HIGH/CAUTION/OK, usable in a warn-only pre-push hook.",
-      "decision": "Risk is the min over touched units with sqrt line share; signals are advisory, only --strict gives non-zero exit.",
-      "alternatives": "Blocking merges; averaging across units.",
-      "why": "Owner decided gating stays advisory with opt-in soft block; a change is as risky as the unit least understood.",
-      "paths": [
         "udebt/risk.py",
-        "tests/test_risk.py"
+        "udebt/cache.py",
+        "udebt/history.py",
+        "udebt/synthetic.py",
+        "udebt/replay.py",
+        "udebt/ladder.py"
       ],
-      "centrality": 3,
+      "centrality": 5,
       "clusters": [
-        "C1.2"
+        "C1.2",
+        "C1.1"
       ],
       "scope": "architectural",
-      "history": [],
-      "churn": 1.542,
+      "history": [
+        {
+          "sha": "286cdd4",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Phase 1: commit weights, contributors, change risk, pre-push hook"
+        },
+        {
+          "sha": "9b7d0e2",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Synthetic-developer experiment and its first result"
+        },
+        {
+          "sha": "4ff6ad0",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Weigh version-only manifest edits like lockfile bumps"
+        },
+        {
+          "sha": "32f7a0c",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Cache parsed commits under .udebt/ and parse only new ones"
+        },
+        {
+          "sha": "060b4a8",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Decay understanding by the share of a unit that changed"
+        },
+        {
+          "sha": "9111b03",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Cap a commit's lines at its unit's size and refit the decay rate"
+        },
+        {
+          "sha": "4b37b20",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Decay each ladder level at its own rate (Phase 3.5)"
+        },
+        {
+          "sha": "323d3bf",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Replay debt over time: snapshot, timeline, export, risk history, dashboard"
+        }
+      ],
+      "churn": 11.584,
       "provenance": {
-        "total": 6,
-        "ai": 6,
+        "total": 29,
+        "ai": 29,
         "assisted": 0,
         "human": 0,
         "bot": 0,
         "ai_share": 1.0,
-        "mass": 1.542,
-        "first": "2026-11-12",
-        "last": "2026-11-12"
+        "mass": 11.584,
+        "first": "2026-11-11",
+        "last": "2026-11-15"
       },
-      "importance": 0.472
+      "importance": 0.993
     },
     {
-      "id": "responsibility-contributors",
-      "name": "Responsibility sets and contributor labels",
-      "kind": "module",
-      "summary": "Defines which units each developer is expected to understand (CODEOWNERS, footprint, manual) and labels contributors as AI, Joint, Human or Bot.",
-      "decision": "Seeded sets curated by leads with per-developer scope overrides; AI-likelihood labels from metadata only and display-only.",
-      "alternatives": "Everyone responsible for everything; authorship-based scoring.",
-      "why": "Owner answers: repo owners assign roles, metadata-only heuristics; avoids penalising people for units they were never expected to know.",
+      "id": "llm-backend",
+      "name": "LLM backend and prompts",
+      "kind": "boundary",
+      "summary": "Abstraction over LLM calls: real backend shells out to the claude CLI; FakeLLM keys on TASK markers in prompts.",
+      "decision": "Use the subscription-billed `claude` CLI with deny rules on .udebt/ and no repo settings or MCP; FakeLLM for offline tests.",
+      "alternatives": "Direct Anthropic API with key; no isolation from the analysed repo.",
+      "why": "No API key or cost; prevents leaking reference answers and running hostile repo hooks.",
       "paths": [
-        "udebt/responsibility.py",
-        "udebt/contributors.py",
-        "tests/test_responsibility.py",
-        "tests/test_contributors.py"
+        "udebt/llm.py",
+        "udebt/prompts.py",
+        "udebt/orientation.py",
+        "tests/test_llm_isolation.py"
       ],
-      "centrality": 3,
+      "centrality": 5,
       "clusters": [
-        "C3"
+        "C4.1"
       ],
-      "scope": "architectural",
-      "history": [],
-      "churn": 0.962,
-      "provenance": {
-        "total": 3,
-        "ai": 3,
-        "assisted": 0,
-        "human": 0,
-        "bot": 0,
-        "ai_share": 1.0,
-        "mass": 0.962,
-        "first": "2026-11-12",
-        "last": "2026-11-12"
-      },
-      "importance": 0.43
-    },
-    {
-      "id": "project-governance",
-      "name": "Briefing and change log discipline",
-      "kind": "decision",
-      "summary": "BRIEFING.md, CHANGES.md and CLAUDE.md hold scope, decisions and agent instructions that agents must keep in sync with code and README math.",
-      "decision": "Decisions are recorded in docs read and appended by agents, and scoring changes must update the README table alongside.",
-      "alternatives": "ADRs; issue tracker; undocumented decisions.",
-      "why": "Agents build most of the code, so intent needs to be written where they read it.",
-      "paths": [
-        "BRIEFING.md",
-        "CHANGES.md",
-        "CLAUDE.md",
-        "ROADMAP.md",
-        "README.md"
-      ],
-      "centrality": 2,
-      "clusters": [],
       "scope": "architectural",
       "history": [
         {
@@ -589,22 +435,917 @@
           "author": "Claude",
           "email": "noreply@anthropic.com",
           "subject": "Add udebt vertical slice: map, quiz, status, dig over a git repo"
+        },
+        {
+          "sha": "1798733",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Ask quiz questions up a five-level ladder, purpose first"
+        },
+        {
+          "sha": "59a78e9",
+          "date": "2026-11-14",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Ask one fact per question, reveal misses, show estimated vs measured"
         }
       ],
-      "churn": 4.673,
+      "churn": 5.044,
       "provenance": {
-        "total": 33,
-        "ai": 32,
+        "total": 17,
+        "ai": 17,
         "assisted": 0,
-        "human": 1,
+        "human": 0,
         "bot": 0,
-        "ai_share": 0.99,
-        "mass": 4.673,
+        "ai_share": 1.0,
+        "mass": 5.044,
         "first": "2026-11-11",
+        "last": "2026-11-15"
+      },
+      "importance": 0.771
+    },
+    {
+      "id": "json-contract",
+      "name": "Frozen JSON contract and sync",
+      "kind": "boundary",
+      "summary": "Versioned schemas with a stdlib validator for what the CLI writes and the hosted side reads, plus push/pull.",
+      "decision": "Open additionalProperties, version bump only on removal or retype, map sanitized to metadata before upload.",
+      "alternatives": "Shared DB schema; protobuf; no versioning.",
+      "why": "Decouples CLI and hosted service and avoids uploading reference answers.",
+      "paths": [
+        "udebt/contract.py",
+        "udebt/remote.py",
+        "tests/test_contract.py",
+        "tests/test_remote.py"
+      ],
+      "centrality": 4,
+      "clusters": [
+        "C2.1"
+      ],
+      "scope": "architectural",
+      "history": [
+        {
+          "sha": "12ee384",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Freeze the JSON contract the CLI writes and the hosted side reads (Phase 4a)"
+        },
+        {
+          "sha": "22770de",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Sync with a hosted store over the contract: udebt push and pull (Phase 4a)"
+        }
+      ],
+      "churn": 1.481,
+      "provenance": {
+        "total": 2,
+        "ai": 2,
+        "assisted": 0,
+        "human": 0,
+        "bot": 0,
+        "ai_share": 1.0,
+        "mass": 1.481,
+        "first": "2026-11-15",
+        "last": "2026-11-15"
+      },
+      "importance": 0.53
+    },
+    {
+      "id": "hosted-analysis",
+      "name": "Hosted analysis worker (Render)",
+      "kind": "flow",
+      "summary": "Analyses a repo in a transient clone and runs an LLM tool loop as a Render service, writing results to Supabase.",
+      "decision": "Python worker reusing the CLI code, calling the LLM via messages API, Supabase over REST, GitHub app for webhooks and checks.",
+      "alternatives": "Serverless-only analysis; the drafts/hosted-api FastAPI/Starlette service.",
+      "why": "Long-running clones don't fit Netlify functions; first draft was superseded.",
+      "paths": [
+        "udebt/worker.py",
+        "udebt/hosted",
+        "udebt/topfiles.py",
+        "udebt/webhooks.py",
+        "udebt/checks.py",
+        "render.yaml",
+        "tests/fixtures/github",
+        "udebt/hosted/worker_service.py",
+        "udebt/hosted/messages_llm.py",
+        "udebt/hosted/supabase_rest.py",
+        "udebt/hosted/github.py"
+      ],
+      "centrality": 4,
+      "clusters": [
+        "C2.2",
+        "C2.4",
+        "C2.5"
+      ],
+      "scope": "architectural",
+      "history": [
+        {
+          "sha": "9494538",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Analyse a repository in a transient clone: udebt worker run (Phase 4a)"
+        },
+        {
+          "sha": "376379e",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Build the pull-request check run and route GitHub webhooks (Phase 4a)"
+        },
+        {
+          "sha": "a25b473",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Share the quiz prompts and the scoring cases with the web app; worker and loader for 4b"
+        },
+        {
+          "sha": "0c20a00",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "The Render analysis service: udebt.hosted.worker_service and its tool loop"
+        },
+        {
+          "sha": "95133f6",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "topfiles: the tree fallback's rule; the worker records a unit's files"
+        }
+      ],
+      "children": [
+        {
+          "id": "hosted-analysis/worker",
+          "name": "Transient-clone worker",
+          "kind": "module",
+          "summary": "Clones, analyses and records a unit's files.",
+          "decision": "Run the analysis in a temporary clone.",
+          "paths": [
+            "udebt/worker.py",
+            "udebt/topfiles.py"
+          ],
+          "centrality": 4,
+          "scope": "architectural",
+          "history": [
+            {
+              "sha": "9494538",
+              "date": "2026-11-15",
+              "klass": "ai",
+              "agent": "claude-code",
+              "author": "Claude",
+              "email": "noreply@anthropic.com",
+              "subject": "Analyse a repository in a transient clone: udebt worker run (Phase 4a)"
+            },
+            {
+              "sha": "95133f6",
+              "date": "2026-11-15",
+              "klass": "ai",
+              "agent": "claude-code",
+              "author": "Claude",
+              "email": "noreply@anthropic.com",
+              "subject": "topfiles: the tree fallback's rule; the worker records a unit's files"
+            }
+          ],
+          "churn": 1.29,
+          "provenance": {
+            "total": 4,
+            "ai": 4,
+            "assisted": 0,
+            "human": 0,
+            "bot": 0,
+            "ai_share": 1.0,
+            "mass": 1.29,
+            "first": "2026-11-15",
+            "last": "2026-11-15"
+          },
+          "importance": 0.234
+        },
+        {
+          "id": "hosted-analysis/service",
+          "name": "Render service and tool loop",
+          "kind": "module",
+          "summary": "HTTP worker service with LLM messages loop, GitHub and Supabase REST clients.",
+          "decision": "Stdlib-style REST clients instead of SDKs.",
+          "paths": [
+            "udebt/hosted/worker_service.py",
+            "udebt/hosted/messages_llm.py",
+            "udebt/hosted/supabase_rest.py",
+            "udebt/hosted/github.py"
+          ],
+          "centrality": 4,
+          "scope": "architectural",
+          "history": [
+            {
+              "sha": "0c20a00",
+              "date": "2026-11-15",
+              "klass": "ai",
+              "agent": "claude-code",
+              "author": "Claude",
+              "email": "noreply@anthropic.com",
+              "subject": "The Render analysis service: udebt.hosted.worker_service and its tool loop"
+            }
+          ],
+          "churn": 0.799,
+          "provenance": {
+            "total": 1,
+            "ai": 1,
+            "assisted": 0,
+            "human": 0,
+            "bot": 0,
+            "ai_share": 1.0,
+            "mass": 0.799,
+            "first": "2026-11-15",
+            "last": "2026-11-15"
+          },
+          "importance": 0.193
+        },
+        {
+          "id": "hosted-analysis/webhooks-checks",
+          "name": "Webhooks and PR check run",
+          "kind": "flow",
+          "summary": "Routes GitHub webhooks and builds the pull-request check run.",
+          "decision": "Fixture-tested event routing.",
+          "paths": [
+            "udebt/webhooks.py",
+            "udebt/checks.py"
+          ],
+          "centrality": 3,
+          "scope": "architectural",
+          "history": [
+            {
+              "sha": "376379e",
+              "date": "2026-11-15",
+              "klass": "ai",
+              "agent": "claude-code",
+              "author": "Claude",
+              "email": "noreply@anthropic.com",
+              "subject": "Build the pull-request check run and route GitHub webhooks (Phase 4a)"
+            }
+          ],
+          "churn": 0.664,
+          "provenance": {
+            "total": 1,
+            "ai": 1,
+            "assisted": 0,
+            "human": 0,
+            "bot": 0,
+            "ai_share": 1.0,
+            "mass": 0.664,
+            "first": "2026-11-15",
+            "last": "2026-11-15"
+          },
+          "importance": 0.15
+        }
+      ],
+      "churn": 2.86,
+      "provenance": {
+        "total": 6,
+        "ai": 6,
+        "assisted": 0,
+        "human": 0,
+        "bot": 0,
+        "ai_share": 1.0,
+        "mass": 2.86,
+        "first": "2026-11-15",
+        "last": "2026-11-15"
+      },
+      "importance": 0.577
+    },
+    {
+      "id": "supabase-schema",
+      "name": "Supabase schema and loaders",
+      "kind": "boundary",
+      "summary": "app_udebt Postgres schema with a SQLite twin, hosted migrations, idempotent loader and sample load SQL.",
+      "decision": "Postgres (Supabase) with RLS plus a SQLite twin for tests and an idempotent SQL loader.",
+      "alternatives": "Own API with its own DB (the drafts); NoSQL.",
+      "why": "Auth, RLS and storage come with Supabase.",
+      "paths": [
+        "supabase",
+        "udebt/loadsql.py",
+        "udebt/hosted/samples.py",
+        "samples",
+        "tests/test_schema.py"
+      ],
+      "centrality": 4,
+      "clusters": [
+        "C2.3",
+        "C6"
+      ],
+      "scope": "architectural",
+      "history": [
+        {
+          "sha": "36478a0",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Add the app_udebt schema for Supabase, a SQLite twin and an idempotent loader (Phase 4a)"
+        },
+        {
+          "sha": "b5886d8",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Migrations for the hosted app, the sample loader and the Plabs notes"
+        },
+        {
+          "sha": "a141646",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "The three hosted samples as load SQL, their measured usage, and the hook finding"
+        }
+      ],
+      "churn": 2.811,
+      "provenance": {
+        "total": 8,
+        "ai": 8,
+        "assisted": 0,
+        "human": 0,
+        "bot": 0,
+        "ai_share": 1.0,
+        "mass": 2.811,
+        "first": "2026-11-15",
+        "last": "2026-11-15"
+      },
+      "importance": 0.575
+    },
+    {
+      "id": "web-app",
+      "name": "Hosted web app (Netlify)",
+      "kind": "module",
+      "summary": "TypeScript Vite SPA with Netlify functions for sign-in, specs, quiz ladder, walkthroughs, debt and review.",
+      "decision": "Vanilla TS SPA from the HintWise template, Supabase auth, serverless functions, BYOK model keys, CSP.",
+      "alternatives": "A framework like React; server rendering.",
+      "why": "Reuse of an existing app template; unclear beyond that.",
+      "paths": [
+        "web",
+        "netlify.toml",
+        "web/netlify/functions",
+        "web/dev",
+        "web/src/core",
+        "web/test/fixtures",
+        "web/src/data",
+        "web/src/lib",
+        "web/src/fake",
+        "web/src/ui",
+        "web/src/model",
+        "web/e2e"
+      ],
+      "centrality": 4,
+      "clusters": [
+        "C3",
+        "C3.1",
+        "C3.2",
+        "C3.3",
+        "C3.4",
+        "C3.5",
+        "C3.6"
+      ],
+      "scope": "architectural",
+      "history": [
+        {
+          "sha": "efa0ccf",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Import the HintWise app template into web/ (slug udebt)"
+        },
+        {
+          "sha": "df32766",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "The hosted udebt web app: sign-in, specs, quiz ladder, walkthroughs, debt, functions"
+        },
+        {
+          "sha": "f37c5f9",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "web: /api/tree and the tree fallback for units that name only directories"
+        }
+      ],
+      "children": [
+        {
+          "id": "web-app/functions",
+          "name": "Netlify functions",
+          "kind": "boundary",
+          "summary": "Server API for questions, grading, excerpts and tree, with GitHub access and fakes.",
+          "decision": "Handlers in lib shared by Netlify and a Vite dev plugin.",
+          "paths": [
+            "web/netlify/functions",
+            "web/dev"
+          ],
+          "centrality": 4,
+          "scope": "architectural",
+          "history": [
+            {
+              "sha": "df32766",
+              "date": "2026-11-15",
+              "klass": "ai",
+              "agent": "claude-code",
+              "author": "Claude",
+              "email": "noreply@anthropic.com",
+              "subject": "The hosted udebt web app: sign-in, specs, quiz ladder, walkthroughs, debt, functions"
+            },
+            {
+              "sha": "f37c5f9",
+              "date": "2026-11-15",
+              "klass": "ai",
+              "agent": "claude-code",
+              "author": "Claude",
+              "email": "noreply@anthropic.com",
+              "subject": "web: /api/tree and the tree fallback for units that name only directories"
+            }
+          ],
+          "churn": 1.17,
+          "provenance": {
+            "total": 3,
+            "ai": 3,
+            "assisted": 0,
+            "human": 0,
+            "bot": 0,
+            "ai_share": 1.0,
+            "mass": 1.17,
+            "first": "2026-11-15",
+            "last": "2026-11-15"
+          },
+          "importance": 0.167
+        },
+        {
+          "id": "web-app/core",
+          "name": "Ported core logic",
+          "kind": "module",
+          "summary": "TS ports of quiz, review, scoring, topfiles and prompts.",
+          "decision": "Duplicate logic in TS, checked against Python by parity fixtures.",
+          "paths": [
+            "web/src/core",
+            "web/test/fixtures"
+          ],
+          "centrality": 4,
+          "scope": "architectural",
+          "history": [
+            {
+              "sha": "a25b473",
+              "date": "2026-11-15",
+              "klass": "ai",
+              "agent": "claude-code",
+              "author": "Claude",
+              "email": "noreply@anthropic.com",
+              "subject": "Share the quiz prompts and the scoring cases with the web app; worker and loader for 4b"
+            },
+            {
+              "sha": "999b1c1",
+              "date": "2026-11-15",
+              "klass": "ai",
+              "agent": "claude-code",
+              "author": "Claude",
+              "email": "noreply@anthropic.com",
+              "subject": "web: the spaced review queue ported to TypeScript, checked against udebt/review.py"
+            },
+            {
+              "sha": "95133f6",
+              "date": "2026-11-15",
+              "klass": "ai",
+              "agent": "claude-code",
+              "author": "Claude",
+              "email": "noreply@anthropic.com",
+              "subject": "topfiles: the tree fallback's rule; the worker records a unit's files"
+            }
+          ],
+          "churn": 3.452,
+          "provenance": {
+            "total": 6,
+            "ai": 6,
+            "assisted": 0,
+            "human": 0,
+            "bot": 0,
+            "ai_share": 1.0,
+            "mass": 3.452,
+            "first": "2026-11-15",
+            "last": "2026-11-15"
+          },
+          "importance": 0.239
+        },
+        {
+          "id": "web-app/data-auth",
+          "name": "Data store and auth",
+          "kind": "module",
+          "summary": "Store interface with Supabase and in-memory implementations, sign-in and LLM caps.",
+          "decision": "Store abstraction swappable for fakes.",
+          "paths": [
+            "web/src/data",
+            "web/src/lib",
+            "web/src/fake"
+          ],
+          "centrality": 4,
+          "scope": "architectural",
+          "history": [
+            {
+              "sha": "df32766",
+              "date": "2026-11-15",
+              "klass": "ai",
+              "agent": "claude-code",
+              "author": "Claude",
+              "email": "noreply@anthropic.com",
+              "subject": "The hosted udebt web app: sign-in, specs, quiz ladder, walkthroughs, debt, functions"
+            }
+          ],
+          "churn": 1.192,
+          "provenance": {
+            "total": 4,
+            "ai": 4,
+            "assisted": 0,
+            "human": 0,
+            "bot": 0,
+            "ai_share": 1.0,
+            "mass": 1.192,
+            "first": "2026-11-15",
+            "last": "2026-11-15"
+          },
+          "importance": 0.168
+        },
+        {
+          "id": "web-app/ui",
+          "name": "UI screens",
+          "kind": "module",
+          "summary": "App shell and screens for quiz, repo, review, debt, settings.",
+          "decision": "Plain DOM screens.",
+          "paths": [
+            "web/src/ui",
+            "web/src/model",
+            "web/e2e"
+          ],
+          "centrality": 3,
+          "scope": "architectural",
+          "history": [
+            {
+              "sha": "df32766",
+              "date": "2026-11-15",
+              "klass": "ai",
+              "agent": "claude-code",
+              "author": "Claude",
+              "email": "noreply@anthropic.com",
+              "subject": "The hosted udebt web app: sign-in, specs, quiz ladder, walkthroughs, debt, functions"
+            }
+          ],
+          "churn": 2.115,
+          "provenance": {
+            "total": 6,
+            "ai": 6,
+            "assisted": 0,
+            "human": 0,
+            "bot": 0,
+            "ai_share": 1.0,
+            "mass": 2.115,
+            "first": "2026-11-15",
+            "last": "2026-11-15"
+          },
+          "importance": 0.164
+        }
+      ],
+      "churn": 7.584,
+      "provenance": {
+        "total": 13,
+        "ai": 13,
+        "assisted": 0,
+        "human": 0,
+        "bot": 0,
+        "ai_share": 1.0,
+        "mass": 7.584,
+        "first": "2026-11-15",
+        "last": "2026-11-15"
+      },
+      "importance": 0.737
+    },
+    {
+      "id": "provenance-responsibility",
+      "name": "Provenance and responsibility",
+      "kind": "module",
+      "summary": "Mines decisions and authorship from git history and tracks who is responsible for which unit.",
+      "decision": "Per-developer scope, OUTSIDE risk, own-commit prior, decision candidates mined from history.",
+      "alternatives": "Ignore authorship; manual ownership files.",
+      "why": "Understanding debt is per person; AI-authored code is the focus.",
+      "paths": [
+        "udebt/provenance.py",
+        "udebt/responsibility.py",
+        "udebt/contributors.py",
+        "udebt/ledger.py",
+        "udebt/decisions.py"
+      ],
+      "centrality": 3,
+      "clusters": [
+        "C1.3"
+      ],
+      "scope": "architectural",
+      "history": [
+        {
+          "sha": "2394341",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Make udebt history-aware: provenance, decision mining, own-commit prior"
+        },
+        {
+          "sha": "a156812",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Two-level units, responsibility sets, per-developer scope, OUTSIDE risk"
+        },
+        {
+          "sha": "250a41e",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Mine decision candidates from weights, survival and periods"
+        }
+      ],
+      "churn": 4.018,
+      "provenance": {
+        "total": 12,
+        "ai": 12,
+        "assisted": 0,
+        "human": 0,
+        "bot": 0,
+        "ai_share": 1.0,
+        "mass": 4.018,
+        "first": "2026-11-12",
+        "last": "2026-11-14"
+      },
+      "importance": 0.496
+    },
+    {
+      "id": "structural-discovery",
+      "name": "Structural unit discovery",
+      "kind": "module",
+      "summary": "Builds import and co-change graphs and partitions them with Louvain to propose units.",
+      "decision": "Community detection over merged import and co-change graphs, two-level hierarchy.",
+      "alternatives": "Directory-based units; LLM-only mapping.",
+      "why": "Gives units grounded in code and history.",
+      "paths": [
+        "udebt/structure.py",
+        "udebt/graph.py",
+        "udebt/imports.py",
+        "udebt/filekinds.py"
+      ],
+      "centrality": 3,
+      "clusters": [
+        "C1.4"
+      ],
+      "scope": "architectural",
+      "history": [
+        {
+          "sha": "3570a68",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Structural unit discovery: import and co-change graphs, Louvain"
+        },
+        {
+          "sha": "a156812",
+          "date": "2026-11-12",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Two-level units, responsibility sets, per-developer scope, OUTSIDE risk"
+        }
+      ],
+      "churn": 1.104,
+      "provenance": {
+        "total": 3,
+        "ai": 3,
+        "assisted": 0,
+        "human": 0,
+        "bot": 0,
+        "ai_share": 1.0,
+        "mass": 1.104,
+        "first": "2026-11-12",
         "last": "2026-11-12"
       },
-      "importance": 0.578
+      "importance": 0.397
+    },
+    {
+      "id": "teaching-layer",
+      "name": "Teaching layer and local web server",
+      "kind": "module",
+      "summary": "Tour, tutor, review queue, teach-back, digests and a browser UI served by `udebt serve`.",
+      "decision": "Spaced review and walkthroughs on top of the quiz ladder, served by a stdlib HTTP server with static JS.",
+      "alternatives": "Terminal only; a framework web app.",
+      "why": "Turn measuring debt into paying it down.",
+      "paths": [
+        "udebt/serve.py",
+        "udebt/static",
+        "udebt/tutor.py",
+        "udebt/tour.py",
+        "udebt/review.py",
+        "udebt/teachback.py",
+        "udebt/digest.py",
+        "udebt/unitgraph.py",
+        "udebt/learning.py",
+        "udebt/markdown.py",
+        "udebt/dashboard.py",
+        "udebt/dashboard.html"
+      ],
+      "centrality": 3,
+      "clusters": [
+        "C4",
+        "C4.2",
+        "C4.3"
+      ],
+      "scope": "architectural",
+      "history": [
+        {
+          "sha": "6dd435a",
+          "date": "2026-11-14",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Teach the architecture: tour, path, code walkthroughs, review, teach-back"
+        },
+        {
+          "sha": "ee53686",
+          "date": "2026-11-14",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Serve the teaching layer in the browser: udebt serve"
+        },
+        {
+          "sha": "f51a092",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Polish the teaching layer and add change digests (Phase 3.4)"
+        }
+      ],
+      "churn": 4.716,
+      "provenance": {
+        "total": 12,
+        "ai": 12,
+        "assisted": 0,
+        "human": 0,
+        "bot": 0,
+        "ai_share": 1.0,
+        "mass": 4.716,
+        "first": "2026-11-12",
+        "last": "2026-11-15"
+      },
+      "importance": 0.52
+    },
+    {
+      "id": "parity-tests",
+      "name": "Python/TS parity contract",
+      "kind": "decision",
+      "summary": "Shared prompt parts and fixture-based tests keep Python and TypeScript implementations identical.",
+      "decision": "Duplicate implementations with generated shared fixtures instead of one runtime.",
+      "alternatives": "Call Python from the web; rewrite in one language.",
+      "why": "Hosted app can't run the Python CLI in functions.",
+      "paths": [
+        "tests/test_hosted_parity.py",
+        "tests/test_hosted_review_parity.py",
+        "tests/test_hosted_topfiles_parity.py",
+        "web/test/parity.test.ts",
+        "web/src/core/prompt-parts.json",
+        "udebt/hosted/prompt_parts.py"
+      ],
+      "centrality": 3,
+      "scope": "architectural",
+      "history": [
+        {
+          "sha": "a25b473",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Share the quiz prompts and the scoring cases with the web app; worker and loader for 4b"
+        },
+        {
+          "sha": "999b1c1",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "web: the spaced review queue ported to TypeScript, checked against udebt/review.py"
+        },
+        {
+          "sha": "95133f6",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "topfiles: the tree fallback's rule; the worker records a unit's files"
+        }
+      ],
+      "churn": 1.055,
+      "provenance": {
+        "total": 4,
+        "ai": 4,
+        "assisted": 0,
+        "human": 0,
+        "bot": 0,
+        "ai_share": 1.0,
+        "mass": 1.055,
+        "first": "2026-11-15",
+        "last": "2026-11-15"
+      },
+      "importance": 0.396
+    },
+    {
+      "id": "drafts-hosted-api",
+      "name": "Superseded hosted API draft",
+      "kind": "module",
+      "summary": "Parked FastAPI-style service draft with RLS migrations, replaced by the Supabase and Netlify design.",
+      "decision": "Kept under drafts/ as reference, not used.",
+      "alternatives": "Deleting it.",
+      "why": "Superseded by HOSTING.md.",
+      "paths": [
+        "drafts/hosted-api"
+      ],
+      "centrality": 1,
+      "clusters": [
+        "C5",
+        "C5.1",
+        "C5.2",
+        "C5.3"
+      ],
+      "scope": "architectural",
+      "history": [
+        {
+          "sha": "ca899c3",
+          "date": "2026-11-15",
+          "klass": "ai",
+          "agent": "claude-code",
+          "author": "Claude",
+          "email": "noreply@anthropic.com",
+          "subject": "Park the first hosted-API draft under drafts/ (superseded by HOSTING.md)"
+        }
+      ],
+      "churn": 1.0,
+      "provenance": {
+        "total": 1,
+        "ai": 1,
+        "assisted": 0,
+        "human": 0,
+        "bot": 0,
+        "ai_share": 1.0,
+        "mass": 1.0,
+        "first": "2026-11-15",
+        "last": "2026-11-15"
+      },
+      "importance": 0.154
     }
-  ],
-  "rescored_at": "2026-11-12T18:07:12+00:00"
+  ]
 }

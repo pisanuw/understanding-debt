@@ -1,7 +1,7 @@
-# The hosted app's three sample analyses
+# The hosted app's sample analyses
 
-These SQL scripts load the three shared samples for udebt.hintwise.org (HOSTING.md, owner
-decision 7) into schema `app_udebt`. The Plabs session runs each script with the Supabase admin
+These SQL scripts load the shared samples for udebt.hintwise.org (HOSTING.md, owner decisions 7
+and 9) into schema `app_udebt`. The Plabs session runs each script with the Supabase admin
 workflow (`sql <file>`, after the owner's yes), then runs `check-schema app_udebt`. Each script is
 idempotent: it upserts the repository by URL and replaces that commit's shared analysis in one
 transaction. The scripts hold no code lines (the app fetches excerpts from GitHub at the pin), no
@@ -12,11 +12,14 @@ export and no commit emails.
 | `huggingface_hub.sql` | huggingface/huggingface_hub | `2c61ae8c11ee` | Apache-2.0 | 2,920 | 18 | 12 | `c02548c5…aad4e6` |
 | `sentry-javascript.sql` | getsentry/sentry-javascript | `6bee2f2ccccd` | MIT | 17,695 | 15 | 12 | `e0e87f26…4ed8a7` |
 | `mlflow.sql` | mlflow/mlflow | `f6ff35427d7e` | Apache-2.0 | 14,477 | 30 | 12 | `57a6b311…aab6d9` |
+| `understanding-debt.sql` | pisanuw/understanding-debt | `e9c1c8c5754f` | none | 109 | 19 | 12 | `11af30cb…b0b72e` |
 
 ## Loaded (2026-11-15)
 
-The Plabs session loaded all three into production with the owner's yes, from claude-built-apps
-6ff0efc (copied byte for byte; the hashes match):
+`understanding-debt.sql` is not loaded yet; loading it needs the owner's yes.
+
+The Plabs session loaded the first three into production with the owner's yes, from
+claude-built-apps 6ff0efc (copied byte for byte; the hashes match):
 - `migrate udebt` (run 43706780478): 2 migrations applied;
 - `expose-schema app_udebt` (43706833269);
 - `sql` huggingface_hub (43706890759), sentry-javascript (43706915139), mlflow (43706949963);
@@ -32,6 +35,10 @@ The Plabs session loaded all three into production with the owner's yes, from cl
    - huggingface_hub ran on e239f56 and wrote an export, which the loader leaves out.
 2. `python -m udebt.hosted.samples <three dirs> --out samples` on ac89693. `udebt/` is unchanged
    at ff0d807, and the checker reports no problems for any of the three.
+3. understanding-debt was made the same way, at the pin of its refreshed committed map
+   (e9c1c8c), with the code at 6346fe6, which has the `ClaudeCLI` isolation (f294414). The map
+   came from the repository, so the run took 14 calls (orientations, tour and 12 walkthroughs)
+   and 328 s.
 
 Each `claude` call went through a wrapper that adds these flags:
 - `--setting-sources user --strict-mcp-config`;

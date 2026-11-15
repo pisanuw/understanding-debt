@@ -154,4 +154,9 @@
 2026-11-15 [note] mlflow at the pin: all 12 file-less units now get 4 source files (Python and TypeScript agree); samples need no reload.
 
 2026-11-15 [doc] DEPLOY.md: Plabs steps 1, 2 and 7 marked done (migrations, SHARED_TABLES, the three sample loads in production); step 8 waits on the owner's yes to Plabs; owner steps still open.
+
+2026-11-15 [code] .udebt/map.json refreshed (12 units, 7 sub-units, 98% of clustered source; covers web/, udebt/hosted/, supabase/) so this repository can be the fourth hosted sample at this pin.
+
+2026-11-15 [code] udebt/hosted/samples.py: understanding-debt registered as the fourth sample at e9c1c8c (no licence); the other session makes its analysis at that pin.
 2026-11-15 [decision] Owner: understanding-debt as a 4th sample, site usable without login (progress in browser). Options chosen under the 15-minute rule: HOSTING.md decisions 9-10.
+2026-11-15 [note] Fourth sample made at e9c1c8c (19 units, 12 walkthroughs, 14 calls, 328 s; checks pass, no emails): samples/understanding-debt.sql. Production load needs owner's yes.
