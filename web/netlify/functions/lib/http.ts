@@ -58,3 +58,13 @@ export async function readJson(req: Request): Promise<unknown> {
     throw new HttpError(400, 'The body is not JSON.', { error: 'The body is not JSON.' });
   }
 }
+
+/**
+ * What an upstream said when it refused (PostgREST's or the gateway's `message`), short, for the
+ * page to show beside its own words, so a refusal says where it came from. Never a header or a token.
+ */
+export function upstreamDetail(where: string, status: number, data: unknown): string {
+  const d = data && typeof data === 'object' ? (data as { message?: unknown; msg?: unknown; error?: unknown }) : {};
+  const m = [d.message, d.msg, d.error].find((x) => typeof x === 'string' && x.trim()) as string | undefined;
+  return `${where} ${status}${m ? `: ${m.trim().slice(0, 160)}` : ''}`;
+}

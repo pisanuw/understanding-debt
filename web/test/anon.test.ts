@@ -86,10 +86,10 @@ async function sitting(first: 'Correct' | 'Wrong' | 'Partly right' = 'Correct'):
   await click('button', 'Start');
   expect(byText('p', /^\[1\/2\]/)?.textContent).toMatch(/level 1 of 5: purpose and placement · self-checked/);
   expect(byText('summary', 'Orientation: read this first')).toBeTruthy();
-  await click('button', 'Show the answer');
+  await click('button', 'Check Answer');
   expect($('[data-testid=reference]')).toBeNull(); // nothing typed: nothing shown
   answer('It streams the reply and keeps the exchange.');
-  await click('button', 'Show the answer');
+  await click('button', 'Check Answer');
   expect($('[data-testid=reference]')?.textContent).toMatch(/^The answer/);
   expect($<HTMLTextAreaElement>('textarea')?.disabled).toBe(true);
   expect([...document.querySelectorAll<HTMLInputElement>('.conf input')].every((r) => r.disabled)).toBe(true);
@@ -176,7 +176,7 @@ describe('without signing in', () => {
     const before = Number($('[data-testid=debt-index]')?.textContent);
     await click('button', 'Review what is due');
     answer('It streams the reply as it is written.');
-    await click('button', 'Show the answer');
+    await click('button', 'Check Answer');
     await click('button', 'Correct');
     await click('button', 'Finish now', 20);
     expect(byText('p', /^1 correct, self-checked/)).toBeTruthy();
@@ -243,7 +243,7 @@ describe('without signing in', () => {
     ($<HTMLSelectElement>('#quiz-n') as HTMLSelectElement).value = '1';
     await click('button', 'Start', 30);
     answer('It streams the reply to the browser.');
-    await click('button', 'Answer and grade', 40);
+    await click('button', 'Check Answer and Grade', 40);
     expect(byText('p', /^1 correct \(one grading call\)/)).toBeTruthy();
     expect(calls).toHaveLength(2);
     expect(kept().records.map((r) => [r.type, r.verdict])).toEqual([['quiz', 'correct']]);

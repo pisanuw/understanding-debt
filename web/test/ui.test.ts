@@ -262,7 +262,7 @@ describe('the quiz', () => {
       await tick(20);
       expect(byText('p', /^\[1\/1\] React\/Vite frontend/)).toBeTruthy();
       ($<HTMLTextAreaElement>('textarea') as HTMLTextAreaElement).value = 'It renders the chat.';
-      await click('button', 'Answer and grade');
+      await click('button', 'Check Answer and Grade');
       await tick(20);
     }
     expect(trees).toHaveLength(1);
@@ -340,7 +340,7 @@ describe('the review queue', () => {
     expect(again).not.toBe(asked);
     ($<HTMLTextAreaElement>('textarea') as HTMLTextAreaElement).value = 'It streams the reply as it is written.';
     ($<HTMLInputElement>('input[value="3"]') as HTMLInputElement).checked = true;
-    await click('button', 'Answer and grade');
+    await click('button', 'Check Answer and Grade');
     await tick(20);
     expect(byText('p', /^1 correct \(one grading call\)/)).toBeTruthy();
     expect(byText('.result p', /back in review on/)).toBeTruthy();
@@ -372,7 +372,7 @@ describe('the review queue', () => {
     await go('#/r/1/review');
     await click('button', 'Review what is due');
     ($<HTMLTextAreaElement>('textarea') as HTMLTextAreaElement).value = 'this is wrong on purpose';
-    await click('button', 'Answer and grade');
+    await click('button', 'Check Answer and Grade');
     await tick(20);
     expect(byText('p', /^1 wrong/)).toBeTruthy();
     expect(byText('.answer strong', 'The answer')).toBeTruthy();
@@ -402,7 +402,7 @@ describe('the review queue', () => {
     expect(byText('p', /with your own Anthropic key/)).toBeTruthy();
     await click('button', 'Review what is due');
     ($<HTMLTextAreaElement>('textarea') as HTMLTextAreaElement).value = 'partly: it streams replies.';
-    await click('button', 'Answer and grade');
+    await click('button', 'Check Answer and Grade');
     await tick(30);
     expect(calls).toHaveLength(2); // the quiz's questions, then the review's grading; none writes review questions
     expect(JSON.stringify(calls[1])).toContain('TASK: grade');

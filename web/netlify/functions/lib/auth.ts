@@ -6,7 +6,7 @@
  * five minutes per token and repository so a walkthrough's excerpts cost one check.
  */
 import { FAKE_TOKEN, type FnEnv } from './env';
-import { HttpError } from './http';
+import { HttpError, upstreamDetail } from './http';
 
 const TTL_MS = 5 * 60 * 1000;
 const MAX_CACHED = 500;
@@ -33,7 +33,13 @@ export async function authorize(token: string, repoUrl: string, env: FnEnv, doFe
   } catch {
     throw new HttpError(502, 'Could not reach the sign-in service.', { error: 'Could not reach the sign-in service. Try again.' });
   }
-  if (res.status === 401 || res.status === 403) throw new HttpError(401, 'Sign in again.', { error: 'Your sign-in has expired. Sign in again.' });
+  if (res.status === 401 || res.status === 403) {
+    // 401: PostgREST did not accept the token (expired, revoked, or the anon key is wrong);
+    // 403: it accepted it and refused the read. Both go to the page as 401, which refreshes the
+    // session once and retries; the detail says which it was.
+    const detail = upstreamDetail('database', res.status, await res.json().catch(() => ({})));
+    throw new HttpError(401, 'Sign in again.', { error: res.status === 401 ? 'Your sign-in has expired. Sign in again.' : 'The database refused this for your account. Sign in again.', detail });
+  }
   if (!res.ok) throw new HttpError(502, 'The database answered an error.', { error: `The database answered ${res.status}.` });
   const rows: unknown = await res.json().catch(() => []);
   const id = Array.isArray(rows) && rows[0] && typeof rows[0] === 'object' ? Number((rows[0] as { id?: unknown }).id) : NaN;

@@ -103,6 +103,29 @@ describe("the person's own key", () => {
     expect(capNotice({ scope: 'app-day', resets_at: 'not a date' }, true, now)).toMatch(/^This app's shared allowance is used up\. /);
   });
 
+  it('refreshes the session once after a 401 and sends the same request again, with the new token', async () => {
+    const tokens: (string | null)[] = [];
+    const answers = [Response.json({ error: 'Your sign-in has expired. Sign in again.', detail: 'gateway 401: expired' }, { status: 401 }), Response.json({ grades: [], recorded: null })];
+    const fetchSeq = (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      tokens.push((init?.headers as Record<string, string>).authorization ?? null);
+      return answers.shift() as Response;
+    }) as typeof fetch;
+    let refreshed = 0;
+    const g = new GatewayClient({ getToken: async () => 'old', fetch: fetchSeq, refreshToken: async () => (refreshed++, 'new') });
+    await g.grade({ repo: 'https://github.com/a/b', sha: 'a'.repeat(40), items: [] });
+    expect([tokens, refreshed]).toEqual([['Bearer old', 'Bearer new'], 1]);
+
+    // Refused again with the fresh token: no second refresh, and the page learns where it came from.
+    const twice = (async () => Response.json({ error: 'Your sign-in has expired. Sign in again.', detail: 'database 401: JWT expired' }, { status: 401 })) as typeof fetch;
+    let n = 0;
+    const g2 = new GatewayClient({ getToken: async () => 'old', fetch: twice, refreshToken: async () => (n++, 'new') });
+    const e = (await g2.grade({ repo: 'https://github.com/a/b', sha: 'a'.repeat(40), items: [] }).catch((x: unknown) => x)) as ApiError;
+    expect([e.status, e.message, e.detail, n]).toEqual([401, 'Your sign-in has expired. Sign in again.', 'database 401: JWT expired', 1]);
+    // No refresh possible (signed out elsewhere): the first answer stands.
+    const g3 = new GatewayClient({ getToken: async () => 'old', fetch: twice, refreshToken: async () => null });
+    expect(((await g3.grade({ repo: 'https://github.com/a/b', sha: 'a'.repeat(40), items: [] }).catch((x: unknown) => x)) as ApiError).status).toBe(401);
+  });
+
   it('reads the allowance through /api/allowance, and nothing that is not one', async () => {
     const seen: string[] = [];
     const fetchWith = (body: unknown, status = 200) =>

@@ -72,7 +72,11 @@ export function previewDeps(fixture: Fixture, opts: { doFetch?: typeof fetch; se
 export function liveDeps(): AppDeps {
   const client = getSupabase();
   const getToken = () => currentToken(client);
-  const clientDeps: ClientDeps = { getToken };
+  const refreshToken = async (): Promise<string | null> => {
+    const { data, error } = await client.auth.refreshSession();
+    return error ? null : (data.session?.access_token ?? null);
+  };
+  const clientDeps: ClientDeps = { getToken, refreshToken };
   const base = workerUrl();
   const gateway = new GatewayClient(clientDeps);
   return {

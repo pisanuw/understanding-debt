@@ -64,12 +64,12 @@ test('sign in, read the specs, take a level-1 quiz, see the debt fall', async ({
   await expect(page.getByLabel(/Written and graded by the model/)).toBeDisabled(); // locked while the sitting runs
   const selfUnits = [await asked()];
   await page.getByLabel('Your answer').fill('It streams the reply to the browser as it is written and saves the exchange.');
-  await page.getByRole('button', { name: 'Show the answer' }).click();
+  await page.getByRole('button', { name: 'Check Answer' }).click();
   await page.getByRole('button', { name: 'Correct' }).click();
   await expect(page.getByText(/^\[2\/2\]/)).toBeVisible();
   selfUnits.push(await asked());
   await page.getByLabel('Your answer').fill('It keeps the cost of each visitor within the daily budget.');
-  await page.getByRole('button', { name: 'Show the answer' }).click();
+  await page.getByRole('button', { name: 'Check Answer' }).click();
   await page.getByRole('button', { name: 'Correct' }).click();
   await expect(page.getByRole('heading', { name: 'Recorded' })).toBeVisible();
   await expect(page.getByText('2 correct, self-checked (no model call).')).toBeVisible();
@@ -97,7 +97,7 @@ test('sign in, read the specs, take a level-1 quiz, see the debt fall', async ({
   await expect(page.getByText('[2/2]')).toBeVisible();
   modelUnits.push(await asked());
   await page.getByLabel('Your answer').fill('It lets the owner review answers and fix the persona.');
-  await page.getByRole('button', { name: 'Answer and grade' }).click();
+  await page.getByRole('button', { name: 'Check Answer and Grade' }).click();
 
   await expect(page.getByRole('heading', { name: 'Graded' })).toBeVisible();
   await expect(page.getByText('2 correct (one grading call).')).toBeVisible();
@@ -166,7 +166,7 @@ test('a missed question comes back in Review the next day, and a correct answer 
   await expect(page.getByText('[1/1]')).toBeVisible();
   const asked = await page.locator('p.q-text').textContent();
   await page.getByLabel('Your answer').fill('It is wrong on purpose: it renders the slides.');
-  await page.getByRole('button', { name: 'Answer and grade' }).click();
+  await page.getByRole('button', { name: 'Check Answer and Grade' }).click();
   await expect(page.getByText('1 wrong (one grading call).')).toBeVisible();
   await expect(page.locator('.result .answer strong', { hasText: 'The answer' })).toBeVisible();
   await expect(page.locator('.result').getByText(/back in review on/)).toBeVisible();
@@ -195,7 +195,7 @@ test('a missed question comes back in Review the next day, and a correct answer 
   expect(again).not.toBe(asked);
   await page.getByLabel('Your answer').fill('It streams the reply to the browser as it is written.');
   await page.getByLabel('certain').check();
-  await page.getByRole('button', { name: 'Answer and grade' }).click();
+  await page.getByRole('button', { name: 'Check Answer and Grade' }).click();
   await expect(page.getByText('1 correct (one grading call).')).toBeVisible();
   await expect(page.locator('.result').getByText(/back in review on/)).toBeVisible();
   await expect(page.getByTestId('review-count')).toBeHidden();
@@ -247,7 +247,7 @@ test('a quiz on a unit that names only directories gets code from the top files 
     expect(questions[0].evidence).toEqual(['frontend/src/AdminPage.jsx', 'frontend/src/App.jsx']);
     await expect(page.getByText('[1/1] React/Vite frontend')).toBeVisible();
     await page.getByLabel('Your answer').fill(`It is the browser app: chat, the warmth meter and the admin page (sitting ${sitting}).`);
-    await page.getByRole('button', { name: 'Answer and grade' }).click();
+    await page.getByRole('button', { name: 'Check Answer and Grade' }).click();
     await expect(page.getByText('1 correct (one grading call).')).toBeVisible();
     const line = page.getByTestId('evidence');
     await expect(line).toHaveText('In the code: frontend/src/AdminPage.jsx, frontend/src/App.jsx');

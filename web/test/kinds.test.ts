@@ -103,7 +103,7 @@ async function advanceSitting(unit: string, mark: 'Correct' | 'Wrong', text = 'I
   await click('button', 'Start');
   expect(byText('p', /^\[1\/1\]/)?.textContent).toMatch(/· self-checked$/);
   answer(text);
-  await click('button', 'Show the answer');
+  await click('button', 'Check Answer');
   await click('button', mark);
 }
 
@@ -114,7 +114,7 @@ async function modelSitting(unit: string, text: string): Promise<void> {
   await click('button', 'Start', 30);
   expect(byText('p', /^\[1\/1\]/)?.textContent).not.toMatch(/self-checked/);
   answer(text);
-  await click('button', 'Answer and grade', 30);
+  await click('button', 'Check Answer and Grade', 30);
 }
 
 /** The debt table's row of a unit. */
@@ -421,7 +421,7 @@ describe('review with both kinds', () => {
     await click('button', 'Review the self-checked ones');
     expect(byText('p', /^\[1\/1\] Chat request lifecycle \(SSE\)/)?.textContent).toMatch(/self-checked$/);
     answer('It streams the reply as it is written.');
-    await click('button', 'Show the answer');
+    await click('button', 'Check Answer');
     await click('button', 'Correct');
     expect(byText('p', /^1 correct, self-checked \(no model call\)\./)).toBeTruthy();
     expect(calls()).toEqual([]);
@@ -433,7 +433,7 @@ describe('review with both kinds', () => {
     expect(byText('p', /^One grading call per sitting through the HintWise key/)).toBeTruthy();
     await click('button', 'Review what is due');
     answer('It caps what each visitor can spend in a day.');
-    await click('button', 'Answer and grade', 30);
+    await click('button', 'Check Answer and Grade', 30);
     expect(byText('p', /^1 correct \(one grading call\)\./)).toBeTruthy();
     expect(calls()).toEqual(['/api/grade']);
     const rows = await app.deps.store.records(1);
@@ -477,11 +477,11 @@ describe("the model's flow under the choice", () => {
     answer('It caps what each visitor can spend in a day.');
     const real = app.deps.quiz() as QuizClient;
     app.deps.quiz = () => ({ mode: 'gateway', writeQuestions: (r) => real.writeQuestions(r), excerpt: (...a) => real.excerpt(...a), grade: async () => Promise.reject(new CapError('user-day', '2026-11-16T00:00:00Z')) });
-    await click('button', 'Answer and grade', 30);
+    await click('button', 'Check Answer and Grade', 30);
     expect(byText('p.error', /daily HintWise allowance/)).toBeTruthy();
     expect(kind()?.disabled).toBe(true); // the answers are still there to grade
     app.deps.quiz = () => real;
-    await click('button', 'Answer and grade', 30);
+    await click('button', 'Check Answer and Grade', 30);
     expect(byText('p', /^1 unknown, 1 correct \(one grading call\)\./)).toBeTruthy();
     expect(kind()?.disabled).toBe(false);
 

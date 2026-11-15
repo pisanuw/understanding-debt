@@ -20,7 +20,7 @@ import { parseRef, refsForUnit, type ExcerptRef } from '../../core/excerpts';
 import { SELF_CHECKED, SELF_FEEDBACK, UNKNOWN_FEEDBACK, markRevealed, mergeGrades, orientationWanted, pickUnits, revealText, revealedOn, revealedVariant, reveals, levelsFor, sittingTs, type Answered, type Graded, type Question } from '../../core/quiz';
 import { sittingRows, stateAt } from '../../core/review';
 import { githubLink, orientationOf, orientationText, unitById, type Orientation, type SpecUnit } from '../../core/specs';
-import { CapError, capMessage, capNotice, type Allowance } from '../../model/client';
+import { ApiError, CapError, capMessage, capNotice, type Allowance } from '../../model/client';
 import { getQuizKind, setQuizKind, type QuizKind } from '../../model/prefs';
 import { repoHref, unitHref, type App, type RepoTab, type RepoView } from '../app';
 import { badge, busy, button, clear, day, extLink, fmt, h } from '../dom';
@@ -35,6 +35,7 @@ export interface Served extends Question {
 /** What to say for an error from writing or grading. */
 export function errorText(e: unknown): string {
   if (e instanceof CapError || (e instanceof Error && e.name === 'CapReached' && 'scope' in e)) return capMessage(e as CapError);
+  if (e instanceof ApiError && e.detail) return `${e.message} (${e.detail})`;
   return e instanceof Error ? e.message : String(e);
 }
 
@@ -247,7 +248,7 @@ export function askFlow(app: App, view: RepoView, box: HTMLElement, questions: S
     const ta = h('textarea', { 'aria-label': 'Your answer', placeholder: 'One or two sentences, in plain language.' });
     const conf = confPicker(`conf-${q.id}`);
     const last = i + 1 >= questions.length;
-    const send = button(last ? 'Answer and grade' : 'Next', () => {
+    const send = button(last ? 'Check Answer and Grade' : 'Next', () => {
       if (!ta.value.trim()) {
         ta.focus();
         return;
@@ -378,7 +379,7 @@ export function selfCheckFlow(app: App, view: RepoView, box: HTMLElement, questi
       else next();
     };
     const show = button(
-      'Show the answer',
+      'Check Answer',
       () => {
         if (!ta.value.trim()) {
           ta.focus();

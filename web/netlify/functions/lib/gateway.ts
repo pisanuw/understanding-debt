@@ -8,7 +8,7 @@ import { MAX_BODY_BYTES, MAX_TOKENS, type ModelRequest } from '../../../src/core
 import type { ModelMessage } from '../../../src/core/prompts';
 import type { FnEnv } from './env';
 import { fakeGateway } from './fake';
-import { HttpError } from './http';
+import { HttpError, upstreamDetail } from './http';
 
 export const APP = 'udebt';
 
@@ -40,7 +40,7 @@ export async function callGateway(req: ModelRequest, token: string, env: FnEnv, 
   }
   const data: unknown = await res.json().catch(() => ({}));
   if (res.status === 429 && data && typeof data === 'object' && (data as { error?: unknown }).error === 'cap') throw new HttpError(429, 'cap', data);
-  if (res.status === 401) throw new HttpError(401, 'Sign in again.', { error: 'Your sign-in has expired. Sign in again.' });
+  if (res.status === 401) throw new HttpError(401, 'Sign in again.', { error: 'Your sign-in has expired. Sign in again.', detail: upstreamDetail('gateway', 401, data) });
   if (!res.ok) {
     const m = data && typeof data === 'object' ? (data as { message?: unknown; error?: unknown }).message ?? (data as { error?: unknown }).error : undefined;
     throw new HttpError(502, 'Gateway error.', { error: typeof m === 'string' && m ? m : `The HintWise gateway answered ${res.status}.` });
@@ -77,7 +77,7 @@ export async function checkAllowance(token: string, env: FnEnv, doFetch: typeof 
     throw new HttpError(502, 'Gateway unreachable.', { error: 'Could not reach the HintWise gateway. Try again in a moment.' });
   }
   const data: unknown = await res.json().catch(() => ({}));
-  if (res.status === 401) throw new HttpError(401, 'Sign in again.', { error: 'Your sign-in has expired. Sign in again.' });
+  if (res.status === 401) throw new HttpError(401, 'Sign in again.', { error: 'Your sign-in has expired. Sign in again.', detail: upstreamDetail('gateway', 401, data) });
   if (!res.ok || !data || typeof data !== 'object' || typeof (data as { allowed?: unknown }).allowed !== 'boolean') {
     throw new HttpError(502, 'Gateway error.', { error: `The HintWise gateway answered ${res.status} to the allowance check.` });
   }

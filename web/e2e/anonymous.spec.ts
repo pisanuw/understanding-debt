@@ -46,13 +46,13 @@ test('without signing in: a sample, a self-checked quiz, a review; then the copy
   await expect(page.getByText(/^\[1\/2\]/)).toContainText('level 1 of 5: purpose and placement');
   await expect(page.getByText('Orientation: read this first')).toBeVisible();
   await page.getByLabel('Your answer').fill('It streams the reply to the browser as it is written and saves the exchange.');
-  await page.getByRole('button', { name: 'Show the answer' }).click();
+  await page.getByRole('button', { name: 'Check Answer' }).click();
   await expect(page.getByTestId('reference')).toContainText('The answer');
   await page.getByRole('button', { name: 'Correct' }).click();
   await expect(page.getByText(/^\[2\/2\]/)).toBeVisible();
   const missed = await page.locator('p.q-text').textContent();
   await page.getByLabel('Your answer').fill('It renders the slides.');
-  await page.getByRole('button', { name: 'Show the answer' }).click();
+  await page.getByRole('button', { name: 'Check Answer' }).click();
   await page.getByRole('button', { name: 'Wrong' }).click();
   await expect(page.getByRole('heading', { name: 'Recorded' })).toBeVisible();
   await expect(page.getByText('1 correct, 1 wrong, self-checked (no model call).')).toBeVisible();
@@ -80,7 +80,7 @@ test('without signing in: a sample, a self-checked quiz, a review; then the copy
   await page.getByRole('button', { name: 'Review what is due' }).click();
   await expect(page.locator('p.q-text')).not.toHaveText(missed ?? '');
   await page.getByLabel('Your answer').fill('It keeps the cost of each visitor within budget.');
-  await page.getByRole('button', { name: 'Show the answer' }).click();
+  await page.getByRole('button', { name: 'Check Answer' }).click();
   await page.getByRole('button', { name: 'Correct' }).click();
   await expect(page.getByText('1 correct, self-checked (no model call).')).toBeVisible();
   expect(Number(await page.getByTestId('debt-index').textContent())).toBeLessThan(before);

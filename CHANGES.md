@@ -177,3 +177,4 @@
 2026-11-15 [note] Hosted app live at udebt.hintwise.org (main dc75449), worker at udebt-api.hintwise.org; post-deploy checks pass. Build session archived; the "UDebt: Nov 12" session continues.
 2026-11-15 [code] HintWise key is the default for signed-in users (model quiz first); /api/allowance (gateway check mode) shows a used-up allowance clearly and falls back to advance quizzes.
 2026-11-15 [decision] Owner raised udebt's gateway caps: $1.00/person/day, app $5/day, $20/week, $40/month (Plabs sql run 43732364337); udebt-llm-caps.sql updated to match.
+2026-11-15 [code] Buttons: 'Check Answer and Grade', 'Check Answer'. A 401 from /api refreshes the session once and retries; refusals say which check (database or gateway) and its message.

@@ -56,6 +56,8 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /** Where a refusal came from and what it said ("gateway 401: ..."), when the function says so. */
+    public readonly detail?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -69,6 +71,8 @@ export interface ClientDeps {
   base?: string;
   /** For byok: the llm.ts dependencies (tests pass a fake Anthropic client). */
   askDeps?: AskDeps;
+  /** A new token from the session's refresh token, or null: used once after a 401, then the call is sent again. */
+  refreshToken?: () => Promise<string | null>;
 }
 
 /**
@@ -77,17 +81,23 @@ export interface ClientDeps {
  * every other call needs the token and never leaves the page without one (the gateway is for
  * signed-in people only).
  */
-async function call<T>(deps: ClientDeps, path: string, init: RequestInit = {}, anyone = false): Promise<T> {
+async function call<T>(deps: ClientDeps, path: string, init: RequestInit = {}, anyone = false, retried = false): Promise<T> {
   const token = await deps.getToken();
   if (!token && !anyone) throw new ApiError(401, 'Sign in first.');
   const res = await (deps.fetch ?? fetch)(`${deps.base ?? ''}${path}`, {
     ...init,
     headers: { ...(init.headers as Record<string, string> | undefined), ...(token ? { authorization: `Bearer ${token}` } : {}), ...(init.body ? { 'content-type': 'application/json' } : {}) },
   });
+  if (res.status === 401 && token && !retried && deps.refreshToken) {
+    // A token the server refused (expired, or rotated by another tab): refresh the session once
+    // and send the same request again. Nothing was spent: every refusal comes before the model call.
+    const fresh = await deps.refreshToken().catch(() => null);
+    if (fresh && fresh !== token) return call<T>({ ...deps, getToken: async () => fresh }, path, init, anyone, true);
+  }
   const data: unknown = await res.json().catch(() => ({}));
   const d = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
   if (res.status === 429 && d.error === 'cap') throw new CapError(String(d.scope ?? ''), String(d.resets_at ?? ''), typeof d.message === 'string' ? d.message : undefined);
-  if (!res.ok) throw new ApiError(res.status, typeof d.error === 'string' && d.error ? d.error : `The server answered ${res.status}.`);
+  if (!res.ok) throw new ApiError(res.status, typeof d.error === 'string' && d.error ? d.error : `The server answered ${res.status}.`, typeof d.detail === 'string' && d.detail ? d.detail : undefined);
   return data as T;
 }
 

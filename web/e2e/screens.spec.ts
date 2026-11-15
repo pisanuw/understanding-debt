@@ -145,7 +145,7 @@ for (const width of [1280, 390]) {
       await expect(page.getByText('[1/1] React/Vite frontend')).toBeVisible();
       await page.getByLabel('Your answer').fill('It is the browser app: the chat, the warmth meter and the admin page.');
       await shot(page, 'tree-question', width, scheme);
-      await page.getByRole('button', { name: 'Answer and grade' }).click();
+      await page.getByRole('button', { name: 'Check Answer and Grade' }).click();
       await expect(page.getByTestId('evidence')).toBeVisible();
       await shot(page, 'tree-graded', width, scheme);
       await page.evaluate(() => sessionStorage.clear());
@@ -170,12 +170,12 @@ for (const width of [1280, 390]) {
       await expect(page.getByText(/^\[1\/2\]/)).toBeVisible();
       await page.getByLabel('Your answer').fill('It streams the reply to the browser as it is written and saves the exchange.');
       await shot(page, 'anon-question', width, scheme);
-      await page.getByRole('button', { name: 'Show the answer' }).click();
+      await page.getByRole('button', { name: 'Check Answer' }).click();
       await expect(page.getByTestId('reference')).toBeVisible();
       await shot(page, 'anon-check', width, scheme);
       await page.getByRole('button', { name: 'Correct' }).click();
       await page.getByLabel('Your answer').fill('It renders the slides.');
-      await page.getByRole('button', { name: 'Show the answer' }).click();
+      await page.getByRole('button', { name: 'Check Answer' }).click();
       await page.getByRole('button', { name: 'Wrong' }).click();
       await expect(page.getByRole('heading', { name: 'Recorded' })).toBeVisible();
       await shot(page, 'anon-graded', width, scheme);
@@ -212,12 +212,12 @@ for (const width of [1280, 390]) {
       await shot(page, 'choice-advance', width, scheme);
       await page.getByRole('button', { name: 'Start' }).click();
       await page.getByLabel('Your answer').fill('It streams the reply to the browser as it is written and saves the exchange.');
-      await page.getByRole('button', { name: 'Show the answer' }).click();
+      await page.getByRole('button', { name: 'Check Answer' }).click();
       await expect(page.getByTestId('reference')).toBeVisible();
       await shot(page, 'choice-check', width, scheme);
       await page.getByRole('button', { name: 'Correct' }).click();
       await page.getByLabel('Your answer').fill('It renders the slides.');
-      await page.getByRole('button', { name: 'Show the answer' }).click();
+      await page.getByRole('button', { name: 'Check Answer' }).click();
       await page.getByRole('button', { name: 'Wrong' }).click();
       await expect(page.getByRole('heading', { name: 'Recorded' })).toBeVisible();
       await shot(page, 'choice-recorded', width, scheme);
@@ -228,7 +228,7 @@ for (const width of [1280, 390]) {
       await page.getByLabel('Unit').selectOption('persona-retrieval');
       await page.getByRole('button', { name: 'Start' }).click();
       await page.getByLabel('Your answer').fill('It is wrong on purpose: it renders the slides.');
-      await page.getByRole('button', { name: 'Answer and grade' }).click();
+      await page.getByRole('button', { name: 'Check Answer and Grade' }).click();
       await expect(page.getByRole('heading', { name: 'Graded' })).toBeVisible();
       await shot(page, 'choice-graded', width, scheme);
       await page.clock.setFixedTime(new Date('2026-11-16T11:00:00Z'));

@@ -180,6 +180,18 @@ describe('the functions in live mode', () => {
     expect((await handleAllowance(post('/api/allowance', {}), { env: LIVE, fetch: down })).status).toBe(502);
   });
 
+  it('says which check refused a token, and what it said', async () => {
+    const req = () => post('/api/grade', { repo: REPO, sha: SHA, items: [{ question: 'Q?', answer: 'a' }] });
+    const db = await handleGrade(req(), { env: LIVE, fetch: liveFetch({ repo: () => Response.json({ code: 'PGRST301', message: 'JWT expired' }, { status: 401 }) }) });
+    expect([db.status, await db.json()]).toEqual([401, { error: 'Your sign-in has expired. Sign in again.', detail: 'database 401: JWT expired' }]);
+    resetAuthCache();
+    const denied = await handleGrade(req(), { env: LIVE, fetch: liveFetch({ repo: () => Response.json({ code: '42501', message: 'permission denied for table repositories' }, { status: 403 }) }) });
+    expect([denied.status, await denied.json()]).toEqual([401, { error: 'The database refused this for your account. Sign in again.', detail: 'database 403: permission denied for table repositories' }]);
+    resetAuthCache();
+    const gw = await handleGrade(req(), { env: LIVE, fetch: liveFetch({ gateway: () => Response.json({ error: 'auth', message: 'The session token is invalid or expired; sign in again.' }, { status: 401 }) }) });
+    expect([gw.status, await gw.json()]).toEqual([401, { error: 'Your sign-in has expired. Sign in again.', detail: 'gateway 401: The session token is invalid or expired; sign in again.' }]);
+  });
+
   it('refuses a missing or expired token, an unknown repository and a bad request', async () => {
     expect((await handleQuestions(post('/api/questions', {}, null), { env: LIVE, fetch: liveFetch() })).status).toBe(401);
     expect((await handleQuestions(post('/api/questions', { repo: REPO, sha: SHA, units: [unit] }), { env: LIVE, fetch: liveFetch({ repo: () => new Response('{}', { status: 401 }) }) })).status).toBe(401);
