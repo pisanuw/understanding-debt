@@ -7,6 +7,7 @@
  */
 import { REVEAL, architectural, compound, firstClause, levelOf, nextLevel, ordered, passed, sittings, type LadderRecord, type Verdict } from './ladder';
 import { quizPriority, type UnitScore } from './scoring';
+import type { ReviewState } from './review';
 import type { SpecUnit } from './specs';
 
 export interface Question {
@@ -36,7 +37,8 @@ export interface EvidenceRow extends LadderRecord {
   question: string;
   revealed: boolean;
   forced: boolean;
-  data: { variants?: string[]; reference?: string; evidence?: string[] };
+  /** The question's other phrasings, its reference and cited files; the review state after this answer (review.ts). */
+  data: { variants?: string[]; reference?: string; evidence?: string[]; review?: ReviewState };
 }
 
 export interface Answered extends Question {
