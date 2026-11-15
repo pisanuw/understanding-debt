@@ -1,0 +1,47 @@
+{
+ "format": "udebt-samples",
+ "version": 1,
+ "comment": "Written by `python -m udebt.hosted.static_samples`; do not edit by hand.",
+ "samples": [
+  {
+   "name": "huggingface_hub",
+   "url": "https://github.com/huggingface/huggingface_hub",
+   "license": "Apache-2.0",
+   "sha": "2c61ae8c11eedb1b79e262dd9eb5e68962cac063",
+   "analysis": "huggingface_hub.json",
+   "quizzes": null,
+   "units": 18,
+   "questions": null
+  },
+  {
+   "name": "sentry-javascript",
+   "url": "https://github.com/getsentry/sentry-javascript",
+   "license": "MIT",
+   "sha": "6bee2f2ccccdac123199d1b610c70a3bad5c8194",
+   "analysis": "sentry-javascript.json",
+   "quizzes": null,
+   "units": 15,
+   "questions": null
+  },
+  {
+   "name": "mlflow",
+   "url": "https://github.com/mlflow/mlflow",
+   "license": "Apache-2.0",
+   "sha": "f6ff35427d7e1134a83f8f9d8215d0049149162f",
+   "analysis": "mlflow.json",
+   "quizzes": null,
+   "units": 30,
+   "questions": null
+  },
+  {
+   "name": "understanding-debt",
+   "url": "https://github.com/pisanuw/understanding-debt",
+   "license": null,
+   "sha": "e9c1c8c5754f8f4e9061e4d0316c060bd8d1b788",
+   "analysis": "understanding-debt.json",
+   "quizzes": null,
+   "units": 19,
+   "questions": null
+  }
+ ]
+}

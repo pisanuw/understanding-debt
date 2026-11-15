@@ -1,0 +1,2756 @@
+{
+ "format": "udebt-advance-quizzes",
+ "version": 1,
+ "repo": "https://github.com/pisanuw/digitalme",
+ "name": "digitalme",
+ "sha": "f93102b121f1da9055c148e8eccde275ccf18236",
+ "generated_at": "2026-11-15T12:08:50+00:00",
+ "levels": [
+  1,
+  2,
+  3
+ ],
+ "per": 3,
+ "calls": 9,
+ "questions": [
+  {
+   "unit_id": "chat-flow",
+   "level": 1,
+   "question": "What job does Chat request lifecycle (SSE) do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need Chat request lifecycle (SSE)?",
+    "What would a user notice first if Chat request lifecycle (SSE) stopped working?"
+   ],
+   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "evidence": [
+    "frontend/src/App.jsx",
+    "backend/main.py"
+   ],
+   "orientation": {
+    "purpose": "Handles each chat message: it streams the persona's Claude reply to the browser as it is generated, running safety checks before and after, and saves the exchange.",
+    "decision": "One async FastAPI endpoint streams Server-Sent Events from the async Anthropic client. A cheap Haiku hostile pre-check runs first, then retrieval and model choice, then a hard sentence cap. Guardrail and follow-up calls run concurrently after the stream. WebSockets, a blocking request and a worker queue were not chosen; the goals were low latency and a free event loop.",
+    "where": [
+     {
+      "path": "backend/main.py",
+      "what": "the chat endpoint and its event stream"
+     },
+     {
+      "path": "backend/sentences.py",
+      "what": "sentence capping of the reply"
+     },
+     {
+      "path": "frontend/src/sse.js",
+      "what": "client-side stream parsing"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan wrote the first streaming version alone [human] in May 2026, reworked it with an AI co-author [assisted] in June, and hardened it alone [human] in July."
+   }
+  },
+  {
+   "unit_id": "chat-flow",
+   "level": 1,
+   "question": "Why does the rest of the system need Chat request lifecycle (SSE)?",
+   "variants": [
+    "What job does Chat request lifecycle (SSE) do for the rest of the system?",
+    "What would a user notice first if Chat request lifecycle (SSE) stopped working?"
+   ],
+   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "evidence": [
+    "frontend/src/App.jsx",
+    "backend/main.py"
+   ],
+   "orientation": {
+    "purpose": "Handles each chat message: it streams the persona's Claude reply to the browser as it is generated, running safety checks before and after, and saves the exchange.",
+    "decision": "One async FastAPI endpoint streams Server-Sent Events from the async Anthropic client. A cheap Haiku hostile pre-check runs first, then retrieval and model choice, then a hard sentence cap. Guardrail and follow-up calls run concurrently after the stream. WebSockets, a blocking request and a worker queue were not chosen; the goals were low latency and a free event loop.",
+    "where": [
+     {
+      "path": "backend/main.py",
+      "what": "the chat endpoint and its event stream"
+     },
+     {
+      "path": "backend/sentences.py",
+      "what": "sentence capping of the reply"
+     },
+     {
+      "path": "frontend/src/sse.js",
+      "what": "client-side stream parsing"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan wrote the first streaming version alone [human] in May 2026, reworked it with an AI co-author [assisted] in June, and hardened it alone [human] in July."
+   }
+  },
+  {
+   "unit_id": "chat-flow",
+   "level": 1,
+   "question": "What would a user notice first if Chat request lifecycle (SSE) stopped working?",
+   "variants": [
+    "What job does Chat request lifecycle (SSE) do for the rest of the system?",
+    "Why does the rest of the system need Chat request lifecycle (SSE)?"
+   ],
+   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "evidence": [
+    "frontend/src/App.jsx",
+    "backend/main.py"
+   ],
+   "orientation": {
+    "purpose": "Handles each chat message: it streams the persona's Claude reply to the browser as it is generated, running safety checks before and after, and saves the exchange.",
+    "decision": "One async FastAPI endpoint streams Server-Sent Events from the async Anthropic client. A cheap Haiku hostile pre-check runs first, then retrieval and model choice, then a hard sentence cap. Guardrail and follow-up calls run concurrently after the stream. WebSockets, a blocking request and a worker queue were not chosen; the goals were low latency and a free event loop.",
+    "where": [
+     {
+      "path": "backend/main.py",
+      "what": "the chat endpoint and its event stream"
+     },
+     {
+      "path": "backend/sentences.py",
+      "what": "sentence capping of the reply"
+     },
+     {
+      "path": "frontend/src/sse.js",
+      "what": "client-side stream parsing"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan wrote the first streaming version alone [human] in May 2026, reworked it with an AI co-author [assisted] in June, and hardened it alone [human] in July."
+   }
+  },
+  {
+   "unit_id": "chat-flow",
+   "level": 2,
+   "question": "What was chosen for Chat request lifecycle (SSE)?",
+   "variants": [
+    "Which alternative did Chat request lifecycle (SSE) turn down?",
+    "What constraint shaped Chat request lifecycle (SSE)?"
+   ],
+   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "evidence": [
+    "frontend/src/App.jsx",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "chat-flow",
+   "level": 2,
+   "question": "Which alternative did Chat request lifecycle (SSE) turn down?",
+   "variants": [
+    "What was chosen for Chat request lifecycle (SSE)?",
+    "What constraint shaped Chat request lifecycle (SSE)?"
+   ],
+   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "evidence": [
+    "frontend/src/App.jsx",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "chat-flow",
+   "level": 2,
+   "question": "What constraint shaped Chat request lifecycle (SSE)?",
+   "variants": [
+    "What was chosen for Chat request lifecycle (SSE)?",
+    "Which alternative did Chat request lifecycle (SSE) turn down?"
+   ],
+   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "evidence": [
+    "frontend/src/App.jsx",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "chat-flow",
+   "level": 3,
+   "question": "If the decision behind Chat request lifecycle (SSE) were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if Chat request lifecycle (SSE) changed its approach?",
+    "Which part depends most on the choice in Chat request lifecycle (SSE)?"
+   ],
+   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "evidence": [
+    "frontend/src/App.jsx",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "chat-flow",
+   "level": 3,
+   "question": "What breaks elsewhere if Chat request lifecycle (SSE) changed its approach?",
+   "variants": [
+    "If the decision behind Chat request lifecycle (SSE) were reversed, what else would have to change first?",
+    "Which part depends most on the choice in Chat request lifecycle (SSE)?"
+   ],
+   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "evidence": [
+    "frontend/src/App.jsx",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "chat-flow",
+   "level": 3,
+   "question": "Which part depends most on the choice in Chat request lifecycle (SSE)?",
+   "variants": [
+    "If the decision behind Chat request lifecycle (SSE) were reversed, what else would have to change first?",
+    "What breaks elsewhere if Chat request lifecycle (SSE) changed its approach?"
+   ],
+   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "evidence": [
+    "frontend/src/App.jsx",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval",
+   "level": 1,
+   "question": "What job does Persona prompt and retrieval modes do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need Persona prompt and retrieval modes?",
+    "What would a user notice first if Persona prompt and retrieval modes stopped working?"
+   ],
+   "reference_answer": "It builds the system prompt from persona markdown files and tone controls, and selects context via six retrieval modes.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/cascading.py"
+   ],
+   "orientation": {
+    "purpose": "Builds the system prompt from the persona markdown files and tone settings, and chooses how much persona context each request gets.",
+    "decision": "Persona knowledge is plain markdown in the repo, so it stays editable through git. Six retrieval modes are selectable at runtime: full, distilled, TF-IDF, Voyage embeddings, Haiku router and cascading. Cascading is the default, and a DB setting overrides env, which overrides the code default. Fine-tuning, one fixed full prompt and a vector DB service were not chosen; the full persona costs about 40K tokens per call.",
+    "where": [
+     {
+      "path": "persona",
+      "what": "the persona markdown source files"
+     },
+     {
+      "path": "backend/persona.py",
+      "what": "system prompt assembly"
+     },
+     {
+      "path": "backend/cascading.py",
+      "what": "default cascading retrieval mode"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan added the persona files alone [human] in May 2026, then built the retrieval modes and the June refactor with an AI co-author [assisted]."
+   }
+  },
+  {
+   "unit_id": "persona-retrieval",
+   "level": 1,
+   "question": "Why does the rest of the system need Persona prompt and retrieval modes?",
+   "variants": [
+    "What job does Persona prompt and retrieval modes do for the rest of the system?",
+    "What would a user notice first if Persona prompt and retrieval modes stopped working?"
+   ],
+   "reference_answer": "It builds the system prompt from persona markdown files and tone controls, and selects context via six retrieval modes.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/cascading.py"
+   ],
+   "orientation": {
+    "purpose": "Builds the system prompt from the persona markdown files and tone settings, and chooses how much persona context each request gets.",
+    "decision": "Persona knowledge is plain markdown in the repo, so it stays editable through git. Six retrieval modes are selectable at runtime: full, distilled, TF-IDF, Voyage embeddings, Haiku router and cascading. Cascading is the default, and a DB setting overrides env, which overrides the code default. Fine-tuning, one fixed full prompt and a vector DB service were not chosen; the full persona costs about 40K tokens per call.",
+    "where": [
+     {
+      "path": "persona",
+      "what": "the persona markdown source files"
+     },
+     {
+      "path": "backend/persona.py",
+      "what": "system prompt assembly"
+     },
+     {
+      "path": "backend/cascading.py",
+      "what": "default cascading retrieval mode"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan added the persona files alone [human] in May 2026, then built the retrieval modes and the June refactor with an AI co-author [assisted]."
+   }
+  },
+  {
+   "unit_id": "persona-retrieval",
+   "level": 1,
+   "question": "What would a user notice first if Persona prompt and retrieval modes stopped working?",
+   "variants": [
+    "What job does Persona prompt and retrieval modes do for the rest of the system?",
+    "Why does the rest of the system need Persona prompt and retrieval modes?"
+   ],
+   "reference_answer": "It builds the system prompt from persona markdown files and tone controls, and selects context via six retrieval modes.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/cascading.py"
+   ],
+   "orientation": {
+    "purpose": "Builds the system prompt from the persona markdown files and tone settings, and chooses how much persona context each request gets.",
+    "decision": "Persona knowledge is plain markdown in the repo, so it stays editable through git. Six retrieval modes are selectable at runtime: full, distilled, TF-IDF, Voyage embeddings, Haiku router and cascading. Cascading is the default, and a DB setting overrides env, which overrides the code default. Fine-tuning, one fixed full prompt and a vector DB service were not chosen; the full persona costs about 40K tokens per call.",
+    "where": [
+     {
+      "path": "persona",
+      "what": "the persona markdown source files"
+     },
+     {
+      "path": "backend/persona.py",
+      "what": "system prompt assembly"
+     },
+     {
+      "path": "backend/cascading.py",
+      "what": "default cascading retrieval mode"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan added the persona files alone [human] in May 2026, then built the retrieval modes and the June refactor with an AI co-author [assisted]."
+   }
+  },
+  {
+   "unit_id": "persona-retrieval",
+   "level": 2,
+   "question": "What was chosen for Persona prompt and retrieval modes?",
+   "variants": [
+    "Which alternative did Persona prompt and retrieval modes turn down?",
+    "What constraint shaped Persona prompt and retrieval modes?"
+   ],
+   "reference_answer": "It builds the system prompt from persona markdown files and tone controls, and selects context via six retrieval modes.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/cascading.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval",
+   "level": 2,
+   "question": "Which alternative did Persona prompt and retrieval modes turn down?",
+   "variants": [
+    "What was chosen for Persona prompt and retrieval modes?",
+    "What constraint shaped Persona prompt and retrieval modes?"
+   ],
+   "reference_answer": "It builds the system prompt from persona markdown files and tone controls, and selects context via six retrieval modes.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/cascading.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval",
+   "level": 2,
+   "question": "What constraint shaped Persona prompt and retrieval modes?",
+   "variants": [
+    "What was chosen for Persona prompt and retrieval modes?",
+    "Which alternative did Persona prompt and retrieval modes turn down?"
+   ],
+   "reference_answer": "It builds the system prompt from persona markdown files and tone controls, and selects context via six retrieval modes.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/cascading.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval",
+   "level": 3,
+   "question": "If the decision behind Persona prompt and retrieval modes were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if Persona prompt and retrieval modes changed its approach?",
+    "Which part depends most on the choice in Persona prompt and retrieval modes?"
+   ],
+   "reference_answer": "It builds the system prompt from persona markdown files and tone controls, and selects context via six retrieval modes.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/cascading.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval",
+   "level": 3,
+   "question": "What breaks elsewhere if Persona prompt and retrieval modes changed its approach?",
+   "variants": [
+    "If the decision behind Persona prompt and retrieval modes were reversed, what else would have to change first?",
+    "Which part depends most on the choice in Persona prompt and retrieval modes?"
+   ],
+   "reference_answer": "It builds the system prompt from persona markdown files and tone controls, and selects context via six retrieval modes.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/cascading.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval",
+   "level": 3,
+   "question": "Which part depends most on the choice in Persona prompt and retrieval modes?",
+   "variants": [
+    "If the decision behind Persona prompt and retrieval modes were reversed, what else would have to change first?",
+    "What breaks elsewhere if Persona prompt and retrieval modes changed its approach?"
+   ],
+   "reference_answer": "It builds the system prompt from persona markdown files and tone controls, and selects context via six retrieval modes.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/cascading.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/prompt-builder",
+   "level": 1,
+   "question": "What job does Prompt builder and file registry do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need Prompt builder and file registry?",
+    "What would a user notice first if Prompt builder and file registry stopped working?"
+   ],
+   "reference_answer": "It assembles the system prompt from persona files and tone sliders.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/persona_files.py"
+   ],
+   "orientation": {
+    "purpose": "Assembles the system prompt from persona files and tone sliders.",
+    "decision": "Canonical file registry feeds both prompt builder and RAG. Not chosen: Hard-coded prompts in code. Why: One source of truth for persona files.",
+    "where": [
+     {
+      "path": "backend/persona.py",
+      "what": ""
+     },
+     {
+      "path": "backend/persona_files.py",
+      "what": ""
+     },
+     {
+      "path": "backend/paths.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "persona-retrieval/prompt-builder",
+   "level": 1,
+   "question": "Why does the rest of the system need Prompt builder and file registry?",
+   "variants": [
+    "What job does Prompt builder and file registry do for the rest of the system?",
+    "What would a user notice first if Prompt builder and file registry stopped working?"
+   ],
+   "reference_answer": "It assembles the system prompt from persona files and tone sliders.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/persona_files.py"
+   ],
+   "orientation": {
+    "purpose": "Assembles the system prompt from persona files and tone sliders.",
+    "decision": "Canonical file registry feeds both prompt builder and RAG. Not chosen: Hard-coded prompts in code. Why: One source of truth for persona files.",
+    "where": [
+     {
+      "path": "backend/persona.py",
+      "what": ""
+     },
+     {
+      "path": "backend/persona_files.py",
+      "what": ""
+     },
+     {
+      "path": "backend/paths.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "persona-retrieval/prompt-builder",
+   "level": 1,
+   "question": "What would a user notice first if Prompt builder and file registry stopped working?",
+   "variants": [
+    "What job does Prompt builder and file registry do for the rest of the system?",
+    "Why does the rest of the system need Prompt builder and file registry?"
+   ],
+   "reference_answer": "It assembles the system prompt from persona files and tone sliders.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/persona_files.py"
+   ],
+   "orientation": {
+    "purpose": "Assembles the system prompt from persona files and tone sliders.",
+    "decision": "Canonical file registry feeds both prompt builder and RAG. Not chosen: Hard-coded prompts in code. Why: One source of truth for persona files.",
+    "where": [
+     {
+      "path": "backend/persona.py",
+      "what": ""
+     },
+     {
+      "path": "backend/persona_files.py",
+      "what": ""
+     },
+     {
+      "path": "backend/paths.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "persona-retrieval/prompt-builder",
+   "level": 2,
+   "question": "What was chosen for Prompt builder and file registry?",
+   "variants": [
+    "Which alternative did Prompt builder and file registry turn down?",
+    "What constraint shaped Prompt builder and file registry?"
+   ],
+   "reference_answer": "It assembles the system prompt from persona files and tone sliders.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/persona_files.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/prompt-builder",
+   "level": 2,
+   "question": "Which alternative did Prompt builder and file registry turn down?",
+   "variants": [
+    "What was chosen for Prompt builder and file registry?",
+    "What constraint shaped Prompt builder and file registry?"
+   ],
+   "reference_answer": "It assembles the system prompt from persona files and tone sliders.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/persona_files.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/prompt-builder",
+   "level": 2,
+   "question": "What constraint shaped Prompt builder and file registry?",
+   "variants": [
+    "What was chosen for Prompt builder and file registry?",
+    "Which alternative did Prompt builder and file registry turn down?"
+   ],
+   "reference_answer": "It assembles the system prompt from persona files and tone sliders.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/persona_files.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/prompt-builder",
+   "level": 3,
+   "question": "If the decision behind Prompt builder and file registry were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if Prompt builder and file registry changed its approach?",
+    "Which part depends most on the choice in Prompt builder and file registry?"
+   ],
+   "reference_answer": "It assembles the system prompt from persona files and tone sliders.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/persona_files.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/prompt-builder",
+   "level": 3,
+   "question": "What breaks elsewhere if Prompt builder and file registry changed its approach?",
+   "variants": [
+    "If the decision behind Prompt builder and file registry were reversed, what else would have to change first?",
+    "Which part depends most on the choice in Prompt builder and file registry?"
+   ],
+   "reference_answer": "It assembles the system prompt from persona files and tone sliders.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/persona_files.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/prompt-builder",
+   "level": 3,
+   "question": "Which part depends most on the choice in Prompt builder and file registry?",
+   "variants": [
+    "If the decision behind Prompt builder and file registry were reversed, what else would have to change first?",
+    "What breaks elsewhere if Prompt builder and file registry changed its approach?"
+   ],
+   "reference_answer": "It assembles the system prompt from persona files and tone sliders.",
+   "evidence": [
+    "backend/persona.py",
+    "backend/persona_files.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/router-cascade",
+   "level": 1,
+   "question": "What job does Router and cascading tiers do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need Router and cascading tiers?",
+    "What would a user notice first if Router and cascading tiers stopped working?"
+   ],
+   "reference_answer": "It haiku classifies topic or complexity to pick the cheapest context tier and model.",
+   "evidence": [
+    "backend/cascading.py",
+    "backend/router.py"
+   ],
+   "orientation": {
+    "purpose": "Haiku classifies topic or complexity to pick the cheapest context tier and model.",
+    "decision": "LLM-based classification chooses the context and model per query. Not chosen: Always use the full context; heuristic rules. Why: Cost reduction (default changed to cascading for cost).",
+    "where": [
+     {
+      "path": "backend/router.py",
+      "what": ""
+     },
+     {
+      "path": "backend/cascading.py",
+      "what": ""
+     },
+     {
+      "path": "backend/models.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "persona-retrieval/router-cascade",
+   "level": 1,
+   "question": "Why does the rest of the system need Router and cascading tiers?",
+   "variants": [
+    "What job does Router and cascading tiers do for the rest of the system?",
+    "What would a user notice first if Router and cascading tiers stopped working?"
+   ],
+   "reference_answer": "It haiku classifies topic or complexity to pick the cheapest context tier and model.",
+   "evidence": [
+    "backend/cascading.py",
+    "backend/router.py"
+   ],
+   "orientation": {
+    "purpose": "Haiku classifies topic or complexity to pick the cheapest context tier and model.",
+    "decision": "LLM-based classification chooses the context and model per query. Not chosen: Always use the full context; heuristic rules. Why: Cost reduction (default changed to cascading for cost).",
+    "where": [
+     {
+      "path": "backend/router.py",
+      "what": ""
+     },
+     {
+      "path": "backend/cascading.py",
+      "what": ""
+     },
+     {
+      "path": "backend/models.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "persona-retrieval/router-cascade",
+   "level": 1,
+   "question": "What would a user notice first if Router and cascading tiers stopped working?",
+   "variants": [
+    "What job does Router and cascading tiers do for the rest of the system?",
+    "Why does the rest of the system need Router and cascading tiers?"
+   ],
+   "reference_answer": "It haiku classifies topic or complexity to pick the cheapest context tier and model.",
+   "evidence": [
+    "backend/cascading.py",
+    "backend/router.py"
+   ],
+   "orientation": {
+    "purpose": "Haiku classifies topic or complexity to pick the cheapest context tier and model.",
+    "decision": "LLM-based classification chooses the context and model per query. Not chosen: Always use the full context; heuristic rules. Why: Cost reduction (default changed to cascading for cost).",
+    "where": [
+     {
+      "path": "backend/router.py",
+      "what": ""
+     },
+     {
+      "path": "backend/cascading.py",
+      "what": ""
+     },
+     {
+      "path": "backend/models.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "persona-retrieval/router-cascade",
+   "level": 2,
+   "question": "What was chosen for Router and cascading tiers?",
+   "variants": [
+    "Which alternative did Router and cascading tiers turn down?",
+    "What constraint shaped Router and cascading tiers?"
+   ],
+   "reference_answer": "It haiku classifies topic or complexity to pick the cheapest context tier and model.",
+   "evidence": [
+    "backend/cascading.py",
+    "backend/router.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/router-cascade",
+   "level": 2,
+   "question": "Which alternative did Router and cascading tiers turn down?",
+   "variants": [
+    "What was chosen for Router and cascading tiers?",
+    "What constraint shaped Router and cascading tiers?"
+   ],
+   "reference_answer": "It haiku classifies topic or complexity to pick the cheapest context tier and model.",
+   "evidence": [
+    "backend/cascading.py",
+    "backend/router.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/router-cascade",
+   "level": 2,
+   "question": "What constraint shaped Router and cascading tiers?",
+   "variants": [
+    "What was chosen for Router and cascading tiers?",
+    "Which alternative did Router and cascading tiers turn down?"
+   ],
+   "reference_answer": "It haiku classifies topic or complexity to pick the cheapest context tier and model.",
+   "evidence": [
+    "backend/cascading.py",
+    "backend/router.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/router-cascade",
+   "level": 3,
+   "question": "If the decision behind Router and cascading tiers were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if Router and cascading tiers changed its approach?",
+    "Which part depends most on the choice in Router and cascading tiers?"
+   ],
+   "reference_answer": "It haiku classifies topic or complexity to pick the cheapest context tier and model.",
+   "evidence": [
+    "backend/cascading.py",
+    "backend/router.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/router-cascade",
+   "level": 3,
+   "question": "What breaks elsewhere if Router and cascading tiers changed its approach?",
+   "variants": [
+    "If the decision behind Router and cascading tiers were reversed, what else would have to change first?",
+    "Which part depends most on the choice in Router and cascading tiers?"
+   ],
+   "reference_answer": "It haiku classifies topic or complexity to pick the cheapest context tier and model.",
+   "evidence": [
+    "backend/cascading.py",
+    "backend/router.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/router-cascade",
+   "level": 3,
+   "question": "Which part depends most on the choice in Router and cascading tiers?",
+   "variants": [
+    "If the decision behind Router and cascading tiers were reversed, what else would have to change first?",
+    "What breaks elsewhere if Router and cascading tiers changed its approach?"
+   ],
+   "reference_answer": "It haiku classifies topic or complexity to pick the cheapest context tier and model.",
+   "evidence": [
+    "backend/cascading.py",
+    "backend/router.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/rag",
+   "level": 1,
+   "question": "What job does TF-IDF and embedding RAG do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need TF-IDF and embedding RAG?",
+    "What would a user notice first if TF-IDF and embedding RAG stopped working?"
+   ],
+   "reference_answer": "It chunks persona files and retrieves relevant chunks.",
+   "evidence": [
+    "backend/rag.py",
+    "backend/rag_embed.py"
+   ],
+   "orientation": {
+    "purpose": "Chunks persona files and retrieves relevant chunks.",
+    "decision": "TF-IDF index rebuilt at startup, with optional Voyage embeddings. Not chosen: Hosted vector DB. Why: Zero-infra default; the index rebuilds on redeploy.",
+    "where": [
+     {
+      "path": "backend/rag.py",
+      "what": ""
+     },
+     {
+      "path": "backend/rag_embed.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "persona-retrieval/rag",
+   "level": 1,
+   "question": "Why does the rest of the system need TF-IDF and embedding RAG?",
+   "variants": [
+    "What job does TF-IDF and embedding RAG do for the rest of the system?",
+    "What would a user notice first if TF-IDF and embedding RAG stopped working?"
+   ],
+   "reference_answer": "It chunks persona files and retrieves relevant chunks.",
+   "evidence": [
+    "backend/rag.py",
+    "backend/rag_embed.py"
+   ],
+   "orientation": {
+    "purpose": "Chunks persona files and retrieves relevant chunks.",
+    "decision": "TF-IDF index rebuilt at startup, with optional Voyage embeddings. Not chosen: Hosted vector DB. Why: Zero-infra default; the index rebuilds on redeploy.",
+    "where": [
+     {
+      "path": "backend/rag.py",
+      "what": ""
+     },
+     {
+      "path": "backend/rag_embed.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "persona-retrieval/rag",
+   "level": 1,
+   "question": "What would a user notice first if TF-IDF and embedding RAG stopped working?",
+   "variants": [
+    "What job does TF-IDF and embedding RAG do for the rest of the system?",
+    "Why does the rest of the system need TF-IDF and embedding RAG?"
+   ],
+   "reference_answer": "It chunks persona files and retrieves relevant chunks.",
+   "evidence": [
+    "backend/rag.py",
+    "backend/rag_embed.py"
+   ],
+   "orientation": {
+    "purpose": "Chunks persona files and retrieves relevant chunks.",
+    "decision": "TF-IDF index rebuilt at startup, with optional Voyage embeddings. Not chosen: Hosted vector DB. Why: Zero-infra default; the index rebuilds on redeploy.",
+    "where": [
+     {
+      "path": "backend/rag.py",
+      "what": ""
+     },
+     {
+      "path": "backend/rag_embed.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "The history list does not say.",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "persona-retrieval/rag",
+   "level": 2,
+   "question": "What was chosen for TF-IDF and embedding RAG?",
+   "variants": [
+    "Which alternative did TF-IDF and embedding RAG turn down?",
+    "What constraint shaped TF-IDF and embedding RAG?"
+   ],
+   "reference_answer": "It chunks persona files and retrieves relevant chunks.",
+   "evidence": [
+    "backend/rag.py",
+    "backend/rag_embed.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/rag",
+   "level": 2,
+   "question": "Which alternative did TF-IDF and embedding RAG turn down?",
+   "variants": [
+    "What was chosen for TF-IDF and embedding RAG?",
+    "What constraint shaped TF-IDF and embedding RAG?"
+   ],
+   "reference_answer": "It chunks persona files and retrieves relevant chunks.",
+   "evidence": [
+    "backend/rag.py",
+    "backend/rag_embed.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/rag",
+   "level": 2,
+   "question": "What constraint shaped TF-IDF and embedding RAG?",
+   "variants": [
+    "What was chosen for TF-IDF and embedding RAG?",
+    "Which alternative did TF-IDF and embedding RAG turn down?"
+   ],
+   "reference_answer": "It chunks persona files and retrieves relevant chunks.",
+   "evidence": [
+    "backend/rag.py",
+    "backend/rag_embed.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/rag",
+   "level": 3,
+   "question": "If the decision behind TF-IDF and embedding RAG were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if TF-IDF and embedding RAG changed its approach?",
+    "Which part depends most on the choice in TF-IDF and embedding RAG?"
+   ],
+   "reference_answer": "It chunks persona files and retrieves relevant chunks.",
+   "evidence": [
+    "backend/rag.py",
+    "backend/rag_embed.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/rag",
+   "level": 3,
+   "question": "What breaks elsewhere if TF-IDF and embedding RAG changed its approach?",
+   "variants": [
+    "If the decision behind TF-IDF and embedding RAG were reversed, what else would have to change first?",
+    "Which part depends most on the choice in TF-IDF and embedding RAG?"
+   ],
+   "reference_answer": "It chunks persona files and retrieves relevant chunks.",
+   "evidence": [
+    "backend/rag.py",
+    "backend/rag_embed.py"
+   ]
+  },
+  {
+   "unit_id": "persona-retrieval/rag",
+   "level": 3,
+   "question": "Which part depends most on the choice in TF-IDF and embedding RAG?",
+   "variants": [
+    "If the decision behind TF-IDF and embedding RAG were reversed, what else would have to change first?",
+    "What breaks elsewhere if TF-IDF and embedding RAG changed its approach?"
+   ],
+   "reference_answer": "It chunks persona files and retrieves relevant chunks.",
+   "evidence": [
+    "backend/rag.py",
+    "backend/rag_embed.py"
+   ]
+  },
+  {
+   "unit_id": "analytics-persistence",
+   "level": 1,
+   "question": "What job does SQLite persistence (analytics.db) and backup do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need SQLite persistence (analytics.db) and backup?",
+    "What would a user notice first if SQLite persistence (analytics.db) and backup stopped working?"
+   ],
+   "reference_answer": "It one SQLite DB on the Render persistent disk stores conversations, users and roles, bans, feedback, proposals, usage and settings.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/backup.py"
+   ],
+   "orientation": {
+    "purpose": "One SQLite DB on the Render persistent disk stores conversations, users and roles, bans, feedback, proposals, usage and settings.",
+    "decision": "Single-file SQLite with migrations in code (analytics.py, about 1.9K lines) is the system of record. Chat context is rebuilt from it by session_id. A daily gzip snapshot goes to a private GitHub repo via the Contents API. Not chosen: Postgres; managed DB; the browser or cookies for session state. Why: Simple and cheap for one owner; survives redeploys on a persistent disk. The backup guards against disk loss.",
+    "where": [
+     {
+      "path": "backend/analytics.py",
+      "what": ""
+     },
+     {
+      "path": "backend/backup.py",
+      "what": ""
+     },
+     {
+      "path": "scripts/backup_db.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [human].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "analytics-persistence",
+   "level": 1,
+   "question": "Why does the rest of the system need SQLite persistence (analytics.db) and backup?",
+   "variants": [
+    "What job does SQLite persistence (analytics.db) and backup do for the rest of the system?",
+    "What would a user notice first if SQLite persistence (analytics.db) and backup stopped working?"
+   ],
+   "reference_answer": "It one SQLite DB on the Render persistent disk stores conversations, users and roles, bans, feedback, proposals, usage and settings.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/backup.py"
+   ],
+   "orientation": {
+    "purpose": "One SQLite DB on the Render persistent disk stores conversations, users and roles, bans, feedback, proposals, usage and settings.",
+    "decision": "Single-file SQLite with migrations in code (analytics.py, about 1.9K lines) is the system of record. Chat context is rebuilt from it by session_id. A daily gzip snapshot goes to a private GitHub repo via the Contents API. Not chosen: Postgres; managed DB; the browser or cookies for session state. Why: Simple and cheap for one owner; survives redeploys on a persistent disk. The backup guards against disk loss.",
+    "where": [
+     {
+      "path": "backend/analytics.py",
+      "what": ""
+     },
+     {
+      "path": "backend/backup.py",
+      "what": ""
+     },
+     {
+      "path": "scripts/backup_db.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [human].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "analytics-persistence",
+   "level": 1,
+   "question": "What would a user notice first if SQLite persistence (analytics.db) and backup stopped working?",
+   "variants": [
+    "What job does SQLite persistence (analytics.db) and backup do for the rest of the system?",
+    "Why does the rest of the system need SQLite persistence (analytics.db) and backup?"
+   ],
+   "reference_answer": "It one SQLite DB on the Render persistent disk stores conversations, users and roles, bans, feedback, proposals, usage and settings.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/backup.py"
+   ],
+   "orientation": {
+    "purpose": "One SQLite DB on the Render persistent disk stores conversations, users and roles, bans, feedback, proposals, usage and settings.",
+    "decision": "Single-file SQLite with migrations in code (analytics.py, about 1.9K lines) is the system of record. Chat context is rebuilt from it by session_id. A daily gzip snapshot goes to a private GitHub repo via the Contents API. Not chosen: Postgres; managed DB; the browser or cookies for session state. Why: Simple and cheap for one owner; survives redeploys on a persistent disk. The backup guards against disk loss.",
+    "where": [
+     {
+      "path": "backend/analytics.py",
+      "what": ""
+     },
+     {
+      "path": "backend/backup.py",
+      "what": ""
+     },
+     {
+      "path": "scripts/backup_db.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [human].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "analytics-persistence",
+   "level": 2,
+   "question": "What was chosen for SQLite persistence (analytics.db) and backup?",
+   "variants": [
+    "Which alternative did SQLite persistence (analytics.db) and backup turn down?",
+    "What constraint shaped SQLite persistence (analytics.db) and backup?"
+   ],
+   "reference_answer": "It one SQLite DB on the Render persistent disk stores conversations, users and roles, bans, feedback, proposals, usage and settings.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/backup.py"
+   ]
+  },
+  {
+   "unit_id": "analytics-persistence",
+   "level": 2,
+   "question": "Which alternative did SQLite persistence (analytics.db) and backup turn down?",
+   "variants": [
+    "What was chosen for SQLite persistence (analytics.db) and backup?",
+    "What constraint shaped SQLite persistence (analytics.db) and backup?"
+   ],
+   "reference_answer": "It one SQLite DB on the Render persistent disk stores conversations, users and roles, bans, feedback, proposals, usage and settings.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/backup.py"
+   ]
+  },
+  {
+   "unit_id": "analytics-persistence",
+   "level": 2,
+   "question": "What constraint shaped SQLite persistence (analytics.db) and backup?",
+   "variants": [
+    "What was chosen for SQLite persistence (analytics.db) and backup?",
+    "Which alternative did SQLite persistence (analytics.db) and backup turn down?"
+   ],
+   "reference_answer": "It one SQLite DB on the Render persistent disk stores conversations, users and roles, bans, feedback, proposals, usage and settings.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/backup.py"
+   ]
+  },
+  {
+   "unit_id": "analytics-persistence",
+   "level": 3,
+   "question": "If the decision behind SQLite persistence (analytics.db) and backup were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if SQLite persistence (analytics.db) and backup changed its approach?",
+    "Which part depends most on the choice in SQLite persistence (analytics.db) and backup?"
+   ],
+   "reference_answer": "It one SQLite DB on the Render persistent disk stores conversations, users and roles, bans, feedback, proposals, usage and settings.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/backup.py"
+   ]
+  },
+  {
+   "unit_id": "analytics-persistence",
+   "level": 3,
+   "question": "What breaks elsewhere if SQLite persistence (analytics.db) and backup changed its approach?",
+   "variants": [
+    "If the decision behind SQLite persistence (analytics.db) and backup were reversed, what else would have to change first?",
+    "Which part depends most on the choice in SQLite persistence (analytics.db) and backup?"
+   ],
+   "reference_answer": "It one SQLite DB on the Render persistent disk stores conversations, users and roles, bans, feedback, proposals, usage and settings.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/backup.py"
+   ]
+  },
+  {
+   "unit_id": "analytics-persistence",
+   "level": 3,
+   "question": "Which part depends most on the choice in SQLite persistence (analytics.db) and backup?",
+   "variants": [
+    "If the decision behind SQLite persistence (analytics.db) and backup were reversed, what else would have to change first?",
+    "What breaks elsewhere if SQLite persistence (analytics.db) and backup changed its approach?"
+   ],
+   "reference_answer": "It one SQLite DB on the Render persistent disk stores conversations, users and roles, bans, feedback, proposals, usage and settings.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/backup.py"
+   ]
+  },
+  {
+   "unit_id": "safety-guardrails",
+   "level": 1,
+   "question": "What job does Safety: hostile pre-check, guardrails, bans do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need Safety: hostile pre-check, guardrails, bans?",
+    "What would a user notice first if Safety: hostile pre-check, guardrails, bans stopped working?"
+   ],
+   "reference_answer": "It classifies each message and post-checks each reply, with persistent strikes and bans.",
+   "evidence": [
+    "backend/hostile.py",
+    "backend/guardrails.py"
+   ],
+   "orientation": {
+    "purpose": "Classifies each message and post-checks each reply, with persistent strikes and bans.",
+    "decision": "Haiku pre-check (hostile, manipulation, abusive) with 3-strike or 24h bans keyed by stable visitor identity and persisted to SQLite. A Haiku post-check fails closed. The sentence limit is enforced server-side. Not chosen: Prompt-only guardrails; IP-based bans; third-party moderation. Why: Prompt-only rules were evaded; bans must survive redeploys and IP changes. Fingerprinting was explicitly rejected for privacy.",
+    "where": [
+     {
+      "path": "backend/hostile.py",
+      "what": ""
+     },
+     {
+      "path": "backend/guardrails.py",
+      "what": ""
+     },
+     {
+      "path": "backend/visitor.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [assisted], Yusuf Pisan [human].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "safety-guardrails",
+   "level": 1,
+   "question": "Why does the rest of the system need Safety: hostile pre-check, guardrails, bans?",
+   "variants": [
+    "What job does Safety: hostile pre-check, guardrails, bans do for the rest of the system?",
+    "What would a user notice first if Safety: hostile pre-check, guardrails, bans stopped working?"
+   ],
+   "reference_answer": "It classifies each message and post-checks each reply, with persistent strikes and bans.",
+   "evidence": [
+    "backend/hostile.py",
+    "backend/guardrails.py"
+   ],
+   "orientation": {
+    "purpose": "Classifies each message and post-checks each reply, with persistent strikes and bans.",
+    "decision": "Haiku pre-check (hostile, manipulation, abusive) with 3-strike or 24h bans keyed by stable visitor identity and persisted to SQLite. A Haiku post-check fails closed. The sentence limit is enforced server-side. Not chosen: Prompt-only guardrails; IP-based bans; third-party moderation. Why: Prompt-only rules were evaded; bans must survive redeploys and IP changes. Fingerprinting was explicitly rejected for privacy.",
+    "where": [
+     {
+      "path": "backend/hostile.py",
+      "what": ""
+     },
+     {
+      "path": "backend/guardrails.py",
+      "what": ""
+     },
+     {
+      "path": "backend/visitor.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [assisted], Yusuf Pisan [human].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "safety-guardrails",
+   "level": 1,
+   "question": "What would a user notice first if Safety: hostile pre-check, guardrails, bans stopped working?",
+   "variants": [
+    "What job does Safety: hostile pre-check, guardrails, bans do for the rest of the system?",
+    "Why does the rest of the system need Safety: hostile pre-check, guardrails, bans?"
+   ],
+   "reference_answer": "It classifies each message and post-checks each reply, with persistent strikes and bans.",
+   "evidence": [
+    "backend/hostile.py",
+    "backend/guardrails.py"
+   ],
+   "orientation": {
+    "purpose": "Classifies each message and post-checks each reply, with persistent strikes and bans.",
+    "decision": "Haiku pre-check (hostile, manipulation, abusive) with 3-strike or 24h bans keyed by stable visitor identity and persisted to SQLite. A Haiku post-check fails closed. The sentence limit is enforced server-side. Not chosen: Prompt-only guardrails; IP-based bans; third-party moderation. Why: Prompt-only rules were evaded; bans must survive redeploys and IP changes. Fingerprinting was explicitly rejected for privacy.",
+    "where": [
+     {
+      "path": "backend/hostile.py",
+      "what": ""
+     },
+     {
+      "path": "backend/guardrails.py",
+      "what": ""
+     },
+     {
+      "path": "backend/visitor.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [assisted], Yusuf Pisan [human].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "safety-guardrails",
+   "level": 2,
+   "question": "What was chosen for Safety: hostile pre-check, guardrails, bans?",
+   "variants": [
+    "Which alternative did Safety: hostile pre-check, guardrails, bans turn down?",
+    "What constraint shaped Safety: hostile pre-check, guardrails, bans?"
+   ],
+   "reference_answer": "It classifies each message and post-checks each reply, with persistent strikes and bans.",
+   "evidence": [
+    "backend/hostile.py",
+    "backend/guardrails.py"
+   ]
+  },
+  {
+   "unit_id": "safety-guardrails",
+   "level": 2,
+   "question": "Which alternative did Safety: hostile pre-check, guardrails, bans turn down?",
+   "variants": [
+    "What was chosen for Safety: hostile pre-check, guardrails, bans?",
+    "What constraint shaped Safety: hostile pre-check, guardrails, bans?"
+   ],
+   "reference_answer": "It classifies each message and post-checks each reply, with persistent strikes and bans.",
+   "evidence": [
+    "backend/hostile.py",
+    "backend/guardrails.py"
+   ]
+  },
+  {
+   "unit_id": "safety-guardrails",
+   "level": 2,
+   "question": "What constraint shaped Safety: hostile pre-check, guardrails, bans?",
+   "variants": [
+    "What was chosen for Safety: hostile pre-check, guardrails, bans?",
+    "Which alternative did Safety: hostile pre-check, guardrails, bans turn down?"
+   ],
+   "reference_answer": "It classifies each message and post-checks each reply, with persistent strikes and bans.",
+   "evidence": [
+    "backend/hostile.py",
+    "backend/guardrails.py"
+   ]
+  },
+  {
+   "unit_id": "safety-guardrails",
+   "level": 3,
+   "question": "If the decision behind Safety: hostile pre-check, guardrails, bans were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if Safety: hostile pre-check, guardrails, bans changed its approach?",
+    "Which part depends most on the choice in Safety: hostile pre-check, guardrails, bans?"
+   ],
+   "reference_answer": "It classifies each message and post-checks each reply, with persistent strikes and bans.",
+   "evidence": [
+    "backend/hostile.py",
+    "backend/guardrails.py"
+   ]
+  },
+  {
+   "unit_id": "safety-guardrails",
+   "level": 3,
+   "question": "What breaks elsewhere if Safety: hostile pre-check, guardrails, bans changed its approach?",
+   "variants": [
+    "If the decision behind Safety: hostile pre-check, guardrails, bans were reversed, what else would have to change first?",
+    "Which part depends most on the choice in Safety: hostile pre-check, guardrails, bans?"
+   ],
+   "reference_answer": "It classifies each message and post-checks each reply, with persistent strikes and bans.",
+   "evidence": [
+    "backend/hostile.py",
+    "backend/guardrails.py"
+   ]
+  },
+  {
+   "unit_id": "safety-guardrails",
+   "level": 3,
+   "question": "Which part depends most on the choice in Safety: hostile pre-check, guardrails, bans?",
+   "variants": [
+    "If the decision behind Safety: hostile pre-check, guardrails, bans were reversed, what else would have to change first?",
+    "What breaks elsewhere if Safety: hostile pre-check, guardrails, bans changed its approach?"
+   ],
+   "reference_answer": "It classifies each message and post-checks each reply, with persistent strikes and bans.",
+   "evidence": [
+    "backend/hostile.py",
+    "backend/guardrails.py"
+   ]
+  },
+  {
+   "unit_id": "auth-rbac",
+   "level": 1,
+   "question": "What job does Auth and role-based access do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need Auth and role-based access?",
+    "What would a user notice first if Auth and role-based access stopped working?"
+   ],
+   "reference_answer": "It optional Google sign-in issues a JWT. Stackable roles map to capabilities that gate admin endpoints.",
+   "evidence": [
+    "backend/roles.py",
+    "backend/main.py"
+   ],
+   "orientation": {
+    "purpose": "Provides optional Google sign-in and roles, so that only users with the right capabilities can reach admin endpoints.",
+    "decision": "A Google ID token is exchanged for a JWT. The browser keeps the JWT in localStorage and sends it in the Authorization header, with no cookies, because the Netlify frontend and Render backend are on different origins. Roles live in SQLite and are resolved on every request so changes apply at once. Cookie sessions, an external auth provider and a fixed admin list were not chosen.",
+    "where": [
+     {
+      "path": "backend/roles.py",
+      "what": "roles and capability mapping"
+     },
+     {
+      "path": "backend/main.py",
+      "what": "login endpoint and capability checks"
+     },
+     {
+      "path": "frontend/src/auth.js",
+      "what": "client token handling"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan wrote it alone [human], starting in May 2026 and continuing through the June and July commits."
+   }
+  },
+  {
+   "unit_id": "auth-rbac",
+   "level": 1,
+   "question": "Why does the rest of the system need Auth and role-based access?",
+   "variants": [
+    "What job does Auth and role-based access do for the rest of the system?",
+    "What would a user notice first if Auth and role-based access stopped working?"
+   ],
+   "reference_answer": "It optional Google sign-in issues a JWT. Stackable roles map to capabilities that gate admin endpoints.",
+   "evidence": [
+    "backend/roles.py",
+    "backend/main.py"
+   ],
+   "orientation": {
+    "purpose": "Provides optional Google sign-in and roles, so that only users with the right capabilities can reach admin endpoints.",
+    "decision": "A Google ID token is exchanged for a JWT. The browser keeps the JWT in localStorage and sends it in the Authorization header, with no cookies, because the Netlify frontend and Render backend are on different origins. Roles live in SQLite and are resolved on every request so changes apply at once. Cookie sessions, an external auth provider and a fixed admin list were not chosen.",
+    "where": [
+     {
+      "path": "backend/roles.py",
+      "what": "roles and capability mapping"
+     },
+     {
+      "path": "backend/main.py",
+      "what": "login endpoint and capability checks"
+     },
+     {
+      "path": "frontend/src/auth.js",
+      "what": "client token handling"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan wrote it alone [human], starting in May 2026 and continuing through the June and July commits."
+   }
+  },
+  {
+   "unit_id": "auth-rbac",
+   "level": 1,
+   "question": "What would a user notice first if Auth and role-based access stopped working?",
+   "variants": [
+    "What job does Auth and role-based access do for the rest of the system?",
+    "Why does the rest of the system need Auth and role-based access?"
+   ],
+   "reference_answer": "It optional Google sign-in issues a JWT. Stackable roles map to capabilities that gate admin endpoints.",
+   "evidence": [
+    "backend/roles.py",
+    "backend/main.py"
+   ],
+   "orientation": {
+    "purpose": "Provides optional Google sign-in and roles, so that only users with the right capabilities can reach admin endpoints.",
+    "decision": "A Google ID token is exchanged for a JWT. The browser keeps the JWT in localStorage and sends it in the Authorization header, with no cookies, because the Netlify frontend and Render backend are on different origins. Roles live in SQLite and are resolved on every request so changes apply at once. Cookie sessions, an external auth provider and a fixed admin list were not chosen.",
+    "where": [
+     {
+      "path": "backend/roles.py",
+      "what": "roles and capability mapping"
+     },
+     {
+      "path": "backend/main.py",
+      "what": "login endpoint and capability checks"
+     },
+     {
+      "path": "frontend/src/auth.js",
+      "what": "client token handling"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan wrote it alone [human], starting in May 2026 and continuing through the June and July commits."
+   }
+  },
+  {
+   "unit_id": "auth-rbac",
+   "level": 2,
+   "question": "What was chosen for Auth and role-based access?",
+   "variants": [
+    "Which alternative did Auth and role-based access turn down?",
+    "What constraint shaped Auth and role-based access?"
+   ],
+   "reference_answer": "It optional Google sign-in issues a JWT. Stackable roles map to capabilities that gate admin endpoints.",
+   "evidence": [
+    "backend/roles.py",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "auth-rbac",
+   "level": 2,
+   "question": "Which alternative did Auth and role-based access turn down?",
+   "variants": [
+    "What was chosen for Auth and role-based access?",
+    "What constraint shaped Auth and role-based access?"
+   ],
+   "reference_answer": "It optional Google sign-in issues a JWT. Stackable roles map to capabilities that gate admin endpoints.",
+   "evidence": [
+    "backend/roles.py",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "auth-rbac",
+   "level": 2,
+   "question": "What constraint shaped Auth and role-based access?",
+   "variants": [
+    "What was chosen for Auth and role-based access?",
+    "Which alternative did Auth and role-based access turn down?"
+   ],
+   "reference_answer": "It optional Google sign-in issues a JWT. Stackable roles map to capabilities that gate admin endpoints.",
+   "evidence": [
+    "backend/roles.py",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "auth-rbac",
+   "level": 3,
+   "question": "If the decision behind Auth and role-based access were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if Auth and role-based access changed its approach?",
+    "Which part depends most on the choice in Auth and role-based access?"
+   ],
+   "reference_answer": "It optional Google sign-in issues a JWT. Stackable roles map to capabilities that gate admin endpoints.",
+   "evidence": [
+    "backend/roles.py",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "auth-rbac",
+   "level": 3,
+   "question": "What breaks elsewhere if Auth and role-based access changed its approach?",
+   "variants": [
+    "If the decision behind Auth and role-based access were reversed, what else would have to change first?",
+    "Which part depends most on the choice in Auth and role-based access?"
+   ],
+   "reference_answer": "It optional Google sign-in issues a JWT. Stackable roles map to capabilities that gate admin endpoints.",
+   "evidence": [
+    "backend/roles.py",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "auth-rbac",
+   "level": 3,
+   "question": "Which part depends most on the choice in Auth and role-based access?",
+   "variants": [
+    "If the decision behind Auth and role-based access were reversed, what else would have to change first?",
+    "What breaks elsewhere if Auth and role-based access changed its approach?"
+   ],
+   "reference_answer": "It optional Google sign-in issues a JWT. Stackable roles map to capabilities that gate admin endpoints.",
+   "evidence": [
+    "backend/roles.py",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "cost-control",
+   "level": 1,
+   "question": "What job does Cost controls, rate limits and usage metering do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need Cost controls, rate limits and usage metering?",
+    "What would a user notice first if Cost controls, rate limits and usage metering stopped working?"
+   ],
+   "reference_answer": "It layered limits and metering keep Claude spend bounded.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/main.py"
+   ],
+   "orientation": {
+    "purpose": "Keeps Claude API spend bounded on a public bot that runs on the owner's personal key, using limits and usage metering.",
+    "decision": "Layered controls: per-minute and per-session rate limits, daily exchange caps, token and monthly dollar caps with a login-required threshold, and a bring-your-own-key exemption. Haiku side calls are metered through a context-local tracker. No limits, a paid-only gate and a flat quota were not chosen; the history only says the changes were cost-driven.",
+    "where": [
+     {
+      "path": "backend/usage_tracker.py",
+      "what": "usage metering and caps"
+     },
+     {
+      "path": "backend/main.py",
+      "what": "rate-limit and cap checks in endpoints"
+     },
+     {
+      "path": "backend/analytics.py",
+      "what": "usage and cost reporting"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan built it across three commits from May to June 2026, all with an AI co-author [assisted], including disabling an unmetered daily cron."
+   }
+  },
+  {
+   "unit_id": "cost-control",
+   "level": 1,
+   "question": "Why does the rest of the system need Cost controls, rate limits and usage metering?",
+   "variants": [
+    "What job does Cost controls, rate limits and usage metering do for the rest of the system?",
+    "What would a user notice first if Cost controls, rate limits and usage metering stopped working?"
+   ],
+   "reference_answer": "It layered limits and metering keep Claude spend bounded.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/main.py"
+   ],
+   "orientation": {
+    "purpose": "Keeps Claude API spend bounded on a public bot that runs on the owner's personal key, using limits and usage metering.",
+    "decision": "Layered controls: per-minute and per-session rate limits, daily exchange caps, token and monthly dollar caps with a login-required threshold, and a bring-your-own-key exemption. Haiku side calls are metered through a context-local tracker. No limits, a paid-only gate and a flat quota were not chosen; the history only says the changes were cost-driven.",
+    "where": [
+     {
+      "path": "backend/usage_tracker.py",
+      "what": "usage metering and caps"
+     },
+     {
+      "path": "backend/main.py",
+      "what": "rate-limit and cap checks in endpoints"
+     },
+     {
+      "path": "backend/analytics.py",
+      "what": "usage and cost reporting"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan built it across three commits from May to June 2026, all with an AI co-author [assisted], including disabling an unmetered daily cron."
+   }
+  },
+  {
+   "unit_id": "cost-control",
+   "level": 1,
+   "question": "What would a user notice first if Cost controls, rate limits and usage metering stopped working?",
+   "variants": [
+    "What job does Cost controls, rate limits and usage metering do for the rest of the system?",
+    "Why does the rest of the system need Cost controls, rate limits and usage metering?"
+   ],
+   "reference_answer": "It layered limits and metering keep Claude spend bounded.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/main.py"
+   ],
+   "orientation": {
+    "purpose": "Keeps Claude API spend bounded on a public bot that runs on the owner's personal key, using limits and usage metering.",
+    "decision": "Layered controls: per-minute and per-session rate limits, daily exchange caps, token and monthly dollar caps with a login-required threshold, and a bring-your-own-key exemption. Haiku side calls are metered through a context-local tracker. No limits, a paid-only gate and a flat quota were not chosen; the history only says the changes were cost-driven.",
+    "where": [
+     {
+      "path": "backend/usage_tracker.py",
+      "what": "usage metering and caps"
+     },
+     {
+      "path": "backend/main.py",
+      "what": "rate-limit and cap checks in endpoints"
+     },
+     {
+      "path": "backend/analytics.py",
+      "what": "usage and cost reporting"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan built it across three commits from May to June 2026, all with an AI co-author [assisted], including disabling an unmetered daily cron."
+   }
+  },
+  {
+   "unit_id": "cost-control",
+   "level": 2,
+   "question": "What was chosen for Cost controls, rate limits and usage metering?",
+   "variants": [
+    "Which alternative did Cost controls, rate limits and usage metering turn down?",
+    "What constraint shaped Cost controls, rate limits and usage metering?"
+   ],
+   "reference_answer": "It layered limits and metering keep Claude spend bounded.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "cost-control",
+   "level": 2,
+   "question": "Which alternative did Cost controls, rate limits and usage metering turn down?",
+   "variants": [
+    "What was chosen for Cost controls, rate limits and usage metering?",
+    "What constraint shaped Cost controls, rate limits and usage metering?"
+   ],
+   "reference_answer": "It layered limits and metering keep Claude spend bounded.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "cost-control",
+   "level": 2,
+   "question": "What constraint shaped Cost controls, rate limits and usage metering?",
+   "variants": [
+    "What was chosen for Cost controls, rate limits and usage metering?",
+    "Which alternative did Cost controls, rate limits and usage metering turn down?"
+   ],
+   "reference_answer": "It layered limits and metering keep Claude spend bounded.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "cost-control",
+   "level": 3,
+   "question": "If the decision behind Cost controls, rate limits and usage metering were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if Cost controls, rate limits and usage metering changed its approach?",
+    "Which part depends most on the choice in Cost controls, rate limits and usage metering?"
+   ],
+   "reference_answer": "It layered limits and metering keep Claude spend bounded.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "cost-control",
+   "level": 3,
+   "question": "What breaks elsewhere if Cost controls, rate limits and usage metering changed its approach?",
+   "variants": [
+    "If the decision behind Cost controls, rate limits and usage metering were reversed, what else would have to change first?",
+    "Which part depends most on the choice in Cost controls, rate limits and usage metering?"
+   ],
+   "reference_answer": "It layered limits and metering keep Claude spend bounded.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "cost-control",
+   "level": 3,
+   "question": "Which part depends most on the choice in Cost controls, rate limits and usage metering?",
+   "variants": [
+    "If the decision behind Cost controls, rate limits and usage metering were reversed, what else would have to change first?",
+    "What breaks elsewhere if Cost controls, rate limits and usage metering changed its approach?"
+   ],
+   "reference_answer": "It layered limits and metering keep Claude spend bounded.",
+   "evidence": [
+    "backend/analytics.py",
+    "backend/main.py"
+   ]
+  },
+  {
+   "unit_id": "faq-cache-tts",
+   "level": 1,
+   "question": "What job does FAQ cache and voice replies do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need FAQ cache and voice replies?",
+    "What would a user notice first if FAQ cache and voice replies stopped working?"
+   ],
+   "reference_answer": "It pre-generated FAQ answers are matched by TF-IDF and served without a full LLM call. Cached answers can have ElevenLabs audio.",
+   "evidence": [
+    "backend/faq_cache.py",
+    "backend/tts.py"
+   ],
+   "orientation": {
+    "purpose": "Pre-generated FAQ answers are matched by TF-IDF and served without a full LLM call. Cached answers can have ElevenLabs audio.",
+    "decision": "Stale-while-revalidate FAQ entries keyed by persona_hash, generated on the distilled persona. Audio clips are stored on disk by a content hash of the answer. Not chosen: Regenerate the whole bank on each deploy; a manifest or DB column for audio. Why: A redeploy regeneration cost about $5. The content hash orphans old clips automatically.",
+    "where": [
+     {
+      "path": "backend/faq_cache.py",
+      "what": ""
+     },
+     {
+      "path": "backend/tts.py",
+      "what": ""
+     },
+     {
+      "path": "backend/data/faq_cache.json",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [assisted], Yusuf Pisan [human].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "faq-cache-tts",
+   "level": 1,
+   "question": "Why does the rest of the system need FAQ cache and voice replies?",
+   "variants": [
+    "What job does FAQ cache and voice replies do for the rest of the system?",
+    "What would a user notice first if FAQ cache and voice replies stopped working?"
+   ],
+   "reference_answer": "It pre-generated FAQ answers are matched by TF-IDF and served without a full LLM call. Cached answers can have ElevenLabs audio.",
+   "evidence": [
+    "backend/faq_cache.py",
+    "backend/tts.py"
+   ],
+   "orientation": {
+    "purpose": "Pre-generated FAQ answers are matched by TF-IDF and served without a full LLM call. Cached answers can have ElevenLabs audio.",
+    "decision": "Stale-while-revalidate FAQ entries keyed by persona_hash, generated on the distilled persona. Audio clips are stored on disk by a content hash of the answer. Not chosen: Regenerate the whole bank on each deploy; a manifest or DB column for audio. Why: A redeploy regeneration cost about $5. The content hash orphans old clips automatically.",
+    "where": [
+     {
+      "path": "backend/faq_cache.py",
+      "what": ""
+     },
+     {
+      "path": "backend/tts.py",
+      "what": ""
+     },
+     {
+      "path": "backend/data/faq_cache.json",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [assisted], Yusuf Pisan [human].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "faq-cache-tts",
+   "level": 1,
+   "question": "What would a user notice first if FAQ cache and voice replies stopped working?",
+   "variants": [
+    "What job does FAQ cache and voice replies do for the rest of the system?",
+    "Why does the rest of the system need FAQ cache and voice replies?"
+   ],
+   "reference_answer": "It pre-generated FAQ answers are matched by TF-IDF and served without a full LLM call. Cached answers can have ElevenLabs audio.",
+   "evidence": [
+    "backend/faq_cache.py",
+    "backend/tts.py"
+   ],
+   "orientation": {
+    "purpose": "Pre-generated FAQ answers are matched by TF-IDF and served without a full LLM call. Cached answers can have ElevenLabs audio.",
+    "decision": "Stale-while-revalidate FAQ entries keyed by persona_hash, generated on the distilled persona. Audio clips are stored on disk by a content hash of the answer. Not chosen: Regenerate the whole bank on each deploy; a manifest or DB column for audio. Why: A redeploy regeneration cost about $5. The content hash orphans old clips automatically.",
+    "where": [
+     {
+      "path": "backend/faq_cache.py",
+      "what": ""
+     },
+     {
+      "path": "backend/tts.py",
+      "what": ""
+     },
+     {
+      "path": "backend/data/faq_cache.json",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [assisted], Yusuf Pisan [human].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "faq-cache-tts",
+   "level": 2,
+   "question": "What was chosen for FAQ cache and voice replies?",
+   "variants": [
+    "Which alternative did FAQ cache and voice replies turn down?",
+    "What constraint shaped FAQ cache and voice replies?"
+   ],
+   "reference_answer": "It pre-generated FAQ answers are matched by TF-IDF and served without a full LLM call. Cached answers can have ElevenLabs audio.",
+   "evidence": [
+    "backend/faq_cache.py",
+    "backend/tts.py"
+   ]
+  },
+  {
+   "unit_id": "faq-cache-tts",
+   "level": 2,
+   "question": "Which alternative did FAQ cache and voice replies turn down?",
+   "variants": [
+    "What was chosen for FAQ cache and voice replies?",
+    "What constraint shaped FAQ cache and voice replies?"
+   ],
+   "reference_answer": "It pre-generated FAQ answers are matched by TF-IDF and served without a full LLM call. Cached answers can have ElevenLabs audio.",
+   "evidence": [
+    "backend/faq_cache.py",
+    "backend/tts.py"
+   ]
+  },
+  {
+   "unit_id": "faq-cache-tts",
+   "level": 2,
+   "question": "What constraint shaped FAQ cache and voice replies?",
+   "variants": [
+    "What was chosen for FAQ cache and voice replies?",
+    "Which alternative did FAQ cache and voice replies turn down?"
+   ],
+   "reference_answer": "It pre-generated FAQ answers are matched by TF-IDF and served without a full LLM call. Cached answers can have ElevenLabs audio.",
+   "evidence": [
+    "backend/faq_cache.py",
+    "backend/tts.py"
+   ]
+  },
+  {
+   "unit_id": "faq-cache-tts",
+   "level": 3,
+   "question": "If the decision behind FAQ cache and voice replies were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if FAQ cache and voice replies changed its approach?",
+    "Which part depends most on the choice in FAQ cache and voice replies?"
+   ],
+   "reference_answer": "It pre-generated FAQ answers are matched by TF-IDF and served without a full LLM call. Cached answers can have ElevenLabs audio.",
+   "evidence": [
+    "backend/faq_cache.py",
+    "backend/tts.py"
+   ]
+  },
+  {
+   "unit_id": "faq-cache-tts",
+   "level": 3,
+   "question": "What breaks elsewhere if FAQ cache and voice replies changed its approach?",
+   "variants": [
+    "If the decision behind FAQ cache and voice replies were reversed, what else would have to change first?",
+    "Which part depends most on the choice in FAQ cache and voice replies?"
+   ],
+   "reference_answer": "It pre-generated FAQ answers are matched by TF-IDF and served without a full LLM call. Cached answers can have ElevenLabs audio.",
+   "evidence": [
+    "backend/faq_cache.py",
+    "backend/tts.py"
+   ]
+  },
+  {
+   "unit_id": "faq-cache-tts",
+   "level": 3,
+   "question": "Which part depends most on the choice in FAQ cache and voice replies?",
+   "variants": [
+    "If the decision behind FAQ cache and voice replies were reversed, what else would have to change first?",
+    "What breaks elsewhere if FAQ cache and voice replies changed its approach?"
+   ],
+   "reference_answer": "It pre-generated FAQ answers are matched by TF-IDF and served without a full LLM call. Cached answers can have ElevenLabs audio.",
+   "evidence": [
+    "backend/faq_cache.py",
+    "backend/tts.py"
+   ]
+  },
+  {
+   "unit_id": "admin-persona-fix-loop",
+   "level": 1,
+   "question": "What job does Admin dashboard and Persona Fixes loop do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need Admin dashboard and Persona Fixes loop?",
+    "What would a user notice first if Admin dashboard and Persona Fixes loop stopped working?"
+   ],
+   "reference_answer": "It admins review conversations and rate replies. A background worker proposes persona edits, which become a GitHub PR.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "backend/repo_admin.py"
+   ],
+   "orientation": {
+    "purpose": "Lets admins review conversations and rate replies, then turns that feedback into proposed persona edits delivered as a GitHub pull request.",
+    "decision": "Feedback goes to Sonnet, which returns full-file rewrites. A background daemon thread does the work while the client polls, because synchronous generation timed out at the edge proxy. Edits are limited to an allowlist of persona files and open a PR rather than pushing to main, so a human approves. Manual edits and a job queue were not chosen.",
+    "where": [
+     {
+      "path": "frontend/src/AdminPage.jsx",
+      "what": "admin dashboard tabs and polling UI"
+     },
+     {
+      "path": "backend/repo_admin.py",
+      "what": "persona-fix generation and GitHub PR creation"
+     },
+     {
+      "path": "backend/faq_gap_report.py",
+      "what": "FAQ gap analysis"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan introduced it in May 2026 with an AI co-author [assisted], then extended the admin page and sessions alone [human] in late May and June."
+   }
+  },
+  {
+   "unit_id": "admin-persona-fix-loop",
+   "level": 1,
+   "question": "Why does the rest of the system need Admin dashboard and Persona Fixes loop?",
+   "variants": [
+    "What job does Admin dashboard and Persona Fixes loop do for the rest of the system?",
+    "What would a user notice first if Admin dashboard and Persona Fixes loop stopped working?"
+   ],
+   "reference_answer": "It admins review conversations and rate replies. A background worker proposes persona edits, which become a GitHub PR.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "backend/repo_admin.py"
+   ],
+   "orientation": {
+    "purpose": "Lets admins review conversations and rate replies, then turns that feedback into proposed persona edits delivered as a GitHub pull request.",
+    "decision": "Feedback goes to Sonnet, which returns full-file rewrites. A background daemon thread does the work while the client polls, because synchronous generation timed out at the edge proxy. Edits are limited to an allowlist of persona files and open a PR rather than pushing to main, so a human approves. Manual edits and a job queue were not chosen.",
+    "where": [
+     {
+      "path": "frontend/src/AdminPage.jsx",
+      "what": "admin dashboard tabs and polling UI"
+     },
+     {
+      "path": "backend/repo_admin.py",
+      "what": "persona-fix generation and GitHub PR creation"
+     },
+     {
+      "path": "backend/faq_gap_report.py",
+      "what": "FAQ gap analysis"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan introduced it in May 2026 with an AI co-author [assisted], then extended the admin page and sessions alone [human] in late May and June."
+   }
+  },
+  {
+   "unit_id": "admin-persona-fix-loop",
+   "level": 1,
+   "question": "What would a user notice first if Admin dashboard and Persona Fixes loop stopped working?",
+   "variants": [
+    "What job does Admin dashboard and Persona Fixes loop do for the rest of the system?",
+    "Why does the rest of the system need Admin dashboard and Persona Fixes loop?"
+   ],
+   "reference_answer": "It admins review conversations and rate replies. A background worker proposes persona edits, which become a GitHub PR.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "backend/repo_admin.py"
+   ],
+   "orientation": {
+    "purpose": "Lets admins review conversations and rate replies, then turns that feedback into proposed persona edits delivered as a GitHub pull request.",
+    "decision": "Feedback goes to Sonnet, which returns full-file rewrites. A background daemon thread does the work while the client polls, because synchronous generation timed out at the edge proxy. Edits are limited to an allowlist of persona files and open a PR rather than pushing to main, so a human approves. Manual edits and a job queue were not chosen.",
+    "where": [
+     {
+      "path": "frontend/src/AdminPage.jsx",
+      "what": "admin dashboard tabs and polling UI"
+     },
+     {
+      "path": "backend/repo_admin.py",
+      "what": "persona-fix generation and GitHub PR creation"
+     },
+     {
+      "path": "backend/faq_gap_report.py",
+      "what": "FAQ gap analysis"
+     }
+    ],
+    "shaped_by": "Yusuf Pisan introduced it in May 2026 with an AI co-author [assisted], then extended the admin page and sessions alone [human] in late May and June."
+   }
+  },
+  {
+   "unit_id": "admin-persona-fix-loop",
+   "level": 2,
+   "question": "What was chosen for Admin dashboard and Persona Fixes loop?",
+   "variants": [
+    "Which alternative did Admin dashboard and Persona Fixes loop turn down?",
+    "What constraint shaped Admin dashboard and Persona Fixes loop?"
+   ],
+   "reference_answer": "It admins review conversations and rate replies. A background worker proposes persona edits, which become a GitHub PR.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "backend/repo_admin.py"
+   ]
+  },
+  {
+   "unit_id": "admin-persona-fix-loop",
+   "level": 2,
+   "question": "Which alternative did Admin dashboard and Persona Fixes loop turn down?",
+   "variants": [
+    "What was chosen for Admin dashboard and Persona Fixes loop?",
+    "What constraint shaped Admin dashboard and Persona Fixes loop?"
+   ],
+   "reference_answer": "It admins review conversations and rate replies. A background worker proposes persona edits, which become a GitHub PR.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "backend/repo_admin.py"
+   ]
+  },
+  {
+   "unit_id": "admin-persona-fix-loop",
+   "level": 2,
+   "question": "What constraint shaped Admin dashboard and Persona Fixes loop?",
+   "variants": [
+    "What was chosen for Admin dashboard and Persona Fixes loop?",
+    "Which alternative did Admin dashboard and Persona Fixes loop turn down?"
+   ],
+   "reference_answer": "It admins review conversations and rate replies. A background worker proposes persona edits, which become a GitHub PR.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "backend/repo_admin.py"
+   ]
+  },
+  {
+   "unit_id": "admin-persona-fix-loop",
+   "level": 3,
+   "question": "If the decision behind Admin dashboard and Persona Fixes loop were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if Admin dashboard and Persona Fixes loop changed its approach?",
+    "Which part depends most on the choice in Admin dashboard and Persona Fixes loop?"
+   ],
+   "reference_answer": "It admins review conversations and rate replies. A background worker proposes persona edits, which become a GitHub PR.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "backend/repo_admin.py"
+   ]
+  },
+  {
+   "unit_id": "admin-persona-fix-loop",
+   "level": 3,
+   "question": "What breaks elsewhere if Admin dashboard and Persona Fixes loop changed its approach?",
+   "variants": [
+    "If the decision behind Admin dashboard and Persona Fixes loop were reversed, what else would have to change first?",
+    "Which part depends most on the choice in Admin dashboard and Persona Fixes loop?"
+   ],
+   "reference_answer": "It admins review conversations and rate replies. A background worker proposes persona edits, which become a GitHub PR.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "backend/repo_admin.py"
+   ]
+  },
+  {
+   "unit_id": "admin-persona-fix-loop",
+   "level": 3,
+   "question": "Which part depends most on the choice in Admin dashboard and Persona Fixes loop?",
+   "variants": [
+    "If the decision behind Admin dashboard and Persona Fixes loop were reversed, what else would have to change first?",
+    "What breaks elsewhere if Admin dashboard and Persona Fixes loop changed its approach?"
+   ],
+   "reference_answer": "It admins review conversations and rate replies. A background worker proposes persona edits, which become a GitHub PR.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "backend/repo_admin.py"
+   ]
+  },
+  {
+   "unit_id": "content-pipeline",
+   "level": 1,
+   "question": "What job does Content pipeline and CI/deploy do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need Content pipeline and CI/deploy?",
+    "What would a user notice first if Content pipeline and CI/deploy stopped working?"
+   ],
+   "reference_answer": "It headlines are scored and drafted into posts, which open a PR. Merge ingests them and CI gates deployment to Render.",
+   "evidence": [
+    "frontend/netlify.toml",
+    "scripts/typecheck.sh"
+   ],
+   "orientation": {
+    "purpose": "Headlines are scored and drafted into posts, which open a PR. Merge ingests them and CI gates deployment to Render.",
+    "decision": "Git is the approval and ingestion mechanism: a GitHub Action or local CLI drafts a post PR, and merge triggers a gated Render deploy. The CLI backend avoids API cost. CI gates on ruff, mypy, tests and build. Not chosen: A CMS; direct publishing; a manual deploy. Why: Reuses PR review and keeps humans in control. The cron was disabled to stop unmetered API spend.",
+    "where": [
+     {
+      "path": "automation",
+      "what": ""
+     },
+     {
+      "path": "posts",
+      "what": ""
+     },
+     {
+      "path": ".github/workflows",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: YPai pipeline [human], Yusuf Pisan [human], Yusuf Pisan [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "content-pipeline",
+   "level": 1,
+   "question": "Why does the rest of the system need Content pipeline and CI/deploy?",
+   "variants": [
+    "What job does Content pipeline and CI/deploy do for the rest of the system?",
+    "What would a user notice first if Content pipeline and CI/deploy stopped working?"
+   ],
+   "reference_answer": "It headlines are scored and drafted into posts, which open a PR. Merge ingests them and CI gates deployment to Render.",
+   "evidence": [
+    "frontend/netlify.toml",
+    "scripts/typecheck.sh"
+   ],
+   "orientation": {
+    "purpose": "Headlines are scored and drafted into posts, which open a PR. Merge ingests them and CI gates deployment to Render.",
+    "decision": "Git is the approval and ingestion mechanism: a GitHub Action or local CLI drafts a post PR, and merge triggers a gated Render deploy. The CLI backend avoids API cost. CI gates on ruff, mypy, tests and build. Not chosen: A CMS; direct publishing; a manual deploy. Why: Reuses PR review and keeps humans in control. The cron was disabled to stop unmetered API spend.",
+    "where": [
+     {
+      "path": "automation",
+      "what": ""
+     },
+     {
+      "path": "posts",
+      "what": ""
+     },
+     {
+      "path": ".github/workflows",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: YPai pipeline [human], Yusuf Pisan [human], Yusuf Pisan [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "content-pipeline",
+   "level": 1,
+   "question": "What would a user notice first if Content pipeline and CI/deploy stopped working?",
+   "variants": [
+    "What job does Content pipeline and CI/deploy do for the rest of the system?",
+    "Why does the rest of the system need Content pipeline and CI/deploy?"
+   ],
+   "reference_answer": "It headlines are scored and drafted into posts, which open a PR. Merge ingests them and CI gates deployment to Render.",
+   "evidence": [
+    "frontend/netlify.toml",
+    "scripts/typecheck.sh"
+   ],
+   "orientation": {
+    "purpose": "Headlines are scored and drafted into posts, which open a PR. Merge ingests them and CI gates deployment to Render.",
+    "decision": "Git is the approval and ingestion mechanism: a GitHub Action or local CLI drafts a post PR, and merge triggers a gated Render deploy. The CLI backend avoids API cost. CI gates on ruff, mypy, tests and build. Not chosen: A CMS; direct publishing; a manual deploy. Why: Reuses PR review and keeps humans in control. The cron was disabled to stop unmetered API spend.",
+    "where": [
+     {
+      "path": "automation",
+      "what": ""
+     },
+     {
+      "path": "posts",
+      "what": ""
+     },
+     {
+      "path": ".github/workflows",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: YPai pipeline [human], Yusuf Pisan [human], Yusuf Pisan [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "content-pipeline",
+   "level": 2,
+   "question": "What was chosen for Content pipeline and CI/deploy?",
+   "variants": [
+    "Which alternative did Content pipeline and CI/deploy turn down?",
+    "What constraint shaped Content pipeline and CI/deploy?"
+   ],
+   "reference_answer": "It headlines are scored and drafted into posts, which open a PR. Merge ingests them and CI gates deployment to Render.",
+   "evidence": [
+    "frontend/netlify.toml",
+    "scripts/typecheck.sh"
+   ]
+  },
+  {
+   "unit_id": "content-pipeline",
+   "level": 2,
+   "question": "Which alternative did Content pipeline and CI/deploy turn down?",
+   "variants": [
+    "What was chosen for Content pipeline and CI/deploy?",
+    "What constraint shaped Content pipeline and CI/deploy?"
+   ],
+   "reference_answer": "It headlines are scored and drafted into posts, which open a PR. Merge ingests them and CI gates deployment to Render.",
+   "evidence": [
+    "frontend/netlify.toml",
+    "scripts/typecheck.sh"
+   ]
+  },
+  {
+   "unit_id": "content-pipeline",
+   "level": 2,
+   "question": "What constraint shaped Content pipeline and CI/deploy?",
+   "variants": [
+    "What was chosen for Content pipeline and CI/deploy?",
+    "Which alternative did Content pipeline and CI/deploy turn down?"
+   ],
+   "reference_answer": "It headlines are scored and drafted into posts, which open a PR. Merge ingests them and CI gates deployment to Render.",
+   "evidence": [
+    "frontend/netlify.toml",
+    "scripts/typecheck.sh"
+   ]
+  },
+  {
+   "unit_id": "content-pipeline",
+   "level": 3,
+   "question": "If the decision behind Content pipeline and CI/deploy were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if Content pipeline and CI/deploy changed its approach?",
+    "Which part depends most on the choice in Content pipeline and CI/deploy?"
+   ],
+   "reference_answer": "It headlines are scored and drafted into posts, which open a PR. Merge ingests them and CI gates deployment to Render.",
+   "evidence": [
+    "frontend/netlify.toml",
+    "scripts/typecheck.sh"
+   ]
+  },
+  {
+   "unit_id": "content-pipeline",
+   "level": 3,
+   "question": "What breaks elsewhere if Content pipeline and CI/deploy changed its approach?",
+   "variants": [
+    "If the decision behind Content pipeline and CI/deploy were reversed, what else would have to change first?",
+    "Which part depends most on the choice in Content pipeline and CI/deploy?"
+   ],
+   "reference_answer": "It headlines are scored and drafted into posts, which open a PR. Merge ingests them and CI gates deployment to Render.",
+   "evidence": [
+    "frontend/netlify.toml",
+    "scripts/typecheck.sh"
+   ]
+  },
+  {
+   "unit_id": "content-pipeline",
+   "level": 3,
+   "question": "Which part depends most on the choice in Content pipeline and CI/deploy?",
+   "variants": [
+    "If the decision behind Content pipeline and CI/deploy were reversed, what else would have to change first?",
+    "What breaks elsewhere if Content pipeline and CI/deploy changed its approach?"
+   ],
+   "reference_answer": "It headlines are scored and drafted into posts, which open a PR. Merge ingests them and CI gates deployment to Render.",
+   "evidence": [
+    "frontend/netlify.toml",
+    "scripts/typecheck.sh"
+   ]
+  },
+  {
+   "unit_id": "frontend-spa",
+   "level": 1,
+   "question": "What job does React/Vite frontend do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need React/Vite frontend?",
+    "What would a user notice first if React/Vite frontend stopped working?"
+   ],
+   "reference_answer": "It the SPA covers chat, admin, shared view and the warmth meter. It is a PWA hosted on Netlify and calls Render directly.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "frontend/netlify.toml"
+   ],
+   "orientation": {
+    "purpose": "The SPA covers chat, admin, shared view and the warmth meter. It is a PWA hosted on Netlify and calls Render directly.",
+    "decision": "Plain React with JS and JSDoc type checking. It uses localStorage for the JWT, session resume and visitor id. It has no proxy, and CORS is restricted. Not chosen: Next.js SSR; a Netlify proxy; cookies. Why: Cross-origin deploy, a simple static host, and installability.",
+    "where": [
+     {
+      "path": "frontend",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [human], Yusuf Pisan [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "frontend-spa",
+   "level": 1,
+   "question": "Why does the rest of the system need React/Vite frontend?",
+   "variants": [
+    "What job does React/Vite frontend do for the rest of the system?",
+    "What would a user notice first if React/Vite frontend stopped working?"
+   ],
+   "reference_answer": "It the SPA covers chat, admin, shared view and the warmth meter. It is a PWA hosted on Netlify and calls Render directly.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "frontend/netlify.toml"
+   ],
+   "orientation": {
+    "purpose": "The SPA covers chat, admin, shared view and the warmth meter. It is a PWA hosted on Netlify and calls Render directly.",
+    "decision": "Plain React with JS and JSDoc type checking. It uses localStorage for the JWT, session resume and visitor id. It has no proxy, and CORS is restricted. Not chosen: Next.js SSR; a Netlify proxy; cookies. Why: Cross-origin deploy, a simple static host, and installability.",
+    "where": [
+     {
+      "path": "frontend",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [human], Yusuf Pisan [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "frontend-spa",
+   "level": 1,
+   "question": "What would a user notice first if React/Vite frontend stopped working?",
+   "variants": [
+    "What job does React/Vite frontend do for the rest of the system?",
+    "Why does the rest of the system need React/Vite frontend?"
+   ],
+   "reference_answer": "It the SPA covers chat, admin, shared view and the warmth meter. It is a PWA hosted on Netlify and calls Render directly.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "frontend/netlify.toml"
+   ],
+   "orientation": {
+    "purpose": "The SPA covers chat, admin, shared view and the warmth meter. It is a PWA hosted on Netlify and calls Render directly.",
+    "decision": "Plain React with JS and JSDoc type checking. It uses localStorage for the JWT, session resume and visitor id. It has no proxy, and CORS is restricted. Not chosen: Next.js SSR; a Netlify proxy; cookies. Why: Cross-origin deploy, a simple static host, and installability.",
+    "where": [
+     {
+      "path": "frontend",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [human], Yusuf Pisan [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "frontend-spa",
+   "level": 2,
+   "question": "What was chosen for React/Vite frontend?",
+   "variants": [
+    "Which alternative did React/Vite frontend turn down?",
+    "What constraint shaped React/Vite frontend?"
+   ],
+   "reference_answer": "It the SPA covers chat, admin, shared view and the warmth meter. It is a PWA hosted on Netlify and calls Render directly.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "frontend/netlify.toml"
+   ]
+  },
+  {
+   "unit_id": "frontend-spa",
+   "level": 2,
+   "question": "Which alternative did React/Vite frontend turn down?",
+   "variants": [
+    "What was chosen for React/Vite frontend?",
+    "What constraint shaped React/Vite frontend?"
+   ],
+   "reference_answer": "It the SPA covers chat, admin, shared view and the warmth meter. It is a PWA hosted on Netlify and calls Render directly.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "frontend/netlify.toml"
+   ]
+  },
+  {
+   "unit_id": "frontend-spa",
+   "level": 2,
+   "question": "What constraint shaped React/Vite frontend?",
+   "variants": [
+    "What was chosen for React/Vite frontend?",
+    "Which alternative did React/Vite frontend turn down?"
+   ],
+   "reference_answer": "It the SPA covers chat, admin, shared view and the warmth meter. It is a PWA hosted on Netlify and calls Render directly.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "frontend/netlify.toml"
+   ]
+  },
+  {
+   "unit_id": "frontend-spa",
+   "level": 3,
+   "question": "If the decision behind React/Vite frontend were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if React/Vite frontend changed its approach?",
+    "Which part depends most on the choice in React/Vite frontend?"
+   ],
+   "reference_answer": "It the SPA covers chat, admin, shared view and the warmth meter. It is a PWA hosted on Netlify and calls Render directly.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "frontend/netlify.toml"
+   ]
+  },
+  {
+   "unit_id": "frontend-spa",
+   "level": 3,
+   "question": "What breaks elsewhere if React/Vite frontend changed its approach?",
+   "variants": [
+    "If the decision behind React/Vite frontend were reversed, what else would have to change first?",
+    "Which part depends most on the choice in React/Vite frontend?"
+   ],
+   "reference_answer": "It the SPA covers chat, admin, shared view and the warmth meter. It is a PWA hosted on Netlify and calls Render directly.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "frontend/netlify.toml"
+   ]
+  },
+  {
+   "unit_id": "frontend-spa",
+   "level": 3,
+   "question": "Which part depends most on the choice in React/Vite frontend?",
+   "variants": [
+    "If the decision behind React/Vite frontend were reversed, what else would have to change first?",
+    "What breaks elsewhere if React/Vite frontend changed its approach?"
+   ],
+   "reference_answer": "It the SPA covers chat, admin, shared view and the warmth meter. It is a PWA hosted on Netlify and calls Render directly.",
+   "evidence": [
+    "frontend/src/AdminPage.jsx",
+    "frontend/netlify.toml"
+   ]
+  },
+  {
+   "unit_id": "email-notifications",
+   "level": 1,
+   "question": "What job does Email correspondence and notifications do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need Email correspondence and notifications?",
+    "What would a user notice first if Email correspondence and notifications stopped working?"
+   ],
+   "reference_answer": "It resend handles inbound webhook mail, approval-gated draft replies, and notification emails.",
+   "evidence": [
+    "backend/email_agent.py",
+    "backend/notifier.py"
+   ],
+   "orientation": {
+    "purpose": "Resend handles inbound webhook mail, approval-gated draft replies, and notification emails.",
+    "decision": "Inbound mail is stored in threads. Drafts are generated only on admin click and sent only after explicit approval. The notifier emails capability holders and throttles API-key alerts via a DB timestamp. Not chosen: Auto-reply; Gmail API; SMTP. Why: Prevents spam and cost, and gives a human gate. The features are inert without env config.",
+    "where": [
+     {
+      "path": "backend/email_agent.py",
+      "what": ""
+     },
+     {
+      "path": "backend/notifier.py",
+      "what": ""
+     },
+     {
+      "path": "backend/email_topics.md",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [human].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "email-notifications",
+   "level": 1,
+   "question": "Why does the rest of the system need Email correspondence and notifications?",
+   "variants": [
+    "What job does Email correspondence and notifications do for the rest of the system?",
+    "What would a user notice first if Email correspondence and notifications stopped working?"
+   ],
+   "reference_answer": "It resend handles inbound webhook mail, approval-gated draft replies, and notification emails.",
+   "evidence": [
+    "backend/email_agent.py",
+    "backend/notifier.py"
+   ],
+   "orientation": {
+    "purpose": "Resend handles inbound webhook mail, approval-gated draft replies, and notification emails.",
+    "decision": "Inbound mail is stored in threads. Drafts are generated only on admin click and sent only after explicit approval. The notifier emails capability holders and throttles API-key alerts via a DB timestamp. Not chosen: Auto-reply; Gmail API; SMTP. Why: Prevents spam and cost, and gives a human gate. The features are inert without env config.",
+    "where": [
+     {
+      "path": "backend/email_agent.py",
+      "what": ""
+     },
+     {
+      "path": "backend/notifier.py",
+      "what": ""
+     },
+     {
+      "path": "backend/email_topics.md",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [human].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "email-notifications",
+   "level": 1,
+   "question": "What would a user notice first if Email correspondence and notifications stopped working?",
+   "variants": [
+    "What job does Email correspondence and notifications do for the rest of the system?",
+    "Why does the rest of the system need Email correspondence and notifications?"
+   ],
+   "reference_answer": "It resend handles inbound webhook mail, approval-gated draft replies, and notification emails.",
+   "evidence": [
+    "backend/email_agent.py",
+    "backend/notifier.py"
+   ],
+   "orientation": {
+    "purpose": "Resend handles inbound webhook mail, approval-gated draft replies, and notification emails.",
+    "decision": "Inbound mail is stored in threads. Drafts are generated only on admin click and sent only after explicit approval. The notifier emails capability holders and throttles API-key alerts via a DB timestamp. Not chosen: Auto-reply; Gmail API; SMTP. Why: Prevents spam and cost, and gives a human gate. The features are inert without env config.",
+    "where": [
+     {
+      "path": "backend/email_agent.py",
+      "what": ""
+     },
+     {
+      "path": "backend/notifier.py",
+      "what": ""
+     },
+     {
+      "path": "backend/email_topics.md",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [human].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "email-notifications",
+   "level": 2,
+   "question": "What was chosen for Email correspondence and notifications?",
+   "variants": [
+    "Which alternative did Email correspondence and notifications turn down?",
+    "What constraint shaped Email correspondence and notifications?"
+   ],
+   "reference_answer": "It resend handles inbound webhook mail, approval-gated draft replies, and notification emails.",
+   "evidence": [
+    "backend/email_agent.py",
+    "backend/notifier.py"
+   ]
+  },
+  {
+   "unit_id": "email-notifications",
+   "level": 2,
+   "question": "Which alternative did Email correspondence and notifications turn down?",
+   "variants": [
+    "What was chosen for Email correspondence and notifications?",
+    "What constraint shaped Email correspondence and notifications?"
+   ],
+   "reference_answer": "It resend handles inbound webhook mail, approval-gated draft replies, and notification emails.",
+   "evidence": [
+    "backend/email_agent.py",
+    "backend/notifier.py"
+   ]
+  },
+  {
+   "unit_id": "email-notifications",
+   "level": 2,
+   "question": "What constraint shaped Email correspondence and notifications?",
+   "variants": [
+    "What was chosen for Email correspondence and notifications?",
+    "Which alternative did Email correspondence and notifications turn down?"
+   ],
+   "reference_answer": "It resend handles inbound webhook mail, approval-gated draft replies, and notification emails.",
+   "evidence": [
+    "backend/email_agent.py",
+    "backend/notifier.py"
+   ]
+  },
+  {
+   "unit_id": "email-notifications",
+   "level": 3,
+   "question": "If the decision behind Email correspondence and notifications were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if Email correspondence and notifications changed its approach?",
+    "Which part depends most on the choice in Email correspondence and notifications?"
+   ],
+   "reference_answer": "It resend handles inbound webhook mail, approval-gated draft replies, and notification emails.",
+   "evidence": [
+    "backend/email_agent.py",
+    "backend/notifier.py"
+   ]
+  },
+  {
+   "unit_id": "email-notifications",
+   "level": 3,
+   "question": "What breaks elsewhere if Email correspondence and notifications changed its approach?",
+   "variants": [
+    "If the decision behind Email correspondence and notifications were reversed, what else would have to change first?",
+    "Which part depends most on the choice in Email correspondence and notifications?"
+   ],
+   "reference_answer": "It resend handles inbound webhook mail, approval-gated draft replies, and notification emails.",
+   "evidence": [
+    "backend/email_agent.py",
+    "backend/notifier.py"
+   ]
+  },
+  {
+   "unit_id": "email-notifications",
+   "level": 3,
+   "question": "Which part depends most on the choice in Email correspondence and notifications?",
+   "variants": [
+    "If the decision behind Email correspondence and notifications were reversed, what else would have to change first?",
+    "What breaks elsewhere if Email correspondence and notifications changed its approach?"
+   ],
+   "reference_answer": "It resend handles inbound webhook mail, approval-gated draft replies, and notification emails.",
+   "evidence": [
+    "backend/email_agent.py",
+    "backend/notifier.py"
+   ]
+  },
+  {
+   "unit_id": "contacts-db",
+   "level": 1,
+   "question": "What job does Contacts database with privacy filter do for the rest of the system?",
+   "variants": [
+    "Why does the rest of the system need Contacts database with privacy filter?",
+    "What would a user notice first if Contacts database with privacy filter stopped working?"
+   ],
+   "reference_answer": "It on-demand lookup in a separate contacts.db, injected transiently into prompts.",
+   "evidence": [
+    "backend/contacts.py",
+    "scripts/populate_contacts_db.py"
+   ],
+   "orientation": {
+    "purpose": "On-demand lookup in a separate contacts.db, injected transiently into prompts.",
+    "decision": "A separate SQLite DB is built offline from email and LinkedIn data by scripts. A privacy filter excludes personal-email and family contacts. It is deployed to the Render disk. Not chosen: Put contacts in persona files; no contact lookup. Why: The data is large (about 18K entries) and private, so it is kept out of the prompt and out of git.",
+    "where": [
+     {
+      "path": "backend/contacts.py",
+      "what": ""
+     },
+     {
+      "path": "scripts/populate_contacts_db.py",
+      "what": ""
+     },
+     {
+      "path": "scripts/parse_email_contacts.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "contacts-db",
+   "level": 1,
+   "question": "Why does the rest of the system need Contacts database with privacy filter?",
+   "variants": [
+    "What job does Contacts database with privacy filter do for the rest of the system?",
+    "What would a user notice first if Contacts database with privacy filter stopped working?"
+   ],
+   "reference_answer": "It on-demand lookup in a separate contacts.db, injected transiently into prompts.",
+   "evidence": [
+    "backend/contacts.py",
+    "scripts/populate_contacts_db.py"
+   ],
+   "orientation": {
+    "purpose": "On-demand lookup in a separate contacts.db, injected transiently into prompts.",
+    "decision": "A separate SQLite DB is built offline from email and LinkedIn data by scripts. A privacy filter excludes personal-email and family contacts. It is deployed to the Render disk. Not chosen: Put contacts in persona files; no contact lookup. Why: The data is large (about 18K entries) and private, so it is kept out of the prompt and out of git.",
+    "where": [
+     {
+      "path": "backend/contacts.py",
+      "what": ""
+     },
+     {
+      "path": "scripts/populate_contacts_db.py",
+      "what": ""
+     },
+     {
+      "path": "scripts/parse_email_contacts.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "contacts-db",
+   "level": 1,
+   "question": "What would a user notice first if Contacts database with privacy filter stopped working?",
+   "variants": [
+    "What job does Contacts database with privacy filter do for the rest of the system?",
+    "Why does the rest of the system need Contacts database with privacy filter?"
+   ],
+   "reference_answer": "It on-demand lookup in a separate contacts.db, injected transiently into prompts.",
+   "evidence": [
+    "backend/contacts.py",
+    "scripts/populate_contacts_db.py"
+   ],
+   "orientation": {
+    "purpose": "On-demand lookup in a separate contacts.db, injected transiently into prompts.",
+    "decision": "A separate SQLite DB is built offline from email and LinkedIn data by scripts. A privacy filter excludes personal-email and family contacts. It is deployed to the Render disk. Not chosen: Put contacts in persona files; no contact lookup. Why: The data is large (about 18K entries) and private, so it is kept out of the prompt and out of git.",
+    "where": [
+     {
+      "path": "backend/contacts.py",
+      "what": ""
+     },
+     {
+      "path": "scripts/populate_contacts_db.py",
+      "what": ""
+     },
+     {
+      "path": "scripts/parse_email_contacts.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Yusuf Pisan [assisted].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "contacts-db",
+   "level": 2,
+   "question": "What was chosen for Contacts database with privacy filter?",
+   "variants": [
+    "Which alternative did Contacts database with privacy filter turn down?",
+    "What constraint shaped Contacts database with privacy filter?"
+   ],
+   "reference_answer": "It on-demand lookup in a separate contacts.db, injected transiently into prompts.",
+   "evidence": [
+    "backend/contacts.py",
+    "scripts/populate_contacts_db.py"
+   ]
+  },
+  {
+   "unit_id": "contacts-db",
+   "level": 2,
+   "question": "Which alternative did Contacts database with privacy filter turn down?",
+   "variants": [
+    "What was chosen for Contacts database with privacy filter?",
+    "What constraint shaped Contacts database with privacy filter?"
+   ],
+   "reference_answer": "It on-demand lookup in a separate contacts.db, injected transiently into prompts.",
+   "evidence": [
+    "backend/contacts.py",
+    "scripts/populate_contacts_db.py"
+   ]
+  },
+  {
+   "unit_id": "contacts-db",
+   "level": 2,
+   "question": "What constraint shaped Contacts database with privacy filter?",
+   "variants": [
+    "What was chosen for Contacts database with privacy filter?",
+    "Which alternative did Contacts database with privacy filter turn down?"
+   ],
+   "reference_answer": "It on-demand lookup in a separate contacts.db, injected transiently into prompts.",
+   "evidence": [
+    "backend/contacts.py",
+    "scripts/populate_contacts_db.py"
+   ]
+  },
+  {
+   "unit_id": "contacts-db",
+   "level": 3,
+   "question": "If the decision behind Contacts database with privacy filter were reversed, what else would have to change first?",
+   "variants": [
+    "What breaks elsewhere if Contacts database with privacy filter changed its approach?",
+    "Which part depends most on the choice in Contacts database with privacy filter?"
+   ],
+   "reference_answer": "It on-demand lookup in a separate contacts.db, injected transiently into prompts.",
+   "evidence": [
+    "backend/contacts.py",
+    "scripts/populate_contacts_db.py"
+   ]
+  },
+  {
+   "unit_id": "contacts-db",
+   "level": 3,
+   "question": "What breaks elsewhere if Contacts database with privacy filter changed its approach?",
+   "variants": [
+    "If the decision behind Contacts database with privacy filter were reversed, what else would have to change first?",
+    "Which part depends most on the choice in Contacts database with privacy filter?"
+   ],
+   "reference_answer": "It on-demand lookup in a separate contacts.db, injected transiently into prompts.",
+   "evidence": [
+    "backend/contacts.py",
+    "scripts/populate_contacts_db.py"
+   ]
+  },
+  {
+   "unit_id": "contacts-db",
+   "level": 3,
+   "question": "Which part depends most on the choice in Contacts database with privacy filter?",
+   "variants": [
+    "If the decision behind Contacts database with privacy filter were reversed, what else would have to change first?",
+    "What breaks elsewhere if Contacts database with privacy filter changed its approach?"
+   ],
+   "reference_answer": "It on-demand lookup in a separate contacts.db, injected transiently into prompts.",
+   "evidence": [
+    "backend/contacts.py",
+    "scripts/populate_contacts_db.py"
+   ]
+  }
+ ]
+}

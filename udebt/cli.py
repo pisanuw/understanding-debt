@@ -1240,6 +1240,8 @@ def _kind_of(data, name: str) -> str:
     if isinstance(data, dict):
         if data.get("format") == "udebt-export":
             return "import" if "map" in data else "export"
+        if data.get("format") == "udebt-advance-quizzes":
+            return "quizzes"
         if "fingerprint" in data and "points" in data:
             return "snapshots"
         if "developers" in data:
@@ -1254,6 +1256,10 @@ def _kind_of(data, name: str) -> str:
 def cmd_worker(args) -> int:
     from . import worker
 
+    if args.action == "quizzes":
+        from .hosted import advance
+
+        return advance.run(args)
     if args.action == "sql":
         from .loadsql import LoadError, analysis_json, analysis_sql
 
@@ -2640,6 +2646,18 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--url", help="the repository URL to store (default: the manifest's)")
     x.add_argument("--out", help="write the SQL here instead of stdout")
     x.set_defaults(fn=cmd_worker)
+    x = wk.add_parser("quizzes", help="questions written in advance, self-checked by visitors "
+                      "who are not signed in (levels 1-3)")  # fmt: skip
+    x.add_argument("source", help="a sample name, a worker output, a load script (.sql) or a "
+                   "rows file (.json)")  # fmt: skip
+    x.add_argument("--out", help="the file to write, e.g. web/public/samples/<name>.quizzes.json")
+    x.add_argument("--levels", default="1-3", help="ladder levels, within 1-3 (default 1-3)")
+    x.add_argument("--per", type=int, default=3, help="questions per unit and level (1-3)")
+    x.add_argument("--batch", type=int, default=5, help="units per model call (1-12)")
+    x.add_argument("--clone", help="a local clone holding the commit (default: read GitHub)")
+    x.add_argument("--plan", action="store_true", help="print the calls, make none")
+    x.add_argument("--model", help="the model for the claude CLI (default: its own)")
+    x.set_defaults(fn=cmd_worker)
 
     s = sub.add_parser("remote", help="the hosted store push and pull talk to")
     s.add_argument("action", nargs="?", choices=["show", "set", "token"], default="show")
@@ -2656,7 +2674,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("validate", help="check a JSON file against the versioned contract")
     s.add_argument("file")
     s.add_argument("--kind", choices=["map", "record", "snapshots", "commits", "responsibility",
-                                      "export", "import", "evidence"])  # fmt: skip
+                                      "export", "import", "evidence", "quizzes"])  # fmt: skip
     s.set_defaults(fn=cmd_validate)
 
     s = sub.add_parser("serve", help="the teaching surface in your browser, on 127.0.0.1")

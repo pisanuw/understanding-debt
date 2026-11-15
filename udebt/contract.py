@@ -10,11 +10,19 @@ properties, required, items, enum, const, minimum, maximum, additionalProperties
     responsibility   .udebt/responsibility.json                udebt responsibility seed
     export           `udebt export --format json` (udebt-export v1), the import format
     import           what `udebt push` sends: an export with an optional sanitized `map`
+    quizzes          advance quizzes (udebt-advance-quizzes v1)   udebt worker quizzes
 
 `CONTRACT` is the contract's version; an export carries it as `contract`. A field may be added
 without a version change (consumers ignore what they do not know: `additionalProperties` is
 open everywhere); removing or retyping one bumps it. Validation is strict about what a
 consumer relies on and silent about the rest.
+
+`quizzes` (added 2026-11-15, no version change: adding a kind changes no existing one) is the
+file the hosted site serves next to a sample's static JSON: questions written in advance per
+unit and ladder level 1-3, each with its reference answer (and, at level 1, the orientation
+shown before it), which a visitor who is not signed in answers and checks against the reference
+without a model call. Its own `version` is the file format's, bumped when a field is removed or
+retyped, as `contract` is for the rest.
 
 `sanitize_map` is the map as the hosted service stores it: the descriptions, paths, history
 and orientations, the tour; never the walkthroughs (narration tied to line ranges of the
@@ -240,6 +248,39 @@ EXPORT = _t(
     },
 )  # fmt: skip
 
+ADVANCE_QUESTION = _t(
+    "object",
+    required=["unit_id", "level", "question", "reference_answer"],
+    properties={
+        "unit_id": STR,
+        "level": _t("integer", minimum=1, maximum=3),
+        "question": STR,
+        "variants": STRS,
+        "reference_answer": STR,
+        "evidence": STRS,
+        "orientation": _t("object", required=["purpose", "decision", "where", "shaped_by"],
+                          properties={"purpose": STR, "decision": STR, "shaped_by": STR,
+                                      "where": _t("array", items=_t("object", required=["path"],
+                                                                    properties={"path": STR}))}),
+    },
+)  # fmt: skip
+QUIZZES = _t(
+    "object",
+    required=["format", "version", "repo", "sha", "questions"],
+    properties={
+        "format": _t("string", const="udebt-advance-quizzes"),
+        "version": _t("integer", const=1),
+        "repo": STR,
+        "name": STR,
+        "sha": STR,
+        "generated_at": OPT_STR,
+        "levels": _t("array", items=_t("integer", minimum=1, maximum=3)),
+        "per": INT,
+        "calls": INT,
+        "questions": _t("array", items=ADVANCE_QUESTION),
+    },
+)
+
 SCHEMAS: dict[str, dict[str, Any]] = {
     "map": MAP,
     "record": RECORD,
@@ -249,6 +290,7 @@ SCHEMAS: dict[str, dict[str, Any]] = {
     "export": EXPORT,
     "import": EXPORT,
     "evidence": EVIDENCE,
+    "quizzes": QUIZZES,
 }
 
 _PY = {

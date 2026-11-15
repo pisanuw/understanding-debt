@@ -178,3 +178,148 @@ def analysis_sql(
         "commit;",
     ]
     return "\n".join(lines) + "\n"
+
+
+# -- reading a script back ------------------------------------------------------------------
+#
+# The site serves the samples to visitors who are not signed in as static JSON (web/public/
+# samples/, udebt.hosted.static_samples), the same rows `udebt worker sql --dialect json
+# --public` writes. They are derived from the committed load scripts (samples/*.sql), so no
+# worker output has to be kept: `rows_from_sql` reads back what `analysis_sql` wrote, in either
+# dialect, and `analysis_rows(out)` == `rows_from_sql(analysis_sql(out))` for the same options.
+
+_JSON_COLUMNS = {"manifest", "export", "map", "specs"}
+_TOKEN = re.compile(r"\s+|--[^\n]*|[A-Za-z_][A-Za-z0-9_.]*|-?\d+|[(),;=]|\$|'|.", re.S)
+
+
+def _tokens(text: str) -> list[tuple[str, Any]]:
+    """(kind, value) for the script: `str` (a literal, value (text, is_json)), `null`,
+    `bool`, `int`, `word`, `punct`; comments and whitespace dropped."""
+    out: list[tuple[str, Any]] = []
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == "$":
+            m = re.compile(r"\$([A-Za-z0-9_]*)\$").match(text, i)
+            if not m:
+                raise LoadError(f"unreadable dollar quote at {i}")
+            tag = m.group(0)
+            end = text.find(tag, m.end())
+            if end < 0:
+                raise LoadError(f"unterminated dollar quote {tag}")
+            value, i = text[m.end() : end], end + len(tag)
+            is_json = text.startswith("::jsonb", i)
+            i += 7 if is_json else 0
+            out.append(("str", (value, is_json)))
+            continue
+        if c == "'":
+            j, buf = i + 1, []
+            while True:
+                k = text.find("'", j)
+                if k < 0:
+                    raise LoadError("unterminated quoted string")
+                buf.append(text[j:k])
+                if text.startswith("''", k):
+                    buf.append("'")
+                    j = k + 2
+                    continue
+                i = k + 1
+                break
+            out.append(("str", ("".join(buf), False)))
+            continue
+        m = _TOKEN.match(text, i)
+        assert m is not None
+        tok, i = m.group(0), m.end()
+        if tok.isspace() or tok.startswith("--"):
+            continue
+        low = tok.lower()
+        if low == "null":
+            out.append(("null", None))
+        elif low in ("true", "false"):
+            out.append(("bool", low == "true"))
+        elif re.fullmatch(r"-?\d+", tok):
+            out.append(("int", int(tok)))
+        elif tok in "(),;=":
+            out.append(("punct", tok))
+        else:
+            out.append(("word", low))
+    return out
+
+
+def _insert_values(toks: list[tuple[str, Any]], table: str) -> tuple[list[str], list[Any]]:
+    """The column names and values of the script's `insert into <table>`; a parenthesised
+    subselect is read as the literals it holds."""
+    for i in range(len(toks) - 2):
+        if toks[i] == ("word", "insert") and toks[i + 2] == ("word", table):
+            break
+    else:
+        raise LoadError(f"no insert into {table}")
+    j = i + 3
+    if toks[j] != ("punct", "("):
+        raise LoadError(f"{table}: no column list")
+    cols: list[str] = []
+    j += 1
+    while toks[j] != ("punct", ")"):
+        if toks[j][0] == "word":
+            cols.append(toks[j][1])
+        j += 1
+    j += 1
+    if toks[j] != ("word", "values") or toks[j + 1] != ("punct", "("):
+        raise LoadError(f"{table}: no values")
+    j += 2
+    values: list[Any] = []
+    while toks[j] != ("punct", ")"):
+        kind, v = toks[j]
+        if kind == "punct" and v == ",":
+            j += 1
+            continue
+        if kind == "punct" and v == "(":
+            depth, inner = 1, []
+            j += 1
+            while depth:
+                k2, v2 = toks[j]
+                depth += (k2, v2) == ("punct", "(")
+                depth -= (k2, v2) == ("punct", ")")
+                if depth and k2 == "str":
+                    inner.append(v2[0])
+                j += 1
+            values.append(("subselect", inner))
+            continue
+        values.append(v)
+        j += 1
+    if len(values) != len(cols):
+        raise LoadError(f"{table}: {len(cols)} columns, {len(values)} values")
+    return cols, values
+
+
+def rows_from_sql(text: str) -> dict[str, Any]:
+    """The repository row and the analysis row a script from `analysis_sql` loads, as
+    `analysis_rows` gives them (JSON columns parsed)."""
+    toks = _tokens(text)
+    rcols, rvals = _insert_values(toks, "app_udebt.repositories")
+    acols, avals = _insert_values(toks, "app_udebt.analyses")
+
+    def plain(v: Any, col: str) -> Any:
+        if isinstance(v, tuple) and len(v) == 2 and isinstance(v[1], bool):
+            text_, is_json = v
+            return json.loads(text_) if is_json or col in _JSON_COLUMNS else text_
+        return v
+
+    if not {"url", "name"} <= set(rcols) or not {"sha", "manifest", "specs"} <= set(acols):
+        raise LoadError("not a script `udebt worker sql` wrote (columns missing)")
+    repo = {c: plain(v, c) for c, v in zip(rcols, rvals, strict=True)}
+    repo["is_sample"] = bool(repo.get("is_sample"))
+    an = {c: plain(v, c) for c, v in zip(acols, avals, strict=True)}
+    an.pop("repo_id", None)
+    return {
+        "repository": {k: repo.get(k) for k in ("url", "name", "license", "is_sample")},
+        "analysis": {"repo_url": repo["url"], **{k: an.get(k) for k in (
+            "sha", "user_id", "contract", "manifest", "export", "map", "specs", "storage_path")}},
+    }  # fmt: skip
+
+
+def json_from_sql(text: str) -> str:
+    """`analysis_json` for the analysis a script loads: one fixture document."""
+    rows = rows_from_sql(text)
+    doc = {"repositories": [rows["repository"]], "analyses": [rows["analysis"]]}
+    return json.dumps(doc, ensure_ascii=False, separators=(",", ":")) + "\n"

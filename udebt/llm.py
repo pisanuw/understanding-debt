@@ -195,6 +195,8 @@ class FakeLLM:
             units = _unit_blocks(prompt)
             m = re.search(r"Write\s+(?:exactly\s+)?(\d+)\s+question", prompt)
             n = int(m.group(1)) if m else 1
+            if "You cannot open files" in prompt:  # the hosted prompt (udebt/hosted/advance.py)
+                return {"questions": _hosted_questions(prompt, n)}
             return {
                 "questions": [
                     {
@@ -359,6 +361,47 @@ _FAKE_QUESTIONS = {
     5: ["What happens in {u} when the input is empty?",
         "Why does {u} keep its state that way?"],
 }  # fmt: skip
+
+
+# The hosted prompt's fake answers, as web/netlify/functions/lib/fake.ts writes them for the
+# preview's gateway: questions name the unit, follow its level, reference its summary and cite
+# the excerpts the prompt carried for it (its paths otherwise); n per unit in rotation.
+_HOSTED_ASK = {
+    1: ["What job does {n} do for the rest of the system?", "Why does the rest of the system need "
+        "{n}?", "What would a user notice first if {n} stopped working?"],
+    2: ["What was chosen for {n}?", "Which alternative did {n} turn down?",
+        "What constraint shaped {n}?"],
+    3: ["If the decision behind {n} were reversed, what else would have to change first?",
+        "What breaks elsewhere if {n} changed its approach?",
+        "Which part depends most on the choice in {n}?"],
+}  # fmt: skip
+
+
+def _hosted_questions(prompt: str, n: int) -> list[dict[str, Any]]:
+    shown = list(dict.fromkeys(re.findall(r"^--- (.+) lines \d+-\d+$", prompt, re.M)))
+    out = []
+    for block in prompt.split("\n- unit_id: ")[1:]:
+        fields = {"id": block.split("\n", 1)[0].strip()}
+        for ln in block.splitlines()[1:]:
+            if not ln.startswith("  "):
+                break
+            k, _, v = ln.strip().partition(": ")
+            if k in ("name", "level", "summary", "paths"):
+                fields.setdefault(k, v)
+        name = re.sub(r" \(a part of .*\)$", "", fields.get("name", fields["id"])).strip()
+        level = int((fields.get("level") or "1").split()[0])
+        paths = [p.strip() for p in fields.get("paths", "").split(",") if p.strip()]
+        dirs = [p.rstrip("/") + "/" for p in paths]
+        under = [f for f in shown if f in paths or any(f.startswith(d) for d in dirs)]
+        summary = fields.get("summary", "").strip()
+        ref = f"It {summary[:1].lower()}{summary[1:]}" if summary else f"{name} does one job."
+        asks = [a.format(n=name) for a in _HOSTED_ASK.get(level, _HOSTED_ASK[1])]
+        for k in range(n):
+            q = asks[k % 3]
+            out.append({"unit_id": fields["id"], "level": level, "question": q,
+                        "variants": [a for a in asks if a != q][:2], "reference_answer": ref,
+                        "evidence": (under or paths)[:2]})  # fmt: skip
+    return out
 
 
 def _unit_blocks(prompt: str) -> list[dict[str, Any]]:
