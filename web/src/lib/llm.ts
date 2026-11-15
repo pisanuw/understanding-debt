@@ -20,7 +20,10 @@ export type LlmMode = 'byok' | 'gateway' | 'off';
 
 export const MODE_KEY = 'hintwise.llmMode';
 export const BYOK_KEY = 'hintwise.anthropicKey';
-export const DEFAULT_MODEL = 'claude-opus-5-5';
+/** The cheaper of the gateway's two models (owner, 15 Nov 2026): a quiz sitting costs about half
+ *  of what it would on the default, so $0.25 a day is about seven short sittings, not three. The
+ *  gateway row (supabase/ops/udebt-llm-caps.sql) names the same model for calls that send none. */
+export const DEFAULT_MODEL = 'claude-sonnet-5-5';
 export const DEFAULT_MAX_TOKENS = 1024;
 /** The row in platform.llm_apps this app calls the gateway as. */
 export const GATEWAY_APP = APP_SLUG;

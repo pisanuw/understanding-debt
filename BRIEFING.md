@@ -753,8 +753,9 @@ acceptable.
 - **Phase 4b answers (2026-11-15, 15-minute rule; the owner can reverse any of them):**
   (1) a signed-in person's shared analysis stays visible, labelled as theirs, HintWise's own
   preferred (revisit with real users; the alternative is a worker signature or samples only);
-  (2) the platform's default $0.25 per person per day stays until measured on the gateway,
-  `default_model` unchanged; (3) own-row records stay: the hosted debt is a self-assessment,
+  (2) the platform's default $0.25 per person per day stays until measured on the gateway;
+  the owner then said yes (same day, "1 yes") to the cheaper model as `default_model`
+  (`supabase/ops/udebt-llm-caps.sql`, the web app's `DEFAULT_MODEL`); (3) own-row records stay: the hosted debt is a self-assessment,
   README says so; (4) the free instance keeps 6,000 commits and 200 MB, large repositories are
   precomputed samples or `udebt worker run` locally then `udebt push`; (5) the spaced review
   queue is ported next, the tutor (needs streaming and the `claude` CLI) after.
@@ -765,6 +766,13 @@ acceptable.
   hooks, permissions and `.mcp.json` never load (found by the testbeds session: sentry-javascript's
   SessionStart hook installed and built the clone on every call). Reproduced with a one-hook
   repository: the hook ran without the flags, not with them. The hosted worker is unaffected.
+
+- **Owner's yeses of 2026-11-15 (after the Phase 4b report):** (1) the cheaper model as
+  the hosted default; (2) a fallback for units whose paths are directories only (12 of mlflow's
+  30 units had no file for a quiz): the top tracked files under the directory; (3) the production
+  steps in docs/DEPLOY.md, in their order: the session merges to `main`, the owner imports the
+  Netlify site and creates the Render blueprint, the Plabs session runs the migrations, labels,
+  the three sample loads and the caps file.
 
 ## Open questions
 

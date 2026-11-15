@@ -73,7 +73,7 @@ SQLite and Postgres 16 and every signed-in person reads the sample.
 
 ## 5. Gateway settings (the owner names the numbers)
 
-`0002_hosted.sql` registers the app (`platform.llm_apps`, default caps). A quiz sitting makes
+`0002_hosted.sql` registers the app (`platform.llm_apps`, default caps); `ops/udebt-llm-caps.sql` then sets the cheaper model and the caps the owner chose. A quiz sitting makes
 two gateway calls (writing the questions, grading the answers), each at most 4096 output tokens;
 the owner picks the per-person and per-app caps after measuring them (docs/DEPLOY.md, "Not
 tested"), and the Plabs session sets them with an `ops/udebt-llm-caps.sql` like photo2pgn's.

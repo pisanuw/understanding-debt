@@ -77,12 +77,13 @@ worker, used for that job and dropped).
    explicitly; do not derive it from the repository name).
 5. "Set CNAME" / "Render domain": `udebt-api.hintwise.org` -> the Render service `udebt-api`.
 6. "Netlify env" on site `udebt`: `SUPABASE_URL` and `SUPABASE_ANON_KEY`, if the owner did not.
-7. The samples, once the "UDebt: Nov 12" session delivers the three worker outputs:
-   `pip install . && python -m udebt.hosted.samples <hf> <sentry> <mlflow> --out sample-sql`,
-   copy the three `.sql` files into claude-built-apps (for example `udebt/supabase/ops/`),
-   run the admin workflow's `sql <file>` for each, then `check-schema app_udebt` again.
-8. Gateway settings, once the owner names the numbers (below): an `ops/udebt-llm-caps.sql`
-   like photo2pgn's (caps; optionally `default_model`), run with `sql`.
+7. The samples: `samples/{huggingface_hub,sentry-javascript,mlflow}.sql` in this repository
+   (made by the "UDebt: Nov 12" session; `samples/README.md` has their sha256s and how they
+   were made; each applied twice to a scratch Postgres 16 after the migrations). Copy them
+   into claude-built-apps (for example `udebt/supabase/ops/`), run the admin workflow's
+   `sql <file>` for each, then `check-schema app_udebt` again.
+8. Gateway settings: `supabase/ops/udebt-llm-caps.sql` (the cheaper model as `default_model`,
+   $2 a day for the app, $0.25 a day per person; owner's yes of 15 Nov 2026), run with `sql`.
 
 ### Checks after the deploy
 
@@ -128,11 +129,13 @@ fixture the request bodies were about 26 KB and 15 KB for a two-question sitting
 and 3,700 input tokens at four characters a token) and 61 KB and 36 KB for five questions;
 code excerpts are capped at 60,000 characters a call; the answers are a few hundred to 1,500
 output tokens. At the gateway's default model price ($4 in, $20 out per million) that is about
-$0.07 for a two-question sitting and $0.16 for five, so the default $0.25 per person per day is
-three short sittings. A review sitting is one call, the grading (its questions are stored
-phrasings), about the size of a quiz's grading call. Choosing a cheaper `default_model` for
-udebt in `platform.llm_apps`, or call caps per person (photo2pgn's pattern), are the owner's
-levers. Measure on the live gateway before settling (`usage` in the admin workflow).
+$0.07 for a two-question sitting and $0.16 for five, so $0.25 per person per day would be three
+short sittings. udebt uses the cheaper model ($2 in, $10 out; `DEFAULT_MODEL` in the web app and
+`default_model` in `supabase/ops/udebt-llm-caps.sql`, owner's yes of 15 Nov 2026), so a sitting
+is about $0.035 or $0.08 and the day's $0.25 about seven short sittings. A review sitting is one
+call, the grading (its questions are stored phrasings), about the size of a quiz's grading call.
+Call caps per person (photo2pgn's pattern) are the other lever. Measure on the live gateway
+before settling (`usage` in the admin workflow).
 
 A new analysis runs on the person's own key: a map (one call plus up to seven read turns),
 orientations, the tour and three walkthroughs, each a short tool loop; roughly 10 to 30 calls.
