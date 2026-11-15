@@ -3,8 +3,10 @@
  * (code fetched through /api/excerpt from the fake GitHub), take a two-question level-1 quiz
  * through the fake gateway, see the debt fall, then delete the account; and the spaced review:
  * a missed question comes back in Review the next day (the browser's clock moved by
- * Playwright's fake clock, not by waiting) and a correct answer moves its state on. Fails on
- * any Content-Security-Policy violation: the preview sends the live site's headers.
+ * Playwright's fake clock, not by waiting) and a correct answer moves its state on; and a quiz
+ * on a unit that names only directories, written from the top files under them (the tree
+ * fallback). Fails on any Content-Security-Policy violation: the preview sends the live site's
+ * headers.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -151,5 +153,45 @@ test('a missed question comes back in Review the next day, and a correct answer 
   expect(saved.records[1].question).toBe(again);
   await page.getByRole('link', { name: 'Your debt' }).click();
   expect(Number(await page.getByTestId('debt-tile').textContent())).toBeLessThan(before);
+  expect(csp).toEqual([]);
+});
+
+test('a quiz on a unit that names only directories gets code from the top files under them', async ({ page }) => {
+  // React/Vite frontend lists only `frontend`, with no walkthrough or orientation: before the tree
+  // fallback its question was written with no code. Now the page lists the directory through
+  // /api/tree (the fake GitHub: `git ls-tree` of the local clone), sends the top files as
+  // references, the function fetches their first lines, and the fake gateway cites them.
+  const csp = watchCsp(page);
+  const trees: string[] = [];
+  page.on('request', (r) => {
+    if (new URL(r.url()).pathname === '/api/tree') trees.push(r.url());
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Continue with Google' }).click();
+  await page.goto('/#/settings');
+  await page.getByLabel(/The HintWise key/).check();
+  for (const sitting of [1, 2]) {
+    await page.goto('/#/r/1/quiz');
+    await page.getByLabel('Questions').selectOption('1');
+    await page.getByLabel('Unit').selectOption('frontend-spa');
+    const written = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/questions');
+    await page.getByRole('button', { name: 'Start' }).click();
+    const res = await written;
+    const sent = res.request().postDataJSON() as { units: { id: string; refs: { path: string; start: number; end: number }[] }[] };
+    expect(sent.units.map((u) => u.id)).toEqual(['frontend-spa']);
+    expect(sent.units[0].refs.map((r) => `${r.path}:${r.start}-${r.end}`)).toEqual(['frontend/src/AdminPage.jsx:1-60', 'frontend/src/App.jsx:1-60', 'frontend/src/WarmthMeter.jsx:1-60', 'frontend/src/SharedConversation.jsx:1-60']);
+    const { questions } = (await res.json()) as { questions: { evidence: string[] }[] };
+    expect(questions[0].evidence).toEqual(['frontend/src/AdminPage.jsx', 'frontend/src/App.jsx']);
+    await expect(page.getByText('[1/1] React/Vite frontend')).toBeVisible();
+    await page.getByLabel('Your answer').fill(`It is the browser app: chat, the warmth meter and the admin page (sitting ${sitting}).`);
+    await page.getByRole('button', { name: 'Answer and grade' }).click();
+    await expect(page.getByText('1 correct (one grading call).')).toBeVisible();
+    const line = page.getByTestId('evidence');
+    await expect(line).toHaveText('In the code: frontend/src/AdminPage.jsx, frontend/src/App.jsx');
+    await expect(line.getByRole('link').first()).toHaveAttribute('href', 'https://github.com/pisanuw/digitalme/blob/f93102b121f1da9055c148e8eccde275ccf18236/frontend/src/AdminPage.jsx');
+  }
+  // One listing per directory per session: the second sitting asked GitHub nothing.
+  expect(trees).toHaveLength(1);
+  expect(new URL(trees[0]).searchParams.getAll('path')).toEqual(['frontend']);
   expect(csp).toEqual([]);
 });

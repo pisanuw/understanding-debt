@@ -23,6 +23,8 @@ export const MAX_LINES = 200;
 export const DEFAULT_LINES = 80;
 /** A file larger than this is not read (bytes). */
 export const MAX_FILE_BYTES = 2_000_000;
+/** Lines read from the top of a file a unit names or stands for (no walkthrough range). */
+export const TOP_LINES = 60;
 
 /** A repository-relative path that cannot leave the repository, or null. */
 export function safePath(path: unknown): string | null {
@@ -72,7 +74,18 @@ export function sliceLines(text: string, ref: ExcerptRef): Excerpt {
   return { path: ref.path, start, end: start + lines.length - 1, lines, cut: Math.max(0, asked - lines.length) };
 }
 
-/** What the question writer sees of a unit: its walkthrough's steps, else the top of the files its orientation points to. */
+const FILE_SHAPED = /\.[A-Za-z0-9]{1,6}$/;
+
+function unitPaths(u: SpecUnit): unknown[] {
+  return [...(u.orientation?.where?.map((w) => w.path) ?? []), ...(u.paths ?? [])];
+}
+
+/**
+ * What the question writer sees of a unit: its walkthrough's steps, else the top of the files
+ * its orientation and paths name, else the top of the files the worker recorded under its
+ * directories (`files`). Empty for a unit that names only directories in an analysis made
+ * before `files` (dirPaths and the tree fallback then pick files from GitHub).
+ */
 export function refsForUnit(u: SpecUnit, walk?: Walkthrough | null, limit = 4): ExcerptRef[] {
   const out: ExcerptRef[] = [];
   const add = (r: ExcerptRef | null) => {
@@ -83,11 +96,32 @@ export function refsForUnit(u: SpecUnit, walk?: Walkthrough | null, limit = 4): 
     if (path) add({ path, ...clampRange(st.start_line, st.end_line) });
   }
   if (!out.length) {
-    const where = u.orientation?.where?.map((w) => w.path) ?? [];
-    for (const p of [...where, ...(u.paths ?? [])]) {
+    for (const p of unitPaths(u)) {
       const path = safePath(p);
-      if (path && !path.endsWith('/') && /\.[A-Za-z0-9]{1,6}$/.test(path)) add({ path, start: 1, end: 60 });
+      if (path && !path.endsWith('/') && FILE_SHAPED.test(path)) add({ path, start: 1, end: TOP_LINES });
     }
+  }
+  if (!out.length) for (const ref of topRefs(Array.isArray(u.files) ? u.files : [], limit)) add(ref);
+  return out;
+}
+
+/** The directories among a unit's orientation and paths (what refsForUnit does not read as a file), in order. */
+export function dirPaths(u: SpecUnit, limit = 4): string[] {
+  const out: string[] = [];
+  for (const p of unitPaths(u)) {
+    if (typeof p !== 'string') continue;
+    const d = safePath(p.trim().replace(/\/+$/, ''));
+    if (d && !(FILE_SHAPED.test(d) && safePath(p)) && !out.includes(d)) out.push(d);
+  }
+  return out.slice(0, limit);
+}
+
+/** Lines 1-TOP_LINES of each file, as a file named without a range is read. */
+export function topRefs(files: readonly unknown[], limit = 4): ExcerptRef[] {
+  const out: ExcerptRef[] = [];
+  for (const f of files) {
+    const path = safePath(f);
+    if (path && out.length < limit && !out.some((x) => x.path === path)) out.push({ path, start: 1, end: TOP_LINES });
   }
   return out;
 }

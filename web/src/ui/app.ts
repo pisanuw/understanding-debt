@@ -13,6 +13,7 @@ import type { UdebtStore } from '../data/store';
 import { onAuth, type AuthClient, type SignInOptions } from '../lib/auth';
 import type { LlmMode } from '../model/prefs';
 import type { QuizClient } from '../model/client';
+import { TreeCache, type TreeFetch } from '../model/tree';
 import type { WorkerClient } from '../model/worker';
 import { clear, h } from './dom';
 import { addScreen } from './screens/add';
@@ -30,6 +31,8 @@ export interface AppDeps {
   quiz: (mode?: LlmMode) => QuizClient | null;
   /** A line range of a file at a commit, through /api/excerpt (no model call). */
   excerpt: (repoUrl: string, sha: string, ref: ExcerptRef) => Promise<Excerpt>;
+  /** The top files under directories at a commit, through /api/tree (the tree fallback; none: no fallback). */
+  tree?: TreeFetch;
   worker: WorkerClient | null;
   preview: boolean;
   storage?: Storage;
@@ -86,12 +89,15 @@ export class App {
   private leaving: (() => void)[] = [];
   /** The same for the screen being built. */
   private building: (() => void)[] = [];
+  /** Directory listings for units that name only directories, kept for this page session (model/tree.ts). */
+  readonly trees: TreeCache | null;
 
   constructor(
     readonly root: HTMLElement,
     readonly deps: AppDeps,
     readonly win: Window = window,
   ) {
+    this.trees = deps.tree ? new TreeCache(deps.tree) : null;
     this.who = h('nav', { class: 'who', 'aria-label': 'Account' });
     const top = h('header', { class: 'top' }, h('div', { class: 'wrap' }, h('a', { class: 'brand', href: '#/' }, h('strong', null, 'udebt'), h('span', null, 'understanding debt')), this.who));
     this.main = h('main', { class: 'wrap', id: 'main' });

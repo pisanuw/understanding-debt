@@ -2,8 +2,9 @@
  * Screenshots of every screen at 1280 and 390 px, light and dark, for a person to look at
  * (UDEBT_SHOTS=1 npm run e2e; written to UDEBT_SHOTS_DIR, default ../.udebt/dashboard,
  * as hosted-<screen>-<width>-<scheme>.png), the Review tab and a review sitting among them
- * (hosted-review-*.png, a day later on Playwright's fake clock). Also checks that no page
- * scrolls sideways.
+ * (hosted-review-*.png, a day later on Playwright's fake clock) and a quiz on a unit that names
+ * only directories (hosted-tree-*.png: the question, and the grade with the files it rests on).
+ * Also checks that no page scrolls sideways.
  */
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
@@ -116,6 +117,30 @@ for (const width of [1280, 390]) {
       await page.getByRole('link', { name: 'Back to Review' }).click();
       await expect(page.getByRole('heading', { name: 'Nothing due now' })).toBeVisible();
       await shot(page, 'review-after', width, scheme);
+      await page.evaluate(() => sessionStorage.clear());
+    });
+  }
+}
+
+for (const width of [1280, 390]) {
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`a quiz on a unit that names only directories at ${width}px, ${scheme}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Continue with Google' }).click();
+      await page.goto('/#/settings');
+      await page.getByLabel(/The HintWise key/).check();
+      await page.goto('/#/r/1/quiz');
+      await page.getByLabel('Questions').selectOption('1');
+      await page.getByLabel('Unit').selectOption('frontend-spa');
+      await page.getByRole('button', { name: 'Start' }).click();
+      await expect(page.getByText('[1/1] React/Vite frontend')).toBeVisible();
+      await page.getByLabel('Your answer').fill('It is the browser app: the chat, the warmth meter and the admin page.');
+      await shot(page, 'tree-question', width, scheme);
+      await page.getByRole('button', { name: 'Answer and grade' }).click();
+      await expect(page.getByTestId('evidence')).toBeVisible();
+      await shot(page, 'tree-graded', width, scheme);
       await page.evaluate(() => sessionStorage.clear());
     });
   }

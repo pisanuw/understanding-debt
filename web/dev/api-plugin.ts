@@ -10,13 +10,14 @@ import { readFileSync, readdirSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import type { Connect, Plugin } from 'vite';
-import { handleExcerpt, handleGrade, handleQuestions } from '../netlify/functions/lib/handlers';
+import { handleExcerpt, handleGrade, handleQuestions, handleTree } from '../netlify/functions/lib/handlers';
 import type { Fixture } from '../src/data/store';
 
 const ROUTES: Record<string, (req: Request) => Promise<Response>> = {
   '/api/questions': (r) => handleQuestions(r),
   '/api/grade': (r) => handleGrade(r),
   '/api/excerpt': (r) => handleExcerpt(r),
+  '/api/tree': (r) => handleTree(r),
 };
 
 /** Every fixture file in `dir` merged (fixtures/*.json, then fixtures/local/*.json). */

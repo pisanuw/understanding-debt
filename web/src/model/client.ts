@@ -7,13 +7,15 @@
  *   byok     the same prompts built here (src/core/assemble.ts) and sent with the person's
  *            own key straight to api.anthropic.com; excerpts still come from /api/excerpt.
  *
- * Excerpts for the walkthrough view come from /api/excerpt in both modes.
+ * Excerpts for the walkthrough view come from /api/excerpt in both modes, and the tree
+ * fallback's listings (units that name only directories) from /api/tree.
  */
 import type { GradeRequest, QuestionsRequest } from '../core/assemble';
 import type { Excerpt, ExcerptRef } from '../core/excerpts';
 import type { EvidenceRow, Grade, Question } from '../core/quiz';
 import type { AskDeps } from '../lib/llm';
 import { getMode, type LlmMode } from './prefs';
+import type { TreeAnswer, TreeFetch } from './tree';
 
 export interface GradeOutcome {
   grades: Grade[];
@@ -81,6 +83,11 @@ async function call<T>(deps: ClientDeps, path: string, init: RequestInit = {}): 
   if (res.status === 429 && d.error === 'cap') throw new CapError(String(d.scope ?? ''), String(d.resets_at ?? ''), typeof d.message === 'string' ? d.message : undefined);
   if (!res.ok) throw new ApiError(res.status, typeof d.error === 'string' && d.error ? d.error : `The server answered ${res.status}.`);
   return data as T;
+}
+
+/** GET /api/tree for the directories of a sitting's units (model/tree.ts keeps the answers). */
+export function treeVia(deps: ClientDeps): TreeFetch {
+  return (repoUrl, sha, dirs) => call<TreeAnswer>(deps, `/api/tree?${new URLSearchParams([['repo', repoUrl], ['sha', sha], ...dirs.map((d) => ['path', d])])}`);
 }
 
 export function excerptVia(deps: ClientDeps) {

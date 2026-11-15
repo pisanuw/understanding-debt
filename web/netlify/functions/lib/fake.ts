@@ -1,8 +1,10 @@
 /**
  * The fake HintWise gateway for `npm run dev`, `vite preview`, the Playwright walkthrough and
  * tests: canned Messages API answers keyed on the prompt's TASK marker, as udebt's FakeLLM
- * does for the CLI. Questions follow the ladder's level; an answer containing "wrong" is
- * graded wrong, one containing "partly" partial, any other non-blank answer correct.
+ * does for the CLI. Questions follow the ladder's level and cite as evidence the excerpts the
+ * prompt carried for the unit (its paths otherwise), as a model reading them would; an answer
+ * containing "wrong" is graded wrong, one containing "partly" partial, any other non-blank
+ * answer correct.
  */
 import type { ModelRequest } from '../../../src/core/assemble';
 import type { ModelMessage } from '../../../src/core/prompts';
@@ -52,9 +54,20 @@ function message(input: Record<string, unknown>, prompt: string): ModelMessage {
   };
 }
 
+/** The files the prompt's code excerpts come from ("--- <path> lines a-b" headers), in order. */
+export function excerptPaths(prompt: string): string[] {
+  return [...new Set([...prompt.matchAll(/^--- (.+) lines \d+-\d+$/gm)].map((m) => m[1]))];
+}
+
+function evidenceFor(u: FakeUnit, shown: string[]): string[] {
+  const under = shown.filter((f) => u.paths.some((p) => f === p || f.startsWith(`${p.replace(/\/+$/, '')}/`)));
+  return (under.length ? under : u.paths).slice(0, 2);
+}
+
 export function fakeGateway(body: ModelRequest): ModelMessage {
   const prompt = body.messages.map((m) => m.content).join('\n');
   if (prompt.includes('TASK: questions')) {
+    const shown = excerptPaths(prompt);
     const questions = fakeUnits(prompt).map((u) => {
       const [q, v1, v2] = (ASK[u.level] ?? ASK[1])(u.name);
       return {
@@ -63,7 +76,7 @@ export function fakeGateway(body: ModelRequest): ModelMessage {
         question: q,
         variants: [v1, v2],
         reference_answer: u.summary ? `It ${u.summary.charAt(0).toLowerCase()}${u.summary.slice(1)}` : `${u.name} does one job for the rest of the system.`,
-        evidence: u.paths.slice(0, 2),
+        evidence: evidenceFor(u, shown),
       };
     });
     return message({ questions }, prompt);

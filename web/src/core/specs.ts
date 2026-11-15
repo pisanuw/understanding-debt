@@ -37,6 +37,8 @@ export interface SpecUnit {
   history?: HistoryEntry[];
   parent: string | null;
   orientation?: Orientation | null;
+  /** The top tracked files under the unit's directories, recorded by the worker (udebt/topfiles.py); absent in older analyses. */
+  files?: string[] | null;
 }
 
 export interface WalkStep {

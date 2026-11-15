@@ -8,14 +8,14 @@
  */
 import type { QuestionUnit } from '../../core/prompts';
 import { label, levelOf } from '../../core/ladder';
-import { refsForUnit } from '../../core/excerpts';
+import { parseRef, refsForUnit, type ExcerptRef } from '../../core/excerpts';
 import { markRevealed, mergeGrades, orientationWanted, pickUnits, revealText, revealedOn, revealedVariant, reveals, levelsFor, sittingTs, type Answered, type Graded, type Question } from '../../core/quiz';
 import { sittingRows, stateAt } from '../../core/review';
-import { orientationOf, orientationText, unitById, type Orientation, type SpecUnit } from '../../core/specs';
+import { githubLink, orientationOf, orientationText, unitById, type Orientation, type SpecUnit } from '../../core/specs';
 import { CapError, capMessage } from '../../model/client';
 import { getMode } from '../../model/prefs';
 import { repoHref, unitHref, type App, type RepoTab, type RepoView } from '../app';
-import { badge, busy, button, clear, day, fmt, h } from '../dom';
+import { badge, busy, button, clear, day, extLink, fmt, h } from '../dom';
 import { queue, showCount } from './review';
 
 export interface Served extends Question {
@@ -57,7 +57,7 @@ export async function prepare(app: App, v: RepoView, n: number, only: string | n
   if (!picked.length) throw new Error('Nothing to quiz: every unit in view is blackbox.');
   const levels = levelsFor(picked, v.records);
   const chosen = new Map<string, Question>();
-  const toWrite: (QuestionUnit & { refs: ReturnType<typeof refsForUnit> })[] = [];
+  const toWrite: (QuestionUnit & { refs: ExcerptRef[] })[] = [];
   const shown = new Map<string, Orientation>();
   for (const u of picked) {
     const lv = levels.get(u.id) ?? 1;
@@ -86,6 +86,11 @@ export async function prepare(app: App, v: RepoView, n: number, only: string | n
       refs: refsForUnit(u, a.specs.walkthroughs?.[u.id]),
     });
   }
+  if (app.trees && toWrite.some((w) => !w.refs.length)) {
+    // Units that name only directories: the top files under them at the sha (model/tree.ts).
+    const found = await app.trees.refsFor(v.repo.url, a.sha, toWrite.map((w) => ({ unit: unitById(units, w.id) as SpecUnit, walk: a.specs.walkthroughs?.[w.id] })));
+    toWrite.forEach((w, i) => (w.refs = found[i]));
+  }
   if (toWrite.length) {
     const client = app.deps.quiz();
     if (!client) throw new Error('Model features are off. Choose the HintWise key or your own key in Settings.');
@@ -110,6 +115,25 @@ function tabLink(app: App, v: RepoView, tab: RepoTab, text: string): HTMLElement
   return a;
 }
 
+/**
+ * The files a question rests on (its `evidence`), linked on GitHub at the analysis's sha:
+ * shown with the grade, never before the answer, as the CLI shows the evidence beside the
+ * reference answer.
+ */
+export function evidenceLine(repoUrl: string, sha: string, evidence: readonly string[]): HTMLElement | null {
+  const links: HTMLElement[] = [];
+  for (const e of evidence.slice(0, 4)) {
+    const ref = parseRef(e);
+    if (!ref) continue;
+    const ranged = e.trim().replace(/^\.\//, '') !== ref.path;
+    links.push(extLink(githubLink(repoUrl, sha, ref.path, ranged ? ref.start : undefined, ranged ? ref.end : undefined), ranged ? `${ref.path}:${ref.start}-${ref.end}` : ref.path, 'mono'));
+  }
+  if (!links.length) return null;
+  const line = h('p', { class: 'small muted', 'data-testid': 'evidence' }, 'In the code: ');
+  links.forEach((a, i) => line.append(...(i ? [', ', a] : [a])));
+  return line;
+}
+
 function resultCard(v: RepoView, r: Graded, next: number): HTMLElement {
   const card = h('div', { class: 'card result' });
   card.append(
@@ -118,6 +142,8 @@ function resultCard(v: RepoView, r: Graded, next: number): HTMLElement {
     h('p', { class: 'verdict' }, badge(r.verdict, r.verdict), ` ${r.feedback}`),
   );
   if (r.revealed && revealText(r)) card.append(h('div', { class: 'answer' }, h('strong', null, 'The answer'), revealText(r)));
+  const code = v.analysis ? evidenceLine(v.repo.url, v.analysis.sha, r.evidence ?? []) : null;
+  if (code) card.append(code);
   const again = stateAt(v.records, r.unit_id, levelOf(r));
   card.append(h('p', { class: 'small muted' }, `Next on this unit: level ${next}`, again ? '; back in review on ' : '', again ? h('span', { class: 'nb' }, day(again.due)) : null, '.'));
   return card;

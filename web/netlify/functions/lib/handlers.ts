@@ -1,18 +1,19 @@
 /**
- * The three functions behind /api: question writing and grading through the HintWise
- * gateway, and the excerpt proxy. Each takes a web-standard Request and returns a Response,
- * so Netlify (netlify/functions/*.ts), the dev and preview servers (dev/api-plugin.ts) and
- * the tests call the same code.
+ * The four functions behind /api: question writing and grading through the HintWise
+ * gateway, the excerpt proxy and the tree listing for units that name only directories.
+ * Each takes a web-standard Request and returns a Response, so Netlify
+ * (netlify/functions/*.ts), the dev and preview servers (dev/api-plugin.ts) and the tests
+ * call the same code.
  */
 import { gradeAnswers, readGradeRequest, readQuestionsRequest, writeQuestions, type Deps } from '../../../src/core/assemble';
-import { MAX_LINES, parseRef, safeSha } from '../../../src/core/excerpts';
+import { MAX_LINES, parseRef, safePath, safeSha } from '../../../src/core/excerpts';
 import { markRevealed, mergeGrades, type Answered } from '../../../src/core/quiz';
 import { sittingRows } from '../../../src/core/review';
 import { parseGitHubUrl } from '../../../src/core/specs';
 import { authorize } from './auth';
 import { readEnv, type FnEnv } from './env';
 import { callGateway } from './gateway';
-import { excerpt } from './github';
+import { GitHubRefused, dirFiles, excerpt } from './github';
 import { HttpError, bearer, errorResponse, json, readJson } from './http';
 import { insertRecords, priorRecords } from './records';
 
@@ -109,6 +110,42 @@ export async function handleExcerpt(req: Request, opts: HandlerDeps = {}): Promi
     if (!got) return json(404, { error: `${ref.path} could not be read at ${sha.slice(0, 8)} (missing, binary or too large).` });
     return json(200, got);
   } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+/** The most directories one /api/tree request lists (a five-question sitting names at most 20). */
+export const MAX_TREE_DIRS = 20;
+
+/**
+ * GET /api/tree?repo=&sha=&path=<directory>[&path=...] -> {sha, dirs: {<directory>: {files:
+ * [{path, size}], total}}, truncated}: the top files under each directory at the sha, by the
+ * rule in src/core/topfiles.ts; never cached. 503 with `retry_after` (seconds) while GitHub
+ * refuses tree requests.
+ */
+export async function handleTree(req: Request, opts: HandlerDeps & { now?: () => number } = {}): Promise<Response> {
+  const env = opts.env ?? readEnv();
+  const doFetch = opts.fetch ?? fetch;
+  const now = opts.now ?? Date.now;
+  try {
+    if (req.method !== 'GET') throw new HttpError(405, 'Use GET.', { error: 'Use GET.' });
+    const token = bearer(req);
+    const q = new URL(req.url).searchParams;
+    const g = parseGitHubUrl(q.get('repo') ?? '');
+    const sha = safeSha(q.get('sha'));
+    const asked = q.getAll('path');
+    const dirs = [...new Set(asked.map((p) => safePath(p.trim().replace(/\/+$/, ''))).filter((p): p is string => p !== null))];
+    if (!g || !sha || !dirs.length || asked.length > MAX_TREE_DIRS)
+      throw new HttpError(400, 'Bad tree request.', { error: `repo, sha (40 characters) and 1 to ${MAX_TREE_DIRS} directories inside the repository are needed.` });
+    await authorize(token, g.url, env, doFetch);
+    const got = await dirFiles(g, sha, dirs, env, doFetch, now());
+    if (!got) return json(404, { error: `The tree of ${g.owner}/${g.repo} could not be read at ${sha.slice(0, 8)}.` });
+    return json(200, { sha, ...got });
+  } catch (e) {
+    if (e instanceof GitHubRefused) {
+      const wait = String(Math.max(1, Math.ceil((e.until - now()) / 1000)));
+      return json(503, { error: 'GitHub is refusing tree requests from this server for now; questions on this unit are written without code until then.', retry_after: Number(wait) }, { 'retry-after': wait });
+    }
     return errorResponse(e);
   }
 }

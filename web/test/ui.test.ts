@@ -15,7 +15,7 @@ import { App, parseRoute, repoHref, unitHref } from '../src/ui/app';
 import { boot, previewDeps, previewDeleteFetch } from '../src/ui/boot';
 import { renderMarkdown } from '../src/ui/markdown';
 import { busy, day, extLink, fmt, toast } from '../src/ui/dom';
-import { errorText } from '../src/ui/screens/quiz';
+import { errorText, evidenceLine } from '../src/ui/screens/quiz';
 import { countBadge, showCount } from '../src/ui/screens/review';
 import { CapError, LazyByokClient } from '../src/model/client';
 import { fakeGateway } from '../netlify/functions/lib/fake';
@@ -224,6 +224,55 @@ describe('the quiz', () => {
   it('words errors for the person', () => {
     expect(errorText(new CapError('user-day', ''))).toMatch(/daily HintWise allowance/);
     expect(errorText('plain')).toBe('plain');
+  });
+
+  it('quizzes a unit that names only directories from the top files under them, one listing per directory per session', async () => {
+    const trees: string[] = [];
+    const sent: { units: { id: string; refs: { path: string; start: number; end: number }[] }[] }[] = [];
+    const withTree: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://site');
+      if (url.pathname === '/api/tree') {
+        trees.push(url.search);
+        const files = ['frontend/src/AdminPage.jsx', 'frontend/src/App.jsx'].map((path) => ({ path, size: 100 }));
+        return Response.json({ dirs: { frontend: { files, total: 2 } }, truncated: false });
+      }
+      if (url.pathname === '/api/questions') sent.push(JSON.parse(String(init?.body)));
+      return apiFetch(input, init);
+    }) as typeof fetch;
+    const session = memoryStorage();
+    session.setItem('udebt.previewSignedIn', '1');
+    local = memoryStorage();
+    const root = document.createElement('div');
+    document.body.replaceChildren(root);
+    app = new App(root, previewDeps(fixture as unknown as Fixture, { doFetch: withTree, session, local }));
+    app.start();
+    await tick();
+    setMode('gateway', local);
+    for (let sitting = 0; sitting < 2; sitting += 1) {
+      await go('#/r/1/quiz');
+      ($<HTMLSelectElement>('#quiz-n') as HTMLSelectElement).value = '1';
+      ($<HTMLSelectElement>('#quiz-unit') as HTMLSelectElement).value = 'frontend-spa';
+      await click('button', 'Start');
+      await tick(20);
+      expect(byText('p', /^\[1\/1\] React\/Vite frontend/)).toBeTruthy();
+      ($<HTMLTextAreaElement>('textarea') as HTMLTextAreaElement).value = 'It renders the chat.';
+      await click('button', 'Answer and grade');
+      await tick(20);
+    }
+    expect(trees).toHaveLength(1);
+    expect(new URLSearchParams(trees[0]).getAll('path')).toEqual(['frontend']);
+    expect(sent).toHaveLength(2);
+    expect(sent[0].units[0]).toMatchObject({ id: 'frontend-spa', refs: [{ path: 'frontend/src/AdminPage.jsx', start: 1, end: 60 }, { path: 'frontend/src/App.jsx', start: 1, end: 60 }] });
+    const line = $('[data-testid=evidence]');
+    expect(line?.textContent).toBe('In the code: frontend');
+    expect(line?.querySelector('a')?.getAttribute('href')).toBe('https://github.com/pisanuw/digitalme/blob/f93102b121f1da9055c148e8eccde275ccf18236/frontend');
+  });
+
+  it('links the evidence of a graded question at the sha, with its line range when it names one', () => {
+    const line = evidenceLine('https://github.com/a/b', 'f'.repeat(40), ['src/a.py:3-9', '../x', 'src/b.py']);
+    expect(line?.textContent).toBe('In the code: src/a.py:3-9, src/b.py');
+    expect([...(line?.querySelectorAll('a') ?? [])].map((a) => a.getAttribute('href'))).toEqual([`https://github.com/a/b/blob/${'f'.repeat(40)}/src/a.py#L3-L9`, `https://github.com/a/b/blob/${'f'.repeat(40)}/src/b.py`]);
+    expect(evidenceLine('https://github.com/a/b', 'f'.repeat(40), ['../x'])).toBeNull();
   });
 });
 
