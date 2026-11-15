@@ -109,3 +109,4 @@
 2026-11-15 [plan] HOSTING.md: hosted udebt on the HintWise platform (Google/email via Supabase, gateway or BYOK, option B footer), 3 cached samples, 7 owner decisions.
 2026-11-15 [note] Level-5 synthetic on hf bb3d3b55, 3 isolated sets: pooled share vs wrongness rho 0.74 p 0.005 (level 3: 0.29); the L3-L5 gap tracks share (rho 0.80): decay per level.
 2026-11-15 [doc] HOSTING.md checked with Plabs: udebt footer sha256, SHARED_TABLES for shared rows, worker at udebt-api.hintwise.org, no stored code (references + fetch at sha).
+2026-11-15 [decision] Hosted: UDebt session builds; udebt.hintwise.org, repo not renamed; gateway quizzes, user key for new repos; Render free; public only; shared analyses.

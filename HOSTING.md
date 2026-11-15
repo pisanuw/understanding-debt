@@ -1,8 +1,8 @@
 # HOSTING
 
 The brief for the hosted udebt app. It covers how it fits the HintWise platform, what it
-offers, the three ready-made sample repositories, who does what, and the decisions the owner
-still has to make. Written 2026-11-15 from the owner's request and the HintWise platform docs
+offers, the three ready-made sample repositories, who does what, and the owner's decisions
+(made 2026-11-15, at the end). Written 2026-11-15 from the owner's request and the HintWise platform docs
 in `pisanuw/claude-built-apps` (public): `docs/new-app-guide.md` (the standard
 instructions), `docs/platform.md`, `BUILD_ROUTINE.md`, `platform/brand/README.md` and
 `platform/templates/app/`. When this brief and one of those disagree, those win.
@@ -187,32 +187,28 @@ the walkthroughs add one per unit.
 | Import the repo into Netlify with previews off; create the Render service | owner |
 | Attach `<slug>.hintwise.org`; Render domain (`udebt-api.hintwise.org`); apply migrations; add `udebt` to `EXTERNAL_APP_LABELS` and redeploy `sign-in-link` and `delete-account`; add the shared tables to `SHARED_TABLES`; load the sample analyses; set gateway caps and `max_tokens` | the Plabs session, each with the owner's yes |
 
-## Decisions for the owner
+## Owner decisions (2026-11-15)
 
-Numbered for answers; each has a recommendation.
+1. **Who builds:** the UDebt session builds the app, the worker and the migrations. The
+   "UDebt: Nov 12" session prepares the three samples now and checks the result.
+2. **Slug and domain:** `udebt.hintwise.org`, and the worker at `udebt-api.hintwise.org`.
+   **The repository is not renamed;** it stays `pisanuw/understanding-debt`. This is an
+   exception to the guide's "the repository name is the slug" for option B apps. The Netlify
+   import and the Plabs session's "Attach custom domain" run should use the slug `udebt`
+   explicitly, not derive it from the repository name.
+3. **Model use:**
+   - samples are analysed in advance on the owner's subscription;
+   - quizzes go through the HintWise LLM gateway;
+   - analysing a new repository needs the person's own key.
 
-1. **Who builds the app.** Recommended: the UDebt session builds it; this session prepares
-   the samples and checks the result.
-2. **Slug and domain.** The repo name must equal the slug. Recommended: rename
-   `pisanuw/understanding-debt` to `udebt` before the first deploy, giving
-   `udebt.hintwise.org`. Keeping the name gives `understanding-debt.hintwise.org`.
-3. **Model use.** Recommended:
-   - samples are precomputed on the subscription;
-   - quizzes go through the gateway with a per-person call cap, plus bring-your-own-key;
-   - analysing a new repository is bring-your-own-key only until a measured cost per
-     analysis lets the owner set caps.
-
-   This replaces ROADMAP decision 1 (an organisation key stored in Supabase), which the
-   platform's "never put an Anthropic key in an app" rule rules out.
-4. **The Render worker.** It needs its own Python service with disk, which is a cost (Plabs
-   confirms `backend-hub` very likely won't fit). Recommended: one small service that
-   sleeps when idle, at `udebt-api.hintwise.org`. In v1, repositories are limited to about
-   20,000 commits and a 500 MB clone, and each clone is deleted after its job.
-   **Gateway numbers to set:** the app's `max_tokens`, measured first; the photo2pgn
-   precedent is 12000. Also the per-person call caps.
-5. **Repository scope.** Recommended: public GitHub repositories only in v1.
-6. **Sharing analyses.** Should a person's analysis of a public repository be visible to
-   others who add the same repository? Recommended: yes for public repositories, which saves
-   the cost of repeat analyses.
-7. **The samples.** Recommended: the three above. Swapping one for a smaller TypeScript
-   repository would give a gentler second start.
+   No organisation key is stored anywhere. This replaces ROADMAP decision 1.
+4. **Worker:** a Render free instance for now. Plabs expects 512 MB to be tight for Python
+   plus large clones, so the worker's limits (`--max-commits`, `--max-mb`) have to fit it.
+   The gateway's `max_tokens` and the per-person caps are decided after measuring the
+   samples' calls (see "Measured on the samples").
+5. **Scope:** public GitHub repositories only.
+6. **Sharing:** yes. An analysis of a public repository is shared with everyone who adds
+   it. Shared tables need `SHARED_TABLES` entries (a Plabs commit).
+7. **Samples:** huggingface_hub, sentry-javascript and mlflow. Their specs are generated now
+   on the owner's subscription, with `udebt worker run ... --llm --walkthroughs 12
+   --no-excerpts`: references, no stored code.
