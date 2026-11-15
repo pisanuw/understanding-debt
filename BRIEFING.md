@@ -468,6 +468,52 @@ acceptable.
     an answer before being asked; the quiz measures understanding, and reading the answer is
     learning, so this is accepted rather than hidden.
 
+- **Phase 3.4, owner-accepted polish and change digests (2026-11-15)**: the owner accepted
+  the seven Phase 3.3 recommendations; digests are new.
+  - **A partial answer at levels 1-2 is revealed** like an unknown or a wrong one, after
+    grading (`quiz.REVEALED_VERDICTS`); the CLI quiz, review, dig, teach-back and the browser.
+  - **Teach-back is graded at the developer's next ladder level** for the unit (level 1 with
+    no evidence), not always 2: the explanation asked for grows with the level, the grader is
+    given per-level meanings of correct and partial, and a pass moves the ladder (before, a
+    level 2 pass without level 1 added to the score but not to depth).
+  - **Dig rotates its check**: a stored variant of a missed question, else the walkthrough's
+    own check, else an unasked pooled question at that level, else the least recently asked,
+    which triggers one call for a new one (`dig.fresh_check`, told what was asked). A
+    walkthrough's checks join the unit's pool when written, so the quiz can use them too.
+    Writing a new question when the pool is exhausted goes slightly past "draws from the
+    pool": with one walkthrough check per level the pool alone would repeat on the second dig.
+  - **Tutor sessions persist** in `.udebt/tutor/<dev-slug>/<unit>.json` (gitignored), one per
+    developer and unit, saved after every turn and check answer; a restart reattaches by id;
+    a start on a unit with a saved conversation gets a 409 with it, and the page offers
+    resume or start over (start over replaces the file; the CLI store keeps the old
+    transcript). The timer counts epoch seconds and restarts after 30 minutes idle.
+  - **Batch grading in the browser**: `/api/answers` grades a sitting's answers in one call
+    and records them with one timestamp per (source, forced, kind), so one quiz run is one
+    sitting, as in the CLI. `/api/dontknow` holds a blank answer and returns the reference at
+    levels 1-2 with no call; the question cannot then be answered with text. Unanswered
+    questions at "Finish now" are dropped unrecorded. `/api/answer` (one at a time) stays for
+    the tutor's check.
+  - **Reference answers stay in the committed map.json**, documented in README: variants and
+    grading against the code make memorising a reference worth little, and reading it is
+    learning.
+  - **Hub files connect nothing**: a file more than two top-level units list is left out of
+    both the import and the co-change connections (`unitgraph.MAX_OWNERS`), never out of mass.
+    digitalme: `backend/main.py` and `frontend/netlify.toml`; uses edges >= 0.5 30 -> 20, all
+    uses edges 47 -> 30, co-change pairs 64 -> 59; the learning order now starts with auth and
+    cost control and puts the chat flow fourth (was eighth). Its tour went stale and was
+    rewritten (one call).
+  - **Change digests** (`udebt digest`, Digest tab): per unit below the threshold, the range
+    starts at the latest evidence head on the unit, else `--since` (a revision, else a date:
+    the last first-parent commit at or before it), else 30 days before HEAD's commit date
+    (`--days`): "since the first commit" would be the whole unit, which the orientation and
+    the tour cover. The commit list is local; one `TASK: digest` call writes all missing
+    briefings with the range's diff stat and first 160 diff lines (lockfiles and generated
+    files out) and the heaviest 15 commits per unit; `held` / `extended` / `changed`. Cached
+    per (unit, start, end) in `.udebt/digests/` (gitignored), invalid when the unit's map entry
+    changes (its basis). `risk` prints "Read the digest: `udebt digest --unit X`" for up to
+    three flagged units. digitalme, `--since 2026-07-01`: 11 units, 66 commits, one call of
+    32 s (94K characters), 6 held, 5 extended.
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.
@@ -562,24 +608,18 @@ acceptable.
   provider). Confirm, or forbid those too?
 - A parent's depth is its own answers only; sub-unit quizzes roll up understanding but not
   depth. Show the sub-units' minimum depth on the parent?
-- Teaching (Phase 3.3): should partial answers at levels 1-2 also reveal the reference? They
-  get feedback naming what was missing, but not the full answer.
+- (Answered 2026-11-15, Phase 3.4: partial answers at levels 1-2 reveal the reference.)
 - Should `udebt path` count a unit as learned at depth 3, or keep suggesting level 4 once the
   architecture is known? Today it says "nothing now" at depth 3 while understanding is above
   the threshold.
-- The walkthrough's check questions are written once per unit and shared; after a developer
-  has been asked one, `dig` asks the same one again at that level. Rotate to the quiz's
-  questions, or write a second set on demand?
-- Teach-back is always level 2. Grade it at the developer's next level instead (level 1 for a
-  newcomer, 3 for someone who has passed 2)?
-- digitalme's unit graph is dense (one hub file, `backend/main.py`, sits in five units): most
-  units use most others even with shared files split. Should the map's paths avoid listing a
-  hub file in several units, or should the graph ignore files listed by more than k units?
-- The server keeps tutor sessions in memory: a restart loses the page's transcript (the CLI
-  can still `--resume` it). Persist them under `.udebt/` (gitignored), or is that fine for a
-  local tool?
-- The browser grades each answer in its own call, so a three-question quiz costs three calls
-  where the CLI's costs one. Batch the browser's grading at the end of a quiz instead, at the
-  cost of feedback after every question?
-- Pooled questions and walkthrough checks put reference answers in the committed map.json.
-  Keep that (reading them is learning), or keep generated questions out of git?
+- (Answered in Phase 3.4: `dig` rotates through the pool, and writes a new check only when
+  every pooled one was asked.)
+- (Answered in Phase 3.4: teach-back is graded at the developer's next level.)
+- (Answered in Phase 3.4: the graph ignores files listed by more than two units.) Co-change
+  stays dense on digitalme (59 of 66 pairs): most commits there touch several units' own
+  files. Raise `changes_with`'s floor, or show co-change only above a share of the unit's mass?
+- (Answered in Phase 3.4: tutor sessions persist under `.udebt/tutor/`, gitignored.)
+- (Answered in Phase 3.4: the browser grades a sitting in one call at its end.)
+- (Answered in Phase 3.4: kept in map.json, documented in README.) Digests with no evidence
+  on a unit cover the last 30 days before HEAD: right default, or since the developer's last
+  own commit there (which for a sole developer is usually HEAD, so no digest at all)?
