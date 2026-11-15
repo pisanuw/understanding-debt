@@ -152,3 +152,5 @@
 2026-11-15 [code] web: /api/tree lists the tree at the sha (one GitHub call per repo and sha, refusals respected); the page keeps listings per session.
 2026-11-15 [code] web: refsForUnit uses `files`, then the tree; graded questions show their evidence files linked at the sha; the fake gateway cites its excerpts.
 2026-11-15 [note] mlflow at the pin: all 12 file-less units now get 4 source files (Python and TypeScript agree); samples need no reload.
+
+2026-11-15 [doc] DEPLOY.md: Plabs steps 1, 2 and 7 marked done (migrations, SHARED_TABLES, the three sample loads in production); step 8 waits on the owner's yes to Plabs; owner steps still open.

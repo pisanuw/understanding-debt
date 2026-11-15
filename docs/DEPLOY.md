@@ -70,11 +70,12 @@ worker, used for that job and dropped).
 
 ### Plabs session (each after the owner's yes; details in `supabase/README.md`)
 
-1. Copy `supabase/migrations/0001_app_udebt.sql` and `0002_hosted.sql` byte for byte into
+1. **Done 2026-11-15** (claude-built-apps 6ff0efc; reported by the "UDebt: Nov 12" session):
+   Copy `supabase/migrations/0001_app_udebt.sql` and `0002_hosted.sql` byte for byte into
    `claude-built-apps/udebt/supabase/migrations/` (with a `udebt/README.md` like photo2pgn's),
    check the sha256s, then the Supabase admin workflow: `migrate udebt`, `expose-schema
    app_udebt`.
-2. Add `app_udebt.repositories` and `app_udebt.analyses` to `SHARED_TABLES` in
+2. **Done 2026-11-15.** Add `app_udebt.repositories` and `app_udebt.analyses` to `SHARED_TABLES` in
    `platform/supabase-admin.mjs` (the two entries are in `supabase/README.md`), commit, then
    `check-schema app_udebt`.
 3. Add `'udebt'` to `EXTERNAL_APP_LABELS` in `platform/src/signin/validate.ts`, commit, then
@@ -83,12 +84,14 @@ worker, used for that job and dropped).
    explicitly; do not derive it from the repository name).
 5. "Set CNAME" / "Render domain": `udebt-api.hintwise.org` -> the Render service `udebt-api`.
 6. "Netlify env" on site `udebt`: `SUPABASE_URL` and `SUPABASE_ANON_KEY`, if the owner did not.
-7. The samples: `samples/{huggingface_hub,sentry-javascript,mlflow}.sql` in this repository
+7. **Done 2026-11-15** (3 repositories, 3 analyses, `check-schema` passed). The samples:
+   `samples/{huggingface_hub,sentry-javascript,mlflow}.sql` in this repository
    (made by the "UDebt: Nov 12" session; `samples/README.md` has their sha256s and how they
    were made; each applied twice to a scratch Postgres 16 after the migrations). Copy them
    into claude-built-apps (for example `udebt/supabase/ops/`), run the admin workflow's
    `sql <file>` for each, then `check-schema app_udebt` again.
-8. Gateway settings: `supabase/ops/udebt-llm-caps.sql` (the cheaper model as `default_model`,
+8. Gateway settings (prepared by Plabs, waiting on the owner's yes there):
+   `supabase/ops/udebt-llm-caps.sql` (the cheaper model as `default_model`,
    $2 a day for the app, $0.25 a day per person; owner's yes of 15 Nov 2026), run with `sql`.
 
 ### Checks after the deploy
