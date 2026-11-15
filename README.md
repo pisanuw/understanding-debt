@@ -787,12 +787,56 @@ developers with a footprint) every 25 units of mass gives 53 points and 1,383 ev
 Chromium. This repository's own dashboard, `.udebt/dashboard/index.html`, is committed as
 the example (every 2 units of mass, since its history spans two days).
 
+## Hosted app: udebt.hintwise.org (Phase 4b)
+
+udebt as a web app on the HintWise platform, for a developer who has to understand a codebase
+they did not write (or that an AI wrote for them): sign in with Google or an email link (one
+HintWise account), pick a repository, read its architecture (the units and sub-units, each
+unit's decision, the alternatives and why, the commits that shaped it, an orientation, the
+tour, walkthroughs that trace one request through the code), and climb the quiz ladder until
+your understanding debt falls. Three public repositories are ready to start with
+(huggingface_hub, sentry-javascript and mlflow, analysed in advance); any other public GitHub
+repository can be added, at once if someone already analysed it, otherwise analysed with your
+own Anthropic key. Quizzes run on the HintWise key within a daily allowance, or on your own key.
+Not deployed yet: `docs/DEPLOY.md` has the steps, `web/README.md` the code.
+
+The scoring is the CLI's, ported to TypeScript and checked against it case by case: the
+ladder's levels, a third of the understanding for each of levels 1-3, decay per level as a unit
+changes between analysed commits (k 0.2 at levels 1-3, 1.0 at 4-5). You are a learner, not an
+author: there is no own-commit prior, so every repository starts at a debt index of 100 and
+your answers earn it down.
+
+**What is stored, and where.** In HintWise's database (Supabase, US East), schema `app_udebt`:
+
+- for each answer: the unit, the ladder level, the question, the verdict, your confidence,
+  whether the answer was shown, and the question's other phrasings, reference answer and cited
+  files (so a missed question can come back in other words). Never the text of your answer,
+  and not the grader's feedback;
+- the repositories you added, your quiz sessions (the questions as asked) and your analysis
+  jobs;
+- shared with every signed-in person: the repositories in udebt and their analyses (units,
+  decisions, file and line references, the tour; no code, no commit emails), with the id of
+  whoever added or analysed one.
+
+No code is stored: a walkthrough's lines and the excerpts a grader reads are fetched from GitHub
+at the analysis's pinned commit for that one request. The HintWise gateway records the cost of
+each model call on your account and when you first and last used the app. Your own Anthropic
+key stays in your browser and goes only to api.anthropic.com, except that an analysis you start
+sends it once to udebt's analysis service, which uses it for that job and keeps nothing.
+
+**Deleting your account.** Settings, Account, "Delete my account" (sign in again first if your
+sign-in is older than 15 minutes, then type DELETE). It deletes your records, sessions,
+repository list and jobs here and your data in every other HintWise app. Analyses you started
+stay, without your name, because other people use them.
+
+**One honest limitation.** Your records are written with your own sign-in, so nothing stops you
+from editing them: the debt number is a self-assessment for learning, not a certificate of what
+you know.
+
 ## Hosted: the platform-agnostic core (Phase 4a)
 
-The hosted app will live on the HintWise platform (HOSTING.md on the
-`claude/jolly-hamilton-pvos83` branch; Phase 4b, waiting on the owner's decisions; deployment
-notes in `docs/DEPLOY.md`). Phase 4a built what any host needs, stdlib only, with no web
-framework:
+The hosted app (Phase 4b, above) lives on the HintWise platform (HOSTING.md; deployment in
+`docs/DEPLOY.md`). Phase 4a built what any host needs, stdlib only, with no web framework:
 
 - **The contract** (`udebt/contract.py`, version 1): schemas for `map.json` (versions 1-3), a
   record, `snapshots.json`, `commits.json`, `responsibility.json`, the export and the import
@@ -816,7 +860,7 @@ framework:
   public repository's quizzes be graded without a clone; `--no-excerpts` leaves them out), and
   the manifest `analysis.json`; then deletes the clone, always. Over a limit it writes nothing.
   digitalme takes 2 s, dsa-instructor (2,510 commits) 38 s and 1.3 MB.
-- **The schema** (`supabase/migrations/20261115000000_app_udebt.sql`, schema `app_udebt`,
+- **The schema** (`supabase/migrations/0001_app_udebt.sql`, schema `app_udebt`,
   idempotent): shared `repositories` and `analyses` keyed by (repository, sha, owner), where a
   sample's analysis has no owner, is readable by every signed-in person and written by no app
   code; a person's `my_repositories`, `records` and `quiz_sessions`, each with `user_id ...

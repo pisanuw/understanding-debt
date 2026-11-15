@@ -14,6 +14,9 @@ own key, not an organisation key stored in Supabase.
 **Checked with the Plabs session, 2026-11-15** (claude-built-apps aeed6d5, information only):
 the guide is current. Its answers are folded in below, marked "(Plabs)".
 
+**Status 2026-11-15:** built by the UDebt session (ROADMAP Phase 4b) and tested locally with fakes;
+not deployed. The deployment steps, in order, are in `docs/DEPLOY.md`.
+
 ## What the owner asked for (2026-11-15)
 
 - A deployed app on Netlify, Render and Supabase where a signed-in user points udebt at any

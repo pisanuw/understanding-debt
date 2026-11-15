@@ -621,6 +621,95 @@ acceptable.
     line (the prior fades at level 5's rate, still 1.0). Hypothetically, levels 1-3 passed on
     every unit at `f557893` would read 6.5 instead of 27.6.
 
+- **Phase 4b, the HintWise app (2026-11-15)**: built and tested locally with fakes, not deployed
+  (docs/DEPLOY.md lists the owner's and the Plabs session's steps).
+  - **Layout**: the web app in `web/`, created from claude-built-apps `platform/templates/app/`
+    (aeed6d5) with the template's modules and tests unchanged but for the slug; its own code in
+    `web/src/core` (pure TypeScript shared by the page and the functions), `data`, `model`, `ui`;
+    `netlify.toml` at the repository root with `base = "web"`. The repository keeps its name
+    (owner): the slug `udebt` is written out in `footerHtml('udebt')`, the gateway row, the
+    sign-in label and the Netlify site.
+  - **Function framework**: Netlify Functions v2 (a default export taking a web-standard
+    `Request`, `config.path` under `/api`), bundled by Netlify's esbuild, no Netlify package:
+    the same handlers run on Netlify, on the Vite dev and preview servers (`web/dev/
+    api-plugin.ts`) and in vitest. Three functions: `/api/questions`, `/api/grade` (the gateway
+    with the person's token; grading also records the sitting with that token) and
+    `/api/excerpt` (a line range of one file at a sha from raw.githubusercontent.com, at most
+    200 lines of a file under 2 MB, `no-store`). A token is checked with one PostgREST read of
+    `app_udebt.repositories` (row level security refuses a bad token, an unknown repository
+    returns nothing), kept five minutes per token and repository.
+  - **Worker dependency**: none. Stdlib `http.server` (ThreadingHTTPServer) serves three JSON
+    routes behind Render's TLS proxy, one job at a time on a 512 MB instance; a framework would
+    add nothing these routes need and a dependency the package has never had.
+  - **The model steps of an analysis** run in-process (`worker.run(model=...)`) through
+    `MessagesLLM`, a tool loop over a Messages API: udebt's own prompts (which carry the offline
+    structure), the read-only tools `Read`, `Glob`, `Grep` over the clone (named as in the CLI's
+    Claude Code runs, so the prompts' "read-only tools" still hold), a `submit` tool whose input
+    schema is the prompt's schema (the gateway passes `tools` but not `tool_choice`; a JSON text
+    answer is accepted too), one call per turn, at most 8 turns (the last offers only `submit`),
+    the oldest tool results cut when the body nears 1,000,000 bytes. Grep takes fixed strings,
+    not regular expressions (no pattern from a model can stall the worker). New analyses use the
+    person's own key (16,000 output tokens); the gateway path exists behind
+    `UDEBT_ALLOW_GATEWAY=1` for when the owner opens it.
+  - **Worker limits**: `UDEBT_MAX_COMMITS` 6000, `UDEBT_MAX_MB` 200, clone timeout 300 s, three
+    walkthroughs per new analysis, the replay and export skipped (`export=False`, `udebt worker
+    run --no-export`: the learner app uses neither, and on a large team the replay is the
+    slowest part), git with prompts off, https only, symlinks checked out as files and small pack
+    buffers. GitHub's API is asked first whether a repository is public and how large (best
+    effort, unauthenticated), `git ls-remote` names the commit, and a commit already analysed is
+    added to the person's list without a clone. A token with under 15 minutes left is refused,
+    so a job's last writes do not outlive it.
+  - **Shared analyses without the service-role key**: any signed-in person may write an
+    analysis of a public repository with their token (it is theirs: only they change or delete
+    it); everyone reads every analysis. When the account goes, the analysis stays unowned (`on
+    delete set null`), and the unique key `(repo_id, sha, user_id)` lets several unowned ones
+    coexist. The page prefers HintWise's own analysis (a sample), then the person's, then the
+    newest shared one, and says which it shows ("prepared by HintWise", "shared by another
+    person"): a person could write a misleading analysis with their token (open question).
+  - **Decay between analyses**: a record keeps the commit of the analysis it was answered at;
+    a newer analysis's `specs.changed_since` (computed by the worker for every earlier analysed
+    commit, as `status` computes the share) fades it per level. Within one analysis nothing
+    fades. A commit with no figure is not faded and the debt page says so.
+  - **Quizzes without read tools**: the question writer gets the unit's map fields, its
+    orientation and code excerpts (the walkthrough's steps, else the top of the files its
+    orientation names); the grader gets the excerpts of the files each question cited. At most
+    60,000 characters of code a call (about 15,000 tokens), so a two-question sitting is about
+    10,000 input tokens. The rules are the CLI's (`udebt/prompts.py` constants, exported to
+    `web/src/core/prompt-parts.json` by `udebt.hosted.prompt_parts`, a test failing when stale).
+    Orientations come from the analysis, or from the unit's own fields (no call).
+  - **What a record keeps**: as the CLI's but without the answer text and the feedback; its
+    `data` keeps the question's two other phrasings, the reference answer and the cited files, so
+    a missed question comes back in other words with no call (`revealedVariant`). The reference
+    is shown on a miss anyway; the person can read it in their own rows, as they can in map.json
+    locally.
+  - **Parity**: the TypeScript ladder and scoring are checked against
+    `web/test/fixtures/parity.json`, written by `tests/test_hosted_parity.py` from the Python
+    core (11 record sets at four shares, a hierarchy at two shares, compound questions).
+  - **Preview mode**: without Supabase env the page runs on fixture rows (`udebt worker sql
+    --dialect json --public`), a fake sign-in that drives the real sign-in panel, and the
+    functions with fakes (`UDEBT_FAKES=1`, ignored on Netlify; GitHub read with `git show` from
+    a local clone). The Playwright walkthrough and the screenshots use it.
+  - **The page**: the footer embedded byte for byte and pinned by its sha256; a strict CSP
+    (`style-src` with the sign-in block's hash and `FOOTER_STYLE_CSP`, `style-src-attr
+    'unsafe-hashes'` with the two style attributes of Google's unmodified G, no
+    `'unsafe-inline'`), one source for `netlify.toml` and `vite preview`; the Anthropic browser
+    SDK loaded only for an own-key sitting (the main bundle 312 KB instead of 690 KB), so the
+    page keeps the mode and key with the same keys and rules as `llm.ts` in `model/prefs.ts`.
+  - **Template deviations**: `@playwright/test` pinned to 1.63.0 (this environment's browsers);
+    `@types/node` added (the functions and the dev plugin use Node); the lint and coverage
+    include `netlify/`; ESLint ignores `_`-prefixed rest siblings.
+  - **Migrations**: the 4a file renamed to `0001_app_udebt.sql` before anything was applied
+    (the platform runs files in name order and names them `NNNN_`), content unchanged; the 4b
+    changes in `0002_hosted.sql`, including the `platform.llm_apps` row. Shared tables need two
+    `SHARED_TABLES` entries (supabase/README.md).
+  - **Not ported in v1**: the tutor (it needs read tools over a clone per conversation), the
+    spaced review queue (records do not keep `review` state yet), teach-back, digests (they need
+    the commits since an answer, which an analysis does not keep), decision records, team views
+    and pull-request checks.
+  - **Samples**: `python -m udebt.hosted.samples` checks each output against the pins in
+    `testbeds.json` and writes the public SQL; tested on a digitalme output made without a model
+    call. The UDebt session generated no sample and made no model call.
+
 - **Phase 4a answers (2026-11-15, 15-minute rule)**: the hosted app v1 has no own-commit
   prior (learner, not author); a soft-block acknowledgement carries over later pushes on the
   same PR until its touched units change; specs store file and line ranges, never code;
@@ -635,6 +724,23 @@ acceptable.
 - Storing source code in the hosted service. Metadata only (ROADMAP Phase 4).
 
 ## Open questions
+
+- Phase 4b: a signed-in person can write an analysis of a public repository with their own
+  token, and others see it. The page labels whose analysis it shows and prefers HintWise's. Is
+  that enough, or should only analyses the worker wrote be shared (a signature the functions
+  check, which needs a worker secret on Netlify), or only samples?
+- Phase 4b: a quiz sitting is about $0.07 (two questions) to $0.16 (five) on the gateway's
+  default model, estimated, so the default $0.25 per person per day is about three short
+  sittings. Which caps, and should udebt's `default_model` be a cheaper one? (Measure on the
+  gateway first.)
+- Phase 4b: own-row records mean a person can edit their own evidence. Fine for a learning tool;
+  if the debt ever means something to someone else (a lead, a team), grading has to record
+  through a function with a key the person does not hold.
+- Phase 4b: the free Render instance (512 MB, 0.1 CPU) analyses repositories up to 6,000 commits
+  and 200 MB; sentry-javascript and mlflow would not fit. Raise the limits on a paid instance,
+  or keep large repositories to precomputed samples?
+- Phase 4b: port the spaced review queue next (records would keep `review` state in `data`), or
+  the tutor (a gateway conversation with read tools over a short-lived clone on the worker)?
 
 - Phase 3.5: k_low (0.2) comes from huggingface_hub alone, a library whose architecture has
   been stable for years; digitalme decayed fastest on pre-ladder questions (k 2.72) and its

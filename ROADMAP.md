@@ -568,7 +568,8 @@ been measured there, so this is the case to check first when real answers arrive
 ## Phase 4: hosted (Netlify, Render, Supabase) with the CLI as the local twin
 
 **Status 2026-11-15: split.** 4a, the platform-agnostic core, is done (below the original
-plan); 4b, the hosted app on the HintWise platform per HOSTING.md, waits on the owner. HOSTING.md
+plan); 4b, the hosted app on the HintWise platform per HOSTING.md, is built and waits for its
+deployment. HOSTING.md
 supersedes parts of the plan below: sign-in is HintWise's Google and email sign-in through
 Supabase rather than GitHub OAuth, and model calls go through the HintWise gateway or the
 user's own key rather than an organisation key stored in Supabase.
@@ -647,22 +648,44 @@ needs and dropped the rest. No model call.
 |---|---|
 | 1 versioned contract | done: `udebt/contract.py` (version 1; map, record, snapshots, commits, responsibility, export, import), `udebt validate`, the export carries `contract` and `fingerprint` and is checked before it is written; digitalme, dsa-instructor and huggingface_hub exports validate (go-git and prefect have no map) |
 | 2 analysis worker | done: `udebt/worker.py`, `udebt worker run <url> --rev <sha> --out <dir>` (limits, committed or given map or `--llm`, offline core, export, sanitized map, specs with walkthrough excerpts, manifest, clone deleted); digitalme 2 s, dsa-instructor 38 s |
-| 3 schema | done: `supabase/migrations/20261115000000_app_udebt.sql` (shared repositories and analyses by repo and sha; own-row records, my_repositories, quiz_sessions; authenticated only; idempotent; roles designed in comments), `supabase/sqlite/app_udebt.sql`, `udebt worker sql`; RLS tested on Postgres 16 with a stub auth schema |
+| 3 schema | done: `supabase/migrations/20261115000000_app_udebt.sql` (renamed `0001_app_udebt.sql` in 4b) (shared repositories and analyses by repo and sha; own-row records, my_repositories, quiz_sessions; authenticated only; idempotent; roles designed in comments), `supabase/sqlite/app_udebt.sql`, `udebt worker sql`; RLS tested on Postgres 16 with a stub auth schema |
 | 4 push / pull | done: `udebt/remote.py`, `udebt remote set|token`, `udebt push [--dry-run]`, `udebt pull`; idempotent both ways against a stdlib stub host |
 | 5 check run and webhooks | done: `udebt/checks.py` (advisory, soft block, acknowledgement), `udebt/webhooks.py` (signature, router), `udebt risk --check-run`; payload fixtures |
 | docs | done: README "Hosted", `docs/DEPLOY.md` (deployment follows HOSTING.md), BRIEFING, CHANGES |
 | skipped by the scope change | the hosted API server (`udebt[hosted]`, Starlette or FastAPI, GitHub OAuth, an organisation key), the SPA login and data-layer refactor, `render.yaml` and `netlify.toml`, the local end-to-end through a hosted API. A draft of the API written before the change is parked, untested, in `drafts/hosted-api/` (its own commit, `ca899c3`) |
 
-### Phase 4b: the HintWise app (pending the owner)
+### Phase 4b: the HintWise app
 
-Per HOSTING.md, after the owner's decisions there (who builds it, slug and domain, model use,
-the Render worker, public repositories only, shared analyses, the three samples): the Vite +
-TypeScript app from the platform template with the `udebt serve` teaching layer as its start,
-Supabase Auth through HintWise, the worker on Render with the model steps as a tool loop over
-the gateway (or the person's own key), the `app_udebt` migration applied by the Plabs session,
-the sample analyses loaded with `udebt worker sql`, and push and pull served by a platform
-function. Real-service validation (Supabase, Netlify, Render, the gateway, any GitHub App)
-happens there.
+**Status 2026-11-15: built, partial until deployed.** The owner approved the build on
+2026-11-15 (HOSTING.md, "Owner decisions"). Everything the UDebt session can do is done and
+tested locally with fakes; the production steps belong to the owner and the Plabs session
+(docs/DEPLOY.md, in order). No model call was made and no sample generated.
+
+| item | status |
+|---|---|
+| 1 web app | done: `web/` from the platform template (aeed6d5): sign-in (Google through Supabase, email through `sign-in-link`, "Delete my account"), repositories (samples and own, debt index each), specs (tour, units and sub-units, decision, alternatives, why, shaping commits, orientation, connections), walkthroughs with lines from GitHub at the pinned sha, the quiz ladder (level shown, orientation before level 1, one fact, I don't know with no call, reveal on a miss at levels 1-2, stored variants, one grading call per sitting), debt per unit and overall, settings (gateway, own key, off), add a repository; the footer embedded with its sha256 test, the favicon, a strict CSP, light and dark, 390 px; 185 vitest tests, coverage 98% statements, 87.7% branches |
+| 2 functions | done: `/api/questions`, `/api/grade` (gateway with the person's token, five fields, max_tokens <= 4096, body < 1,000,000 bytes; records the sitting), `/api/excerpt` (a line range at a sha, no caching); own key in the browser with the same prompts |
+| 3 worker service | done: `udebt.hosted.worker_service` (stdlib), `MessagesLLM` tool loop, `render.yaml`; 12 tests against a stub Supabase and a fake Messages API |
+| 4 migrations | done: `0001_app_udebt.sql` (the 4a file, renamed), `0002_hosted.sql`; RLS tested on Postgres 16; `supabase/README.md` for the Plabs session (files, sha256s, `SHARED_TABLES`, `EXTERNAL_APP_LABELS`) |
+| 5 samples | done for the loader: `python -m udebt.hosted.samples`, `udebt worker sql --public/--dialect json`; tested on a digitalme output without a model call; the three sample outputs had not arrived |
+| 6 runbook | done: docs/DEPLOY.md (owner steps, Plabs steps, env vars, checks, caps estimate, limits, untested), `netlify.toml`, README "Hosted app" |
+| 7 local end-to-end | done: Playwright with fakes (sign in, digitalme sample, unit and walkthrough, two-question level-1 quiz, debt falls, account deleted, no CSP violation); 52 screenshots (13 screens) at 1280/390 px, light/dark, in `.udebt/dashboard/hosted-*.png` |
+| digest | deferred: an analysis keeps no commits since an answer; the worker would have to precompute digests per unit |
+| tutor, review, teach-back | not ported in v1 (BRIEFING, Phase 4b) |
+
+**Remaining, in order (each production step after the owner's yes):**
+
+1. Owner: merge the branch into `main`; import the repository into Netlify as site `udebt`
+   (previews and branch deploys off; `SUPABASE_URL` and `SUPABASE_ANON_KEY` for the functions);
+   create the Render service from `render.yaml` and set `SUPABASE_ANON_KEY`.
+2. Plabs: copy the two migrations into `claude-built-apps/udebt/supabase/migrations/`, `migrate
+   udebt`, `expose-schema app_udebt`; add the two `SHARED_TABLES` entries, `check-schema
+   app_udebt`; add `udebt` to `EXTERNAL_APP_LABELS`, redeploy `sign-in-link` and
+   `delete-account`; attach `udebt.hintwise.org` (slug given explicitly); point
+   `udebt-api.hintwise.org` at the Render service; load the three samples with
+   `python -m udebt.hosted.samples` and `sql`; set the gateway caps the owner names.
+3. Everyone: the checks in docs/DEPLOY.md, then the real-service validation (Supabase,
+   Netlify, Render, the gateway) the local tests could not do.
 
 ## Phase 5: validity and calibration
 
@@ -1186,17 +1209,28 @@ udebt defaults to advisory and lets a repo owner opt in to soft blocking per rep
 
 ## Handoff 2026-11-15
 
-**Phase 3.3's handoff is closed** (every item done, up to `a96b141`). **Phase 3.4 is done**,
-with the owner's two additions (synthetic report names that never collide, the leakage
-guard); two `claude` calls of three. **Phase 4a is done** as re-scoped (the platform-agnostic
-core: contract, worker, `app_udebt` schema, push and pull, check runs and webhooks); no call.
-**Phase 4b waits on the owner's decisions in HOSTING.md**; nothing of it was started.
-**Phase 3.5 is done** (decay per ladder level: k 0.2 at levels 1-3, 1.0 at levels 4-5; ten
-`claude` calls of ten on huggingface_hub level 3 runs; fits in Phase 5).
+**Phase 4b is built** (branch `claude/eloquent-lamport-afzr0o`): the web app in `web/`, the
+Netlify functions, the Render worker service, the migrations and the sample loader, all tested
+locally with fakes; nothing is deployed. The remaining steps are the owner's and the Plabs
+session's, in order, in docs/DEPLOY.md (summary in Phase 4b above); the Plabs session's part is
+also in supabase/README.md. Open questions are at the top of BRIEFING's list (shared analyses
+written by people, caps and the default model, own-row evidence, the free instance's limits,
+what to port next).
 
-For the next session: read HOSTING.md on `claude/jolly-hamilton-pvos83` and `docs/DEPLOY.md`
-here. The Postgres schema tests need `UDEBT_TEST_PG` (a server where databases can be created;
-`initdb`/`pg_ctl` from `/usr/lib/postgresql/16/bin` as the `postgres` user worked here, with
-the data directory under `/tmp`); the testbed contract test needs `UDEBT_TESTBEDS=1`
-(huggingface_hub's replay takes about six minutes in memory). Open questions are at the top of
-BRIEFING's list.
+Earlier in the day: Phase 3.4 and Phase 3.5 done, Phase 4a done as re-scoped (see their
+sections).
+
+For the next session:
+
+- Python: `ruff check . && ruff format --check . && pytest -q`. The Postgres tests
+  (`tests/test_schema.py`, `tests/test_samples.py`) need `UDEBT_TEST_PG`: `initdb` and `pg_ctl`
+  from `/usr/lib/postgresql/16/bin` as the `postgres` user, data directory under `/tmp`, worked
+  here (port 54329). The testbed contract test needs `UDEBT_TESTBEDS=1`.
+- Web (`cd web`, Node from `/opt/node22/bin`): `npm run lint && npm run typecheck && npm run
+  coverage && npm run build`, then `npm run e2e` (Playwright 1.63 with this environment's
+  browsers; `UDEBT_SHOTS=1` for the screenshots). After changing `udebt/prompts.py`,
+  `udebt/scoring.py` or `udebt/ladder.py`, regenerate `web/src/core/prompt-parts.json`
+  (`python -m udebt.hosted.prompt_parts`) and `web/test/fixtures/parity.json`
+  (`UDEBT_WRITE_PARITY=1 pytest tests/test_hosted_parity.py`).
+- When the sample outputs arrive: `python -m udebt.hosted.samples <dirs> --out <sql dir>` and
+  hand the files to the Plabs session.

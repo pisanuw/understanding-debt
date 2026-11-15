@@ -14,8 +14,8 @@ import { parseGitHubUrl } from './specs';
 /** The gateway's limits (docs/new-app-guide.md section 7): a body of at most 1,000,000 bytes, max_tokens clamped to 4096. */
 export const MAX_BODY_BYTES = 1_000_000;
 export const MAX_TOKENS = 4096;
-/** Room left for the rest of the request when the excerpts are budgeted (characters). */
-export const EXCERPT_BUDGET = 400_000;
+/** The most characters of code excerpts in one request (about 15,000 tokens): a quiz call stays cheap under the gateway caps. */
+export const EXCERPT_BUDGET = 60_000;
 export const MAX_UNITS = 12;
 export const MAX_ITEMS = 20;
 

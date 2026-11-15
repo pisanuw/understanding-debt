@@ -124,3 +124,13 @@
 2026-11-15 [doc] README model table and decay text, BRIEFING Phase 3.5, ROADMAP Phase 3.5 and Phase 5 fits, TESTBEDS Phase 3.5 re-check; dogfood series and dashboard rebuilt.
 2026-11-15 [decision] Hosted: UDebt session builds; udebt.hintwise.org, repo not renamed; gateway quizzes, user key for new repos; Render free; public only; shared analyses.
 2026-11-15 [decision] Phase 4a answers (15-min rule): no own-commit prior in the hosted app v1; soft-block ack carries over a PR until its touched units change; specs store line ranges not code; digest default 30 days; co-change density left as is.
+2026-11-15 [code] web/: the HintWise app from the platform template: sign-in, repositories, specs and units, walkthroughs with code from GitHub at the sha, quiz ladder, debt, settings, add.
+2026-11-15 [code] Ladder and scoring ported to TypeScript (decay per level, no prior) and checked case by case against the Python core (web/test/fixtures/parity.json, tests/test_hosted_parity.py).
+2026-11-15 [code] Netlify functions /api/questions, /api/grade (gateway with the person's token; records the sitting) and /api/excerpt (a line range at a sha, never cached); BYOK in the browser.
+2026-11-15 [decision] Prompt rules shared with the CLI as prompts.py constants exported to web/src/core/prompt-parts.json; hosted quizzes read code excerpts, 60,000 characters a call at most.
+2026-11-15 [code] udebt.hosted.worker_service on Render (stdlib http.server): public GitHub repos, the person's own key, a tool loop over a Messages API, rows written with the person's token.
+2026-11-15 [decision] Worker limits for 512 MB: 6000 commits, 200 MB, one job at a time, no replay or export; measured locally at 135 MB peak for dsa-instructor (2,510 commits, 81 MB pack).
+2026-11-15 [code] Migrations: 4a file renamed 0001_app_udebt.sql (unapplied, unchanged); 0002_hosted.sql: shared analyses kept unowned on account deletion, GitHub URLs only, jobs, gateway row.
+2026-11-15 [code] udebt worker sql --dialect json, --public, --url; udebt worker run --no-export; python -m udebt.hosted.samples checks the three outputs and writes their public SQL.
+2026-11-15 [note] Local end-to-end with fakes: sign in, digitalme sample, two-question level-1 quiz, debt index falls from 100.0; 52 screenshots at 1280/390 px, light/dark; no CSP violation.
+2026-11-15 [doc] docs/DEPLOY.md rewritten for HintWise (owner and Plabs steps, env vars, caps estimate, untested parts), supabase/README.md, README hosted section, BRIEFING and ROADMAP Phase 4b.
