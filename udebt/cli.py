@@ -1202,6 +1202,46 @@ def cmd_digest(args) -> int:
     return 0
 
 
+def cmd_validate(args) -> int:
+    """Check a JSON file (or every line of a .jsonl) against the contract."""
+    import json as _json
+
+    from . import contract
+
+    p = Path(args.file)
+    text = p.read_text(encoding="utf-8")
+    if p.suffix == ".jsonl":
+        items = [_json.loads(x) for x in text.splitlines() if x.strip()]
+        kind = args.kind or "record"
+    else:
+        items = [_json.loads(text)]
+        kind = args.kind or _kind_of(items[0], p.name)
+    errors = [f"line {i + 1}: {e}" if len(items) > 1 else e
+              for i, it in enumerate(items) for e in contract.validate(kind, it)]  # fmt: skip
+    if errors:
+        print(f"{p}: {len(errors)} problem(s) as {kind} (contract {contract.CONTRACT}):")
+        for e in errors[:40]:
+            print(f"  {e}")
+        return 1
+    print(f"{p}: {kind}: conforms to contract {contract.CONTRACT}")
+    return 0
+
+
+def _kind_of(data, name: str) -> str:
+    if isinstance(data, dict):
+        if data.get("format") == "udebt-export":
+            return "import" if "map" in data else "export"
+        if "fingerprint" in data and "points" in data:
+            return "snapshots"
+        if "developers" in data:
+            return "responsibility"
+        if "commits" in data and "units" not in data:
+            return "commits"
+        if "units" in data:
+            return "map"
+    raise SystemExit(f"Cannot tell what {name} is; pass --kind.")
+
+
 def cmd_serve(args) -> int:
     from . import serve
 
@@ -1657,10 +1697,11 @@ def cmd_export(args) -> int:
     import csv
     import json as _json
 
-    from . import replay
+    from . import contract, replay
 
     root, store, h, res, _ = _replayed(args)
     data = replay.export_data(h, res, with_answers=args.with_answers)
+    contract.check("export", data)  # the export is the import format: never write a broken one
     if args.format == "json":
         out = Path(args.out) if args.out else store.dir / "export" / "udebt-export.json"
         text = _json.dumps(data, indent=1, ensure_ascii=False) + "\n"
@@ -2428,6 +2469,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--format", choices=["table", "json"], default="table")
     s.set_defaults(fn=cmd_digest)
+
+    s = sub.add_parser("validate", help="check a JSON file against the versioned contract")
+    s.add_argument("file")
+    s.add_argument("--kind", choices=["map", "record", "snapshots", "commits", "responsibility",
+                                      "export", "import", "evidence"])  # fmt: skip
+    s.set_defaults(fn=cmd_validate)
 
     s = sub.add_parser("serve", help="the teaching surface in your browser, on 127.0.0.1")
     s.add_argument("--port", type=int, default=0, help="default: a free port")
