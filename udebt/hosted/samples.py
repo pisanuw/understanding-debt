@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from ..loadsql import analysis_sql
+from ..topfiles import needs_tree
 
 SAMPLES: dict[str, dict[str, str]] = {
     "huggingface_hub": {"url": "https://github.com/huggingface/huggingface_hub",
@@ -65,12 +66,17 @@ def problems(out_dir: Path, sample: dict[str, str] | None, any_sha: bool = False
 
 
 def summary(out_dir: Path) -> dict[str, Any]:
+    """What the output holds; `tree_fallback` counts the units the app finds no file for (no
+    walkthrough, no file among their orientation and paths, no recorded `files`: an output
+    from before the worker recorded them), whose directories it lists from GitHub instead."""
     out = Path(out_dir)
     m = json.loads((out / "analysis.json").read_text(encoding="utf-8"))
     s = json.loads((out / "specs.json").read_text(encoding="utf-8"))
+    walks = s.get("walkthroughs") or {}
     return {"repo": m.get("repo"), "sha": m.get("sha"), "units": len(s.get("units", [])),
             "orientations": sum(1 for u in s.get("units", []) if u.get("orientation")),
-            "walkthroughs": len(s.get("walkthroughs") or {}), "tour": bool(s.get("tour")),
+            "walkthroughs": len(walks), "tour": bool(s.get("tour")),
+            "tree_fallback": sum(needs_tree(u, walks.get(u.get("id"))) for u in s.get("units", [])),
             "llm_calls": m.get("llm_calls")}  # fmt: skip
 
 

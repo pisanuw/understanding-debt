@@ -110,3 +110,30 @@ def test_the_command_writes_a_map_with_the_model_when_asked(fixture_repo, capsys
     assert "The clone is deleted." in text
     with pytest.raises(SystemExit, match="nothing written; the clone is deleted"):
         cli.main(["worker", "run", str(tmp_path / "nope"), "--out", str(tmp_path / "x")])
+
+
+def test_a_unit_over_directories_gets_its_top_files(mixed_repo, tmp_path):
+    """Phase 4b, the tree fallback: a unit whose paths are directories gets `files`, the top
+    tracked files under them by topfiles.py's rule, so the hosted question writer has code for
+    it without a walkthrough; a unit naming only files gets none."""
+    root = mixed_repo
+    (root / "udebt" / "tests").mkdir()
+    (root / "udebt" / "tests" / "test_store.py").write_text("def test():\n    pass\n" * 50)
+    (root / "udebt" / "uv.lock").write_text("x\n" * 500)
+    subprocess.run(["git", "add", "."], cwd=root, check=True)
+    subprocess.run(["git", "commit", "-qm", "tests"], cwd=root, check=True)
+    mp = tmp_path / "map.json"
+    mp.write_text(json.dumps({"version": 3, "units": [
+        {"id": "core", "name": "Core", "paths": ["udebt/"], "children": [
+            {"id": "core/store", "name": "Store", "paths": ["udebt/store.py"]}]},
+        {"id": "docs", "name": "Docs", "paths": ["README.md", "nowhere"]},
+    ]}))  # fmt: skip
+    out = tmp_path / "out"
+    worker.run(str(root), out, map_file=mp, export=False, log=lambda *_: None)
+    units = {u["id"]: u for u in json.loads((out / "specs.json").read_text())["units"]}
+    assert units["core"]["files"] == ["udebt/scoring.py", "udebt/store.py",
+                                      "udebt/tests/test_store.py"]  # fmt: skip
+    assert "files" not in units["core/store"] and "files" not in units["docs"]
+    from udebt.topfiles import needs_tree
+
+    assert not any(needs_tree(u, None) for u in units.values())

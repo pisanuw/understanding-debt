@@ -52,6 +52,7 @@ def test_the_fixture_passes_the_sample_checks_and_others_do_not(tmp_path):
         "orientations": 5,
         "walkthroughs": 1,
         "tour": True,
+        "tree_fallback": 1,  # frontend-spa lists only `frontend`: an output from before `files`
         "llm_calls": 0,
     }
 

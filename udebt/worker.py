@@ -16,7 +16,8 @@ service on Render).
 3. **The offline core**: commit weights, structural clusters, decision candidates,
    contributors; with a map, the replayed history as the export (`export.json`, contract
    `export`, the import format) and the **specs** (`specs.json`): units and sub-units with their
-   decisions, alternatives, why and history, orientations, the tour as Markdown, and each
+   decisions, alternatives, why and history, orientations, the top tracked files under any
+   directory a unit lists (`files`, topfiles.py), the tour as Markdown, and each
    cached walkthrough with the actual lines of its steps (`--no-excerpts` leaves the lines out;
    for a public repository they let quizzes be graded without a clone).
 4. **Delete the clone**, always.
@@ -183,9 +184,11 @@ def changed_since(root: Path, store: Store, shas: list[str]) -> dict[str, dict[s
 def _specs(root: Path, store: Store, excerpts_too: bool, since: list[str] | None = None
            ) -> dict[str, Any]:  # fmt: skip
     """Units with their decisions and orientations, the tour as Markdown, the walkthroughs with
-    their lines: what the hosted app shows and quizzes from. With `since` (earlier analysed
+    their lines: what the hosted app shows and quizzes from. A unit with a directory among its
+    paths also gets `files`, the top tracked files under them (topfiles.py), so the hosted
+    question writer has code for it with no walkthrough. With `since` (earlier analysed
     commits), `changed_since` says how much of each unit changed after each of them."""
-    from . import dig, excerpts, repo, tour
+    from . import dig, excerpts, repo, topfiles, tour
     from . import orientation as orient
     from . import units as hier
     from .mapping import commits_for, weights_for
@@ -196,13 +199,19 @@ def _specs(root: Path, store: Store, excerpts_too: bool, since: list[str] | None
     graph = build(root, m["units"], commits, weights_for(root, store, commits),
                   max_files=store.config.cochange_max_files)  # fmt: skip
     tracked = set(repo.tracked_files(root))
+    sizes = topfiles.tracked_sizes(root)
+    dirs = topfiles.directories(sizes)
     keep = ("id", "name", "kind", "summary", "decision", "alternatives", "why", "paths",
             "centrality", "scope", "importance", "history")  # fmt: skip
     units, walks = [], {}
     for u, parent in hier.walk(m["units"]):
         o = orient.cached(u)
-        units.append({**{k: u.get(k) for k in keep if k in u}, "parent": parent["id"]
-                      if parent else None, "orientation": o})  # fmt: skip
+        row = {**{k: u.get(k) for k in keep if k in u}, "parent": parent["id"] if parent else None,
+               "orientation": o}  # fmt: skip
+        files = topfiles.recorded_files({**u, "orientation": o}, sizes, dirs)
+        if files:
+            row["files"] = files
+        units.append(row)
         w = dig.cached(root, u)
         if w is None:
             continue
