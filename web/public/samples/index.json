@@ -29,9 +29,9 @@
    "license": "Apache-2.0",
    "sha": "f6ff35427d7e1134a83f8f9d8215d0049149162f",
    "analysis": "mlflow.json",
-   "quizzes": null,
+   "quizzes": "mlflow.quizzes.json",
    "units": 30,
-   "questions": null
+   "questions": 270
   },
   {
    "name": "understanding-debt",
@@ -39,9 +39,9 @@
    "license": null,
    "sha": "e9c1c8c5754f8f4e9061e4d0316c060bd8d1b788",
    "analysis": "understanding-debt.json",
-   "quizzes": null,
+   "quizzes": "understanding-debt.quizzes.json",
    "units": 19,
-   "questions": null
+   "questions": 165
   }
  ]
 }

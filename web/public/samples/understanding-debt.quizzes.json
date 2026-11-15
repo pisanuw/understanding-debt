@@ -1,0 +1,3290 @@
+{
+ "format": "udebt-advance-quizzes",
+ "version": 1,
+ "repo": "https://github.com/pisanuw/understanding-debt",
+ "name": "understanding-debt",
+ "sha": "e9c1c8c5754f8f4e9061e4d0316c060bd8d1b788",
+ "generated_at": "2026-11-15T13:03:43+00:00",
+ "levels": [
+  1,
+  2,
+  3
+ ],
+ "per": 3,
+ "calls": 12,
+ "questions": [
+  {
+   "unit_id": "cli-pipeline",
+   "level": 1,
+   "question": "When someone runs the status command in a repository where the local records folder has never been created, what does the tool tell them to do?",
+   "variants": [
+    "What instruction does the local command-line tool give if status is run before the records folder exists?",
+    "If the records folder is missing, what step does the status command say must come first?"
+   ],
+   "reference_answer": "It stops and tells them to initialise the tool in that repository first, because every command depends on the local records folder existing.",
+   "evidence": [
+    "udebt/store.py:176-178",
+    "udebt/cli.py:548-551"
+   ],
+   "orientation": {
+    "purpose": "The local `udebt` command-line tool. It maps a git repo into units, weighs commits, scores how well someone understands each unit, and writes the results as records under .udebt/.",
+    "decision": "A stdlib-only Python CLI that keeps state in files under .udebt/ and uses git as its only data source. A server-first app, a database and third-party dependencies were rejected. The aim was a local-first tool with nothing to install; the hosted side came later.",
+    "where": [
+     {
+      "path": "udebt/cli.py",
+      "what": "command entry point and subcommands"
+     },
+     {
+      "path": "udebt/mapping.py",
+      "what": "maps the repo into units"
+     },
+     {
+      "path": "udebt/store.py",
+      "what": "file-based records under .udebt/"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits, on 2026-11-11 and 2026-11-12."
+   }
+  },
+  {
+   "unit_id": "cli-pipeline",
+   "level": 1,
+   "question": "After the tool is initialised, what must exist before status can report scores for a repository?",
+   "variants": [
+    "What prerequisite, beyond initialisation, does status need before it can score units?",
+    "If status finds no breakdown of the repo into units, what does it tell the user to run?"
+   ],
+   "reference_answer": "An architectural map of the repository's units; without it status stops and tells the user to run the mapping step first.",
+   "evidence": [
+    "udebt/store.py:196-199",
+    "udebt/cli.py:548-553"
+   ],
+   "orientation": {
+    "purpose": "The local `udebt` command-line tool. It maps a git repo into units, weighs commits, scores how well someone understands each unit, and writes the results as records under .udebt/.",
+    "decision": "A stdlib-only Python CLI that keeps state in files under .udebt/ and uses git as its only data source. A server-first app, a database and third-party dependencies were rejected. The aim was a local-first tool with nothing to install; the hosted side came later.",
+    "where": [
+     {
+      "path": "udebt/cli.py",
+      "what": "command entry point and subcommands"
+     },
+     {
+      "path": "udebt/mapping.py",
+      "what": "maps the repo into units"
+     },
+     {
+      "path": "udebt/store.py",
+      "what": "file-based records under .udebt/"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits, on 2026-11-11 and 2026-11-12."
+   }
+  },
+  {
+   "unit_id": "cli-pipeline",
+   "level": 1,
+   "question": "Since git is the only data source for the local tool, what does it read as the raw material for weighing how much a unit has changed?",
+   "variants": [
+    "What input from git does the local tool's weighing of change start from?",
+    "With git as its sole source, which history does the tool classify and weigh for each unit?"
+   ],
+   "reference_answer": "Every commit reachable from the current head, oldest first, read through a cache of already-parsed commits.",
+   "evidence": [
+    "udebt/mapping.py:55-64"
+   ],
+   "orientation": {
+    "purpose": "The local `udebt` command-line tool. It maps a git repo into units, weighs commits, scores how well someone understands each unit, and writes the results as records under .udebt/.",
+    "decision": "A stdlib-only Python CLI that keeps state in files under .udebt/ and uses git as its only data source. A server-first app, a database and third-party dependencies were rejected. The aim was a local-first tool with nothing to install; the hosted side came later.",
+    "where": [
+     {
+      "path": "udebt/cli.py",
+      "what": "command entry point and subcommands"
+     },
+     {
+      "path": "udebt/mapping.py",
+      "what": "maps the repo into units"
+     },
+     {
+      "path": "udebt/store.py",
+      "what": "file-based records under .udebt/"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits, on 2026-11-11 and 2026-11-12."
+   }
+  },
+  {
+   "unit_id": "cli-pipeline",
+   "level": 2,
+   "question": "The analysis tool was built as a dependency-free command-line program keeping its state in plain files inside the repository, rather than as a server-backed app with a database. What constraint made that the better first choice?",
+   "variants": [
+    "Why was the analysis tool first built as a zero-dependency local program with file-based state instead of a server with a database?",
+    "What requirement favoured a local, plain-file, no-third-party-package tool over a server-first design with a database?"
+   ],
+   "reference_answer": "It had to be local-first and zero-install: a developer can run it inside any git repo with only the standard library, using git history as the sole data source and no server or database to set up. The hosted side was added later.",
+   "evidence": [
+    "udebt/store.py:176-200",
+    "udebt/cli.py:548-572"
+   ]
+  },
+  {
+   "unit_id": "cli-pipeline",
+   "level": 2,
+   "question": "The local tool reads only git history as its source of data, rather than requiring an external service or tracker. What constraint made that choice fit a local-first tool?",
+   "variants": [
+    "Why does the local tool rely solely on the git history of the repository as its data source?",
+    "What made git alone, rather than an external data service, a sufficient source for the local analysis tool?"
+   ],
+   "reference_answer": "Every repo already has its full history locally, so the tool works with zero setup and no network or accounts. Commits, weights and unit touches can all be derived from it and cached locally.",
+   "evidence": [
+    "udebt/mapping.py:55-83",
+    "udebt/store.py:176-200"
+   ]
+  },
+  {
+   "unit_id": "cli-pipeline",
+   "level": 2,
+   "question": "Per-repo records, map and config are kept as JSON files in a hidden folder rather than in a database. What constraint made files the better choice for the local tool?",
+   "variants": [
+    "Why does the local tool persist its map and records as plain JSON files instead of a database?",
+    "What made file-based state preferable to a database for the local analysis tool?"
+   ],
+   "reference_answer": "The tool must be zero-install and self-contained in the repo, so it can't depend on a database engine or extra packages. Plain JSON files using only the standard library are simple, inspectable and need no setup.",
+   "evidence": [
+    "udebt/store.py:176-200"
+   ]
+  },
+  {
+   "unit_id": "cli-pipeline",
+   "level": 3,
+   "question": "If the local analysis tool were rebuilt as a server-first app with a database instead of plain files kept beside the repository, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If the local tool's file-based per-repo state were replaced by a central database, which part of the system would first have to change?",
+    "If analysis state moved from files inside the repository into a server database, what is the first other component that would need rework?"
+   ],
+   "reference_answer": "The commands that load and save the map, records and caches would have to be rewritten to talk to a server or database, since every command reads and writes its state through that file-based storage layer. The zero-install local workflow would also be lost.",
+   "evidence": [
+    "udebt/store.py:176-200",
+    "udebt/cli.py:548-572",
+    "udebt/mapping.py:55-83"
+   ]
+  },
+  {
+   "unit_id": "cli-pipeline",
+   "level": 3,
+   "question": "If the local tool took git history from some source other than the repository's own commit log, what is the first other part of the system that would have to change?",
+   "variants": [
+    "If git were no longer the only data source for the local tool, which part would first need to change?",
+    "If commit data came from somewhere other than git itself, what is the first downstream component that would need to be adapted?"
+   ],
+   "reference_answer": "The step that reads and caches parsed commits would need to change, because the commit weighing and scoring all consume its output. Everything downstream depends on that commit list.",
+   "evidence": [
+    "udebt/mapping.py:55-83",
+    "udebt/quiz.py:98-125"
+   ]
+  },
+  {
+   "unit_id": "cli-pipeline",
+   "level": 3,
+   "question": "If the local tool were allowed to depend on third-party packages, which kind of change would it most affect in how the hosted side reuses it?",
+   "variants": [
+    "If the local tool dropped its standard-library-only rule, what would change for the hosted worker that reuses its code?",
+    "If third-party dependencies were adopted in the local tool, what would the hosted analysis service have to do differently?"
+   ],
+   "reference_answer": "The hosted worker reuses the CLI code directly, so its deployment would need to install and manage those dependencies. The zero-install property that lets it run anywhere would be gone.",
+   "evidence": [
+    "udebt/worker.py:305-321",
+    "udebt/cli.py:548-572"
+   ]
+  },
+  {
+   "unit_id": "debt-model",
+   "level": 1,
+   "question": "Why does the debt model limit one commit's changed lines to the size of the unit it touches?",
+   "variants": [
+    "What is the point of capping a commit's counted lines at the unit's size in the debt calculation?",
+    "Why can a single commit never count as more than the whole unit changing?"
+   ],
+   "reference_answer": "So one commit changes at most 100% of a unit: a rewrite counts the unit once rather than old plus new lines, and deleting most of a unit doesn't count the deleted lines against a size that no longer holds them.",
+   "evidence": [
+    "udebt/provenance.py:621-640"
+   ],
+   "orientation": {
+    "purpose": "Computes the understanding-debt score for a unit. It estimates how much understanding has been lost as the code changed since someone last knew it.",
+    "decision": "A heuristic model: commits are weighted (lockfile, manifest and version bumps count less), a commit's lines are capped at the unit's size, and understanding decays by the share of the unit changed, at a separate rate for each ladder level. Raw line counts, a single decay rate and a learned model were not used. Rates were refit from experiments with a synthetic developer.",
+    "where": [
+     {
+      "path": "udebt/scoring.py",
+      "what": "the debt score"
+     },
+     {
+      "path": "udebt/weights.py",
+      "what": "commit weighting rules"
+     },
+     {
+      "path": "udebt/ladder.py",
+      "what": "ladder levels and their decay"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all eight commits, 2026-11-12 to 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "debt-model",
+   "level": 1,
+   "question": "How much does a commit that changes only lockfiles, generated files or media count toward understanding debt, compared with ordinary code changes?",
+   "variants": [
+    "What weight does the debt model give a commit touching only lockfiles, generated or media files?",
+    "How heavily does a lockfile-only commit weigh in the debt score relative to a code change?"
+   ],
+   "reference_answer": "Almost nothing: such commits get a tiny fixed weight, far below ordinary code changes.",
+   "evidence": [
+    "udebt/weights.py:294-320"
+   ],
+   "orientation": {
+    "purpose": "Computes the understanding-debt score for a unit. It estimates how much understanding has been lost as the code changed since someone last knew it.",
+    "decision": "A heuristic model: commits are weighted (lockfile, manifest and version bumps count less), a commit's lines are capped at the unit's size, and understanding decays by the share of the unit changed, at a separate rate for each ladder level. Raw line counts, a single decay rate and a learned model were not used. Rates were refit from experiments with a synthetic developer.",
+    "where": [
+     {
+      "path": "udebt/scoring.py",
+      "what": "the debt score"
+     },
+     {
+      "path": "udebt/weights.py",
+      "what": "commit weighting rules"
+     },
+     {
+      "path": "udebt/ladder.py",
+      "what": "ladder levels and their decay"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all eight commits, 2026-11-12 to 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "debt-model",
+   "level": 1,
+   "question": "Why does the debt model weigh a merged branch as one change rather than giving each of its commits only its own small share?",
+   "variants": [
+    "What would go wrong in the debt score if each commit of a merged branch counted only its own small part of the lines?",
+    "Why do the lines from a merged branch carry the whole branch's weight in the decay calculation?"
+   ],
+   "reference_answer": "Because otherwise a ten-commit branch would count only about a tenth of the lines that the same work squashed into one commit would count.",
+   "evidence": [
+    "udebt/weights.py:623-636"
+   ],
+   "orientation": {
+    "purpose": "Computes the understanding-debt score for a unit. It estimates how much understanding has been lost as the code changed since someone last knew it.",
+    "decision": "A heuristic model: commits are weighted (lockfile, manifest and version bumps count less), a commit's lines are capped at the unit's size, and understanding decays by the share of the unit changed, at a separate rate for each ladder level. Raw line counts, a single decay rate and a learned model were not used. Rates were refit from experiments with a synthetic developer.",
+    "where": [
+     {
+      "path": "udebt/scoring.py",
+      "what": "the debt score"
+     },
+     {
+      "path": "udebt/weights.py",
+      "what": "commit weighting rules"
+     },
+     {
+      "path": "udebt/ladder.py",
+      "what": "ladder levels and their decay"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all eight commits, 2026-11-12 to 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "debt-model",
+   "level": 2,
+   "question": "Commits are weighted by kind of change, such as lockfile-only edits counting almost nothing, rather than by raw line counts. What constraint made weighting better?",
+   "variants": [
+    "Why does the debt model weigh commits by what they change instead of just counting changed lines?",
+    "What problem with raw line counts led to commits being weighted by kind?"
+   ],
+   "reference_answer": "Raw line counts overstate changes that need no understanding, such as lockfile, generated, media or version-bump edits, which can be huge yet teach nothing. Weighting approximates how much understanding is actually lost.",
+   "evidence": [
+    "udebt/weights.py:294-320"
+   ]
+  },
+  {
+   "unit_id": "debt-model",
+   "level": 2,
+   "question": "A single commit's changed lines are capped at the size of the unit it touches. What constraint made capping better than counting all changed lines?",
+   "variants": [
+    "Why is the amount a commit changes in a unit limited by the unit's size?",
+    "What problem does capping a commit's changed lines at the unit's size solve?"
+   ],
+   "reference_answer": "Without a cap, a rewrite would count both old and new lines and could exceed 100% of the unit. The cap means one commit changes at most the whole unit, so a rewrite counts once and the share-changed decay stays meaningful.",
+   "evidence": [
+    "udebt/provenance.py:621-640"
+   ]
+  },
+  {
+   "unit_id": "debt-model",
+   "level": 2,
+   "question": "Understanding decays by the share of a unit that changed, rather than by a fixed amount per commit. What constraint made share-based decay the better choice?",
+   "variants": [
+    "Why does the model decay understanding by the proportion of a unit changed instead of a flat per-commit rate?",
+    "What made share-of-unit-changed a better decay driver than a uniform per-commit decay?"
+   ],
+   "reference_answer": "The same edit matters far more in a small unit than a large one, and a branch of many commits should not count more than the same work squashed. Scaling by the share changed, with branch weights grouped, reflects how much of the unit a developer no longer knows.",
+   "evidence": [
+    "udebt/weights.py:623-636",
+    "udebt/quiz.py:98-137"
+   ]
+  },
+  {
+   "unit_id": "debt-model",
+   "level": 3,
+   "question": "If the debt score decayed understanding by a fixed amount per commit instead of by the share of a unit that changed, what would the part that measures unit size have to do differently?",
+   "variants": [
+    "If decay no longer depended on the share of a unit changed, which other part of the system would become unnecessary or change?",
+    "If understanding decay ignored how much of a unit changed, what would happen to the component that supplies unit sizes?"
+   ],
+   "reference_answer": "The component that computes unit sizes would no longer be needed for scoring (or its role would change), since sizes are only needed to turn changed lines into a share. The scoring would then use commit weights alone.",
+   "evidence": [
+    "udebt/quiz.py:98-125",
+    "udebt/provenance.py:621-640"
+   ]
+  },
+  {
+   "unit_id": "debt-model",
+   "level": 3,
+   "question": "If commits were scored by raw line counts instead of heuristic weights for lockfiles, version bumps and whitespace, what other part of the system would first have to change?",
+   "variants": [
+    "If the weighing of commits by kind were replaced by plain line counts, what downstream calculation would need to change first?",
+    "If lockfile and version-bump discounts were removed in favour of raw lines, which dependent part would have to adapt?"
+   ],
+   "reference_answer": "The calculation that gives each changed line its share-based decay weight would have to change, because it is built on the per-commit weights. Cached weights would also need recomputing.",
+   "evidence": [
+    "udebt/weights.py:294-320",
+    "udebt/weights.py:623-636",
+    "udebt/quiz.py:98-125"
+   ]
+  },
+  {
+   "unit_id": "debt-model",
+   "level": 3,
+   "question": "If a single decay rate replaced the separate decay per ladder level, what would the part that records quiz answers need to stop doing?",
+   "variants": [
+    "If understanding decayed at one rate regardless of question level, what would the scoring of recorded answers lose?",
+    "If per-level decay were collapsed into one rate, what distinction would the evidence from quiz answers no longer be able to carry?"
+   ],
+   "reference_answer": "Answers would no longer need to be tracked per ladder level, because understanding at each level would not be decayed or scored separately. Scoring would treat evidence from all levels the same way.",
+   "evidence": [
+    "udebt/quiz.py:117-137"
+   ]
+  },
+  {
+   "unit_id": "llm-backend",
+   "level": 1,
+   "question": "What does switching to the fake language-model backend let the tests do that the real backend would not?",
+   "variants": [
+    "Why can tests run offline when the fake backend is selected?",
+    "What does the real backend need that the fake one lets tests avoid?"
+   ],
+   "reference_answer": "Tests can run offline and without cost, since the fake backend answers from the prompts itself instead of invoking the claude command-line tool.",
+   "evidence": [
+    "udebt/llm.py:485-488"
+   ],
+   "orientation": {
+    "purpose": "Wraps every LLM call behind one interface, and holds the prompts for quiz questions and orientations. A fake implementation lets tests run offline.",
+    "decision": "The real backend runs the subscription-billed `claude` CLI. It denies access to .udebt/ and ignores repo settings and MCP. Calling the Anthropic API with a key, and running with no isolation from the analysed repo, were rejected. This avoids API keys and cost, stops reference answers leaking, and stops hostile repo hooks running.",
+    "where": [
+     {
+      "path": "udebt/llm.py",
+      "what": "real and fake backends"
+     },
+     {
+      "path": "udebt/prompts.py",
+      "what": "quiz prompt text"
+     },
+     {
+      "path": "tests/test_llm_isolation.py",
+      "what": "isolation checks"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote the three commits, 2026-11-11 to 2026-11-14."
+   }
+  },
+  {
+   "unit_id": "llm-backend",
+   "level": 1,
+   "question": "What would go wrong if the model analysing a repository could read the tool's own earlier records?",
+   "variants": [
+    "Why is the model denied access to the folder of the tool's earlier records?",
+    "What does blocking the records folder from the model protect?"
+   ],
+   "reference_answer": "It could read earlier answers, grades and reference answers instead of the code, leaking the answers to the quiz questions.",
+   "evidence": [
+    "udebt/llm.py:54-66"
+   ],
+   "orientation": {
+    "purpose": "Wraps every LLM call behind one interface, and holds the prompts for quiz questions and orientations. A fake implementation lets tests run offline.",
+    "decision": "The real backend runs the subscription-billed `claude` CLI. It denies access to .udebt/ and ignores repo settings and MCP. Calling the Anthropic API with a key, and running with no isolation from the analysed repo, were rejected. This avoids API keys and cost, stops reference answers leaking, and stops hostile repo hooks running.",
+    "where": [
+     {
+      "path": "udebt/llm.py",
+      "what": "real and fake backends"
+     },
+     {
+      "path": "udebt/prompts.py",
+      "what": "quiz prompt text"
+     },
+     {
+      "path": "tests/test_llm_isolation.py",
+      "what": "isolation checks"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote the three commits, 2026-11-11 to 2026-11-14."
+   }
+  },
+  {
+   "unit_id": "llm-backend",
+   "level": 1,
+   "question": "Why does the real backend ignore the analysed repository's own settings and tool-server configuration?",
+   "variants": [
+    "What risk comes from letting the analysed repository's own settings load when the model is called?",
+    "Why must a cloned repository not be able to add anything to the process that reads it?"
+   ],
+   "reference_answer": "A repository's own hooks could run on every call, for example one that installs and builds the repository each time, so only the user's settings are loaded.",
+   "evidence": [
+    "udebt/llm.py:56-62"
+   ],
+   "orientation": {
+    "purpose": "Wraps every LLM call behind one interface, and holds the prompts for quiz questions and orientations. A fake implementation lets tests run offline.",
+    "decision": "The real backend runs the subscription-billed `claude` CLI. It denies access to .udebt/ and ignores repo settings and MCP. Calling the Anthropic API with a key, and running with no isolation from the analysed repo, were rejected. This avoids API keys and cost, stops reference answers leaking, and stops hostile repo hooks running.",
+    "where": [
+     {
+      "path": "udebt/llm.py",
+      "what": "real and fake backends"
+     },
+     {
+      "path": "udebt/prompts.py",
+      "what": "quiz prompt text"
+     },
+     {
+      "path": "tests/test_llm_isolation.py",
+      "what": "isolation checks"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote the three commits, 2026-11-11 to 2026-11-14."
+   }
+  },
+  {
+   "unit_id": "llm-backend",
+   "level": 2,
+   "question": "LLM calls go through the locally installed subscription-billed command-line assistant rather than the direct model API with a key. What constraint made that the better choice?",
+   "variants": [
+    "Why does the tool shell out to a subscription-billed CLI assistant instead of calling the model API with a key?",
+    "What requirement favoured the subscription CLI over a keyed direct API for LLM calls?"
+   ],
+   "reference_answer": "Users should not need an API key or pay per-call API cost; the tool rides on their existing subscription. This keeps the local tool zero-setup.",
+   "evidence": [
+    "udebt/llm.py:485-488",
+    "udebt/llm.py:54-66"
+   ]
+  },
+  {
+   "unit_id": "llm-backend",
+   "level": 2,
+   "question": "The assistant is run with the analysed repo's own settings and tool servers disabled, rather than letting it load them as usual. What constraint forced this isolation?",
+   "variants": [
+    "Why are the repository's own settings and extension servers not loaded when the assistant is run inside it?",
+    "What risk made the tool refuse to load the analysed repo's configuration for LLM calls?"
+   ],
+   "reference_answer": "A repository can ship hooks and settings that would run when the assistant starts in its directory, such as one that installs and builds the repo on every call. Loading only user settings means a cloned repo cannot add anything to the process that reads it.",
+   "evidence": [
+    "udebt/llm.py:54-66"
+   ]
+  },
+  {
+   "unit_id": "llm-backend",
+   "level": 2,
+   "question": "The assistant is told it may not read the folder holding udebt's own records. What constraint made that rule necessary?",
+   "variants": [
+    "Why is the LLM denied access to the tool's own records folder inside the repo?",
+    "What would go wrong if the assistant could read the tool's records directory while writing or grading questions?"
+   ],
+   "reference_answer": "That folder holds earlier answers, grades and reference answers, not the code. If the model could read it, it could leak reference answers into the questions it generates or grades.",
+   "evidence": [
+    "udebt/llm.py:54-66"
+   ]
+  },
+  {
+   "unit_id": "llm-backend",
+   "level": 3,
+   "question": "If the model calls moved from the locally installed command-line tool to the direct Anthropic API with a key, what would the user have to supply that they do not now?",
+   "variants": [
+    "If the backend switched from the subscription CLI to the direct API, what new requirement would appear for the user?",
+    "If model calls were billed through an API key instead of a subscription CLI, what would a user newly need to provide?"
+   ],
+   "reference_answer": "They would need to supply an API key and pay per-call costs. The isolation rules that rely on the CLI's settings and tool restrictions would also have to be reimplemented.",
+   "evidence": [
+    "udebt/llm.py:54-66",
+    "udebt/llm.py:485-488"
+   ]
+  },
+  {
+   "unit_id": "llm-backend",
+   "level": 3,
+   "question": "If the isolation from the analysed repository's own settings and hooks were dropped, what is the first part of the system that would be put at risk?",
+   "variants": [
+    "If the model process loaded the analysed repository's own settings, what would be exposed first?",
+    "If the backend no longer ignored the analysed repo's configuration, what would be the primary risk?"
+   ],
+   "reference_answer": "The analysis run itself would be exposed, because a cloned repository could execute its own hooks and add tools to the process that reads it. It would also let the model read stored reference answers.",
+   "evidence": [
+    "udebt/llm.py:54-66"
+   ]
+  },
+  {
+   "unit_id": "llm-backend",
+   "level": 3,
+   "question": "If the offline fake model were replaced by a mock keyed on something other than a task label in each prompt, what else would have to change?",
+   "variants": [
+    "If the fake model stopped keying on task markers in prompts, what would the prompt builders have to change?",
+    "If the test double did not dispatch on a task label, which part of the system would have to be adapted?"
+   ],
+   "reference_answer": "The prompt builders would have to change, since each opens with a task label that the fake uses to decide which canned response to return. Tests relying on that dispatch would be updated too.",
+   "evidence": [
+    "udebt/prompts.py:616-629",
+    "udebt/llm.py:485-488"
+   ]
+  },
+  {
+   "unit_id": "json-contract",
+   "level": 1,
+   "question": "Why is the map cut down to metadata before it is uploaded to the hosted service?",
+   "variants": [
+    "What does stripping the map before upload keep off the hosted store?",
+    "What is removed from the map before sync?"
+   ],
+   "reference_answer": "So that walkthroughs, pooled questions with their reference answers, provenance and churn are not uploaded; in particular reference answers stay local.",
+   "evidence": [
+    "udebt/contract.py:356-374",
+    "udebt/remote.py:108-118"
+   ],
+   "orientation": {
+    "purpose": "Defines the versioned JSON formats that the CLI writes and the hosted side reads. It validates them, and it pushes and pulls records to the hosted store.",
+    "decision": "Schemas allow extra properties. The version bumps only when a field is removed or retyped. The map is cut down to metadata before upload. A shared DB schema, protobuf and no versioning were rejected. The point is to decouple the CLI from the hosted service and keep reference answers from being uploaded.",
+    "where": [
+     {
+      "path": "udebt/contract.py",
+      "what": "schemas and stdlib validator"
+     },
+     {
+      "path": "udebt/remote.py",
+      "what": "push and pull"
+     },
+     {
+      "path": "tests/test_contract.py",
+      "what": "contract tests"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote both commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "json-contract",
+   "level": 1,
+   "question": "Why does the tool check a push payload against the contract before sending it?",
+   "variants": [
+    "What is gained by validating the data against the contract before it leaves the CLI?",
+    "Why is the upload payload run through the contract check as its last step?"
+   ],
+   "reference_answer": "So malformed data fails locally with a list of what is wrong, and the hosted side only ever receives records in the shape it is built to read.",
+   "evidence": [
+    "udebt/remote.py:108-118",
+    "udebt/contract.py:325-330"
+   ],
+   "orientation": {
+    "purpose": "Defines the versioned JSON formats that the CLI writes and the hosted side reads. It validates them, and it pushes and pulls records to the hosted store.",
+    "decision": "Schemas allow extra properties. The version bumps only when a field is removed or retyped. The map is cut down to metadata before upload. A shared DB schema, protobuf and no versioning were rejected. The point is to decouple the CLI from the hosted service and keep reference answers from being uploaded.",
+    "where": [
+     {
+      "path": "udebt/contract.py",
+      "what": "schemas and stdlib validator"
+     },
+     {
+      "path": "udebt/remote.py",
+      "what": "push and pull"
+     },
+     {
+      "path": "tests/test_contract.py",
+      "what": "contract tests"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote both commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "json-contract",
+   "level": 1,
+   "question": "How does the contract validator treat data stamped with a newer contract version than the tool understands?",
+   "variants": [
+    "What happens when exported data claims a contract version newer than the local tool knows?",
+    "Is data from a newer contract version accepted by the validator?"
+   ],
+   "reference_answer": "It is reported as an error saying the data is newer than this tool understands.",
+   "evidence": [
+    "udebt/contract.py:333-339"
+   ],
+   "orientation": {
+    "purpose": "Defines the versioned JSON formats that the CLI writes and the hosted side reads. It validates them, and it pushes and pulls records to the hosted store.",
+    "decision": "Schemas allow extra properties. The version bumps only when a field is removed or retyped. The map is cut down to metadata before upload. A shared DB schema, protobuf and no versioning were rejected. The point is to decouple the CLI from the hosted service and keep reference answers from being uploaded.",
+    "where": [
+     {
+      "path": "udebt/contract.py",
+      "what": "schemas and stdlib validator"
+     },
+     {
+      "path": "udebt/remote.py",
+      "what": "push and pull"
+     },
+     {
+      "path": "tests/test_contract.py",
+      "what": "contract tests"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote both commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "json-contract",
+   "level": 2,
+   "question": "The data the CLI writes and the hosted side reads is governed by a versioned contract rather than a shared database schema. What constraint made that better?",
+   "variants": [
+    "Why do the CLI and hosted service share a versioned data contract instead of a common database schema?",
+    "What made a frozen versioned format preferable to a shared database schema between the CLI and hosted side?"
+   ],
+   "reference_answer": "The CLI is a standalone local tool and the hosted service evolves separately, so they must not be coupled through a database. A versioned file contract lets each change independently.",
+   "evidence": [
+    "udebt/contract.py:315-353",
+    "udebt/remote.py:108-118"
+   ]
+  },
+  {
+   "unit_id": "json-contract",
+   "level": 2,
+   "question": "Before upload, the map is reduced to metadata, dropping walkthroughs and pooled questions. What constraint made this sanitizing necessary?",
+   "variants": [
+    "Why is the map stripped of questions and walkthroughs before being sent to the hosted store?",
+    "What would be at risk if the full map were uploaded to the hosted service?"
+   ],
+   "reference_answer": "Pooled questions carry reference answers, and uploading them would expose answers to the hosted side. Only metadata such as descriptions, paths and tour is needed there.",
+   "evidence": [
+    "udebt/contract.py:356-374",
+    "udebt/remote.py:108-118"
+   ]
+  },
+  {
+   "unit_id": "json-contract",
+   "level": 2,
+   "question": "The contract allows unknown extra fields and bumps its version only when a field is removed or retyped. What constraint made this the better choice than strict versioning on every change?",
+   "variants": [
+    "Why does the contract tolerate extra fields and raise its version only for removals or type changes?",
+    "What made open extra-field handling preferable to bumping the version on any change?"
+   ],
+   "reference_answer": "CLI and hosted service upgrade at different times, so adding fields must not break older readers. Only removing or retyping fields breaks consumers, so only those need a version bump.",
+   "evidence": [
+    "udebt/contract.py:271-306",
+    "udebt/contract.py:333-353"
+   ]
+  },
+  {
+   "unit_id": "json-contract",
+   "level": 3,
+   "question": "If the hosted service read the CLI's records through a shared database schema instead of a versioned file contract, what first would have to change on the CLI side?",
+   "variants": [
+    "If a shared DB schema replaced the versioned JSON format, which CLI part would have to change first?",
+    "If the CLI and hosted side coupled through a database schema rather than a contract, what would the CLI's sync step need to do differently?"
+   ],
+   "reference_answer": "The push and pull sync step would have to write directly to the shared database instead of building a validated payload, and the CLI would become coupled to the hosted schema's changes. The validator and sanitizing step would lose their role as the boundary.",
+   "evidence": [
+    "udebt/remote.py:108-118",
+    "udebt/contract.py:315-353"
+   ]
+  },
+  {
+   "unit_id": "json-contract",
+   "level": 3,
+   "question": "If the map were uploaded in full instead of being reduced to metadata, what would the hosted service newly hold that it does not now?",
+   "variants": [
+    "If the upload skipped the map sanitizing step, what sensitive material would reach the hosted store?",
+    "If the full map were pushed, what would the hosted side begin to store?"
+   ],
+   "reference_answer": "It would store the pooled quiz questions with their reference answers, along with walkthroughs, provenance and churn data. Those are currently dropped before upload.",
+   "evidence": [
+    "udebt/contract.py:356-374",
+    "udebt/remote.py:108-118"
+   ]
+  },
+  {
+   "unit_id": "json-contract",
+   "level": 3,
+   "question": "If the contract closed its objects to unknown fields, what would the first consequence be for adding a new field to what the CLI writes?",
+   "variants": [
+    "If the schemas rejected extra fields, what would adding a new output field now require?",
+    "If additional properties were forbidden, what would the hosted side have to do before a CLI could write a new field?"
+   ],
+   "reference_answer": "Every new field would require a version bump and a coordinated update of the hosted reader, because older validators would reject it. Today extra fields pass, so additions need no bump.",
+   "evidence": [
+    "udebt/contract.py:271-306",
+    "udebt/contract.py:333-353"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis",
+   "level": 1,
+   "question": "What does a user see if they submit a repository for hosted analysis while another analysis is already running?",
+   "variants": [
+    "How does the hosted worker respond to a second submission while one analysis is in progress?",
+    "What message comes back if the hosted analysis service is busy when a repo is submitted?"
+   ],
+   "reference_answer": "The request is rejected with a too-many-requests error saying another analysis is running and to try again in a few minutes.",
+   "evidence": [
+    "udebt/hosted/worker_service.py:244-266"
+   ],
+   "orientation": {
+    "purpose": "The server-side worker. It clones a repo temporarily, analyses it with an LLM tool loop, handles GitHub webhooks and pull-request checks, and stores results in Supabase.",
+    "decision": "A Python worker on Render that reuses the CLI code. It calls the LLM through the messages API, talks to Supabase over REST, and uses a GitHub app. Serverless-only analysis was rejected because long clones don't fit Netlify functions. The earlier drafts/hosted-api service was superseded.",
+    "where": [
+     {
+      "path": "udebt/worker.py",
+      "what": "transient-clone analysis"
+     },
+     {
+      "path": "udebt/hosted/worker_service.py",
+      "what": "the Render service and tool loop"
+     },
+     {
+      "path": "render.yaml",
+      "what": "deployment config"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all five commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "hosted-analysis",
+   "level": 1,
+   "question": "What outcome does a user get when they submit a private repository for hosted analysis?",
+   "variants": [
+    "How does the hosted worker treat a submitted repository that is not public?",
+    "What does the job report when the submitted repository turns out to be private?"
+   ],
+   "reference_answer": "The job fails with a message that it is not a public repository (or not found).",
+   "evidence": [
+    "udebt/hosted/worker_service.py:286-291"
+   ],
+   "orientation": {
+    "purpose": "The server-side worker. It clones a repo temporarily, analyses it with an LLM tool loop, handles GitHub webhooks and pull-request checks, and stores results in Supabase.",
+    "decision": "A Python worker on Render that reuses the CLI code. It calls the LLM through the messages API, talks to Supabase over REST, and uses a GitHub app. Serverless-only analysis was rejected because long clones don't fit Netlify functions. The earlier drafts/hosted-api service was superseded.",
+    "where": [
+     {
+      "path": "udebt/worker.py",
+      "what": "transient-clone analysis"
+     },
+     {
+      "path": "udebt/hosted/worker_service.py",
+      "what": "the Render service and tool loop"
+     },
+     {
+      "path": "render.yaml",
+      "what": "deployment config"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all five commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "hosted-analysis",
+   "level": 1,
+   "question": "What happens when a user submits a repository revision that the hosted service has already analysed?",
+   "variants": [
+    "Does the hosted worker re-run analysis for a revision it has already analysed?",
+    "How does the hosted service respond to a repeat submission of an already analysed commit?"
+   ],
+   "reference_answer": "It skips the analysis, adds the repository to the user's list, and finishes as done with an 'already analysed' message.",
+   "evidence": [
+    "udebt/hosted/worker_service.py:300-306"
+   ],
+   "orientation": {
+    "purpose": "The server-side worker. It clones a repo temporarily, analyses it with an LLM tool loop, handles GitHub webhooks and pull-request checks, and stores results in Supabase.",
+    "decision": "A Python worker on Render that reuses the CLI code. It calls the LLM through the messages API, talks to Supabase over REST, and uses a GitHub app. Serverless-only analysis was rejected because long clones don't fit Netlify functions. The earlier drafts/hosted-api service was superseded.",
+    "where": [
+     {
+      "path": "udebt/worker.py",
+      "what": "transient-clone analysis"
+     },
+     {
+      "path": "udebt/hosted/worker_service.py",
+      "what": "the Render service and tool loop"
+     },
+     {
+      "path": "render.yaml",
+      "what": "deployment config"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all five commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "hosted-analysis",
+   "level": 2,
+   "question": "Repository analysis runs in a long-lived worker service rather than in serverless functions on the web host. What constraint made that the better choice?",
+   "variants": [
+    "Why is analysis done by a dedicated worker service instead of the web host's serverless functions?",
+    "What limitation of serverless functions led to analysis running on a separate service?"
+   ],
+   "reference_answer": "Cloning and analysing a repository takes long and needs disk, which does not fit serverless function time and resource limits. A long-running service can clone transiently and run the multi-turn LLM loop.",
+   "evidence": [
+    "udebt/worker.py:305-321",
+    "udebt/hosted/worker_service.py:244-266"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis",
+   "level": 2,
+   "question": "The hosted worker reuses the local CLI's analysis code instead of reimplementing it for the service. What constraint made reuse the better choice?",
+   "variants": [
+    "Why does the hosted worker run the same analysis code as the CLI?",
+    "What made sharing the CLI's pipeline preferable to writing separate analysis logic for the hosted service?"
+   ],
+   "reference_answer": "The hosted results must match what the local tool computes, so one implementation of mapping, commit weighting and scoring keeps both consistent. The worker just clones the repo transiently and runs that pipeline.",
+   "evidence": [
+    "udebt/worker.py:305-321"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis",
+   "level": 2,
+   "question": "The hosted service accepts one analysis at a time and rejects others while one runs, rather than queueing many in parallel. What constraint made that the better choice?",
+   "variants": [
+    "Why does the hosted service refuse new analyses while one is already running?",
+    "What resource limit led the service to allow only a single analysis at a time?"
+   ],
+   "reference_answer": "Cloning and LLM-driven analysis are heavy for a small service, so concurrency would exhaust its resources. It tells the caller to retry later instead.",
+   "evidence": [
+    "udebt/hosted/worker_service.py:244-266"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis",
+   "level": 3,
+   "question": "If analysis ran only in short serverless functions instead of a long-running service, what first part of the pipeline would break?",
+   "variants": [
+    "If the hosted analysis moved into serverless-only functions, which step would first fail?",
+    "If there were no long-running worker, what part of the analysis would not fit?"
+   ],
+   "reference_answer": "The cloning of the repository and the long model loop over it would not fit within function time limits, so the analysis step would have to be split or moved elsewhere. This is why a long-running service was chosen.",
+   "evidence": [
+    "udebt/worker.py:305-321",
+    "udebt/hosted/worker_service.py:244-266"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis",
+   "level": 3,
+   "question": "If the hosted worker called the model through the locally installed command-line tool instead of the messages API, what would it have to give up?",
+   "variants": [
+    "If the Render service used the CLI backend rather than the messages API, what would break there?",
+    "If the hosted side dropped the messages-API backend, what would it lose?"
+   ],
+   "reference_answer": "It would need the CLI installed and logged in on the host, and could not use a caller-supplied key or token budget per request. A hosted service has no subscription login to rely on.",
+   "evidence": [
+    "udebt/hosted/worker_service.py:244-266",
+    "udebt/llm.py:485-488"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis",
+   "level": 3,
+   "question": "If the hosted service accepted several analyses at once instead of one at a time, what would first have to change in how jobs are handled?",
+   "variants": [
+    "If concurrency limits were removed from the hosted service, what job-handling part would need rework?",
+    "If the service ran parallel analyses, what would have to change in its job tracking?"
+   ],
+   "reference_answer": "The single current-job guard that rejects a second request with a try-later response would have to be replaced by a queue or per-job resource handling. Clone space and model usage would also need to be shared safely.",
+   "evidence": [
+    "udebt/hosted/worker_service.py:244-266",
+    "udebt/hosted/worker_service.py:420-434"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/worker",
+   "level": 1,
+   "question": "Why does the analysis worker always remove its temporary copy of the repository once a run ends, even though the results are kept?",
+   "variants": [
+    "What is the reason the worker discards its working copy of the repository at the end of every run?",
+    "Why is the cloned repository never kept after the worker has produced its output?"
+   ],
+   "reference_answer": "The clone is only a scratch working copy; the lasting product is the set of output files, so deleting the clone always keeps the host (a small hosted instance) from accumulating repositories.",
+   "evidence": [
+    "udebt/worker.py:1-27"
+   ],
+   "orientation": {
+    "purpose": "Clones, analyses and records a unit's files.",
+    "decision": "Run the analysis in a temporary clone.",
+    "where": [
+     {
+      "path": "udebt/worker.py",
+      "what": ""
+     },
+     {
+      "path": "udebt/topfiles.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "hosted-analysis/worker",
+   "level": 1,
+   "question": "What does the analysis worker still produce when a repository has no map of its units and no model is configured to write one?",
+   "variants": [
+    "If there is no unit map and no language model available, what output does the worker still give?",
+    "What is written by the worker for a repository that lacks a map and has no model to create one?"
+   ],
+   "reference_answer": "It still writes the offline core (weights, structure, history, contributors) and reports that the map is missing.",
+   "evidence": [
+    "udebt/worker.py:11-15"
+   ],
+   "orientation": {
+    "purpose": "Clones, analyses and records a unit's files.",
+    "decision": "Run the analysis in a temporary clone.",
+    "where": [
+     {
+      "path": "udebt/worker.py",
+      "what": ""
+     },
+     {
+      "path": "udebt/topfiles.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "hosted-analysis/worker",
+   "level": 1,
+   "question": "What ends up written to the output when a repository's history or size exceeds the worker's limits?",
+   "variants": [
+    "When a repository is over the worker's size or commit limits, what does the run leave behind?",
+    "What does the worker write out for a repository that is too large to analyse?"
+   ],
+   "reference_answer": "Nothing: the clone is deleted and no output is written.",
+   "evidence": [
+    "udebt/worker.py:7-10"
+   ],
+   "orientation": {
+    "purpose": "Clones, analyses and records a unit's files.",
+    "decision": "Run the analysis in a temporary clone.",
+    "where": [
+     {
+      "path": "udebt/worker.py",
+      "what": ""
+     },
+     {
+      "path": "udebt/topfiles.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "hosted-analysis/worker",
+   "level": 2,
+   "question": "The analysis of a repository was made to run inside a temporary clone that is always deleted afterwards, rather than keeping a persistent checkout. What constraint made that the better choice?",
+   "variants": [
+    "Why was analysing a repository in a throwaway clone that is always removed chosen over keeping a long-lived checkout of it?",
+    "What constraint favoured a disposable clone, deleted after every run, over a persistent local copy of the repository for analysis?"
+   ],
+   "reference_answer": "The same code must run on a laptop, in CI or on a small hosted instance with limited disk and memory, and it analyses arbitrary repositories. A temporary clone, size-limited and always deleted, leaves nothing behind, and credentials never reach the output.",
+   "evidence": [
+    "udebt/worker.py:1-27"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/worker",
+   "level": 2,
+   "question": "The worker's analysis uses only the standard library, with no web framework, so it works as a library function and a command. What constraint made that the better choice over building it as a framework-based service?",
+   "variants": [
+    "Why was the analysis worker written as a plain library and command rather than around a web framework?",
+    "What requirement favoured a framework-free, stdlib-only worker over a framework-based service?"
+   ],
+   "reference_answer": "The same code has to run unchanged on a laptop, in CI and as the hosted platform's worker. Avoiding a framework keeps it dependency-free and portable across those hosts.",
+   "evidence": [
+    "udebt/worker.py:1-5"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/worker",
+   "level": 2,
+   "question": "Why does the worker record representative files for directory-only units rather than letting the question writer browse them?",
+   "variants": [
+    "What limitation of the hosted question writer made precomputed file picks for directory-only units necessary?",
+    "When a unit names only directories, the worker precomputes a short list of representative files per unit instead of having the web app's question writer read the directory itself. What constraint forced that choice?"
+   ],
+   "reference_answer": "The hosted question writer has no read tools, so a unit naming only directories would be quizzed with no code. The worker therefore picks the files ahead of time.",
+   "evidence": [
+    "udebt/topfiles.py:1-20"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/worker",
+   "level": 3,
+   "question": "If the analysis ran directly in a long-lived, persistent checkout instead of a temporary clone that is deleted afterwards, what first other behaviour of the surrounding system would have to be added?",
+   "variants": [
+    "If analysed repositories were kept on disk permanently rather than cloned fresh and thrown away, what other part of the system would first need new handling?",
+    "If the worker stopped using a throwaway clone and reused a persistent working copy, what would the rest of the system first have to take on?"
+   ],
+   "reference_answer": "Something would have to manage the stored checkouts: cleaning them up, bounding disk use, and keeping them at the right commit. With a transient clone, the size limits and the guaranteed deletion do this, which a small hosted instance relies on.",
+   "evidence": [
+    "udebt/worker.py:1-27"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/worker",
+   "level": 3,
+   "question": "If the part that picks representative files for a directory-only unit were dropped from the analysis step, which downstream consumer would first be left without code to show?",
+   "variants": [
+    "If the analysis stopped recording representative files for units that name only directories, what consumer would first lose material?",
+    "Without the recorded representative files for directory-only units, which part of the system would first have nothing to show for them?"
+   ],
+   "reference_answer": "The hosted web app's question writer, which has no read tools, would quiz such units with no code, or would have to fall back to listing the directory from GitHub at the pinned commit.",
+   "evidence": [
+    "udebt/topfiles.py:1-20"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/worker",
+   "level": 3,
+   "question": "If the analysis output were no longer written as a set of files, but handed straight back to the caller in memory, which other component that currently consumes the output would first need to change?",
+   "variants": [
+    "If the worker stopped producing output files for a run, what consumer of those files would first have to change?",
+    "If the worker's results were returned in memory instead of written out, which downstream loader would first need to be rewritten?"
+   ],
+   "reference_answer": "The loader that turns the worker's output files into database load statements (and the sample loader) reads the manifest and specs files, so it would need to take in-memory data instead.",
+   "evidence": [
+    "udebt/worker.py:25-27",
+    "udebt/hosted/samples.py:41-65",
+    "udebt/loadsql.py:91-101"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/service",
+   "level": 1,
+   "question": "Why does the hosted analysis service turn away a second analysis request while one is already running?",
+   "variants": [
+    "What constraint explains the service answering 'busy' to a new analysis while another is in progress?",
+    "Why does the hosted service run only one analysis at a time?"
+   ],
+   "reference_answer": "It runs on a small free instance with about 512 MB of memory, so only one clone-and-analyse job fits at once.",
+   "evidence": [
+    "udebt/hosted/worker_service.py:6-14"
+   ],
+   "orientation": {
+    "purpose": "HTTP worker service with LLM messages loop, GitHub and Supabase REST clients.",
+    "decision": "Stdlib-style REST clients instead of SDKs.",
+    "where": [
+     {
+      "path": "udebt/hosted/worker_service.py",
+      "what": ""
+     },
+     {
+      "path": "udebt/hosted/messages_llm.py",
+      "what": ""
+     },
+     {
+      "path": "udebt/hosted/supabase_rest.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "hosted-analysis/service",
+   "level": 1,
+   "question": "Why does the service make its database calls with the signed-in person's own token instead of a privileged service key?",
+   "variants": [
+    "What is gained by the service writing to the database as the person rather than with an all-powerful key?",
+    "Why do the hosted apps never get the database's service-role key for the worker's writes?"
+   ],
+   "reference_answer": "Row-level security then applies, so each row the worker writes belongs to that person, and shared analyses stay readable by signed-in users without extra privileges.",
+   "evidence": [
+    "udebt/hosted/supabase_rest.py:1-6"
+   ],
+   "orientation": {
+    "purpose": "HTTP worker service with LLM messages loop, GitHub and Supabase REST clients.",
+    "decision": "Stdlib-style REST clients instead of SDKs.",
+    "where": [
+     {
+      "path": "udebt/hosted/worker_service.py",
+      "what": ""
+     },
+     {
+      "path": "udebt/hosted/messages_llm.py",
+      "what": ""
+     },
+     {
+      "path": "udebt/hosted/supabase_rest.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "hosted-analysis/service",
+   "level": 1,
+   "question": "Why does the service run its own loop of model calls with read-only repository tools?",
+   "variants": [
+    "What job does the service's tool loop do given that the model gateway offers no file tools?",
+    "Why must the worker itself step the model through reads of the clone instead of the gateway doing so?"
+   ],
+   "reference_answer": "The gateway is a plain proxy with one model call per request and no file tools, so the worker must run the loop that lets the model read tracked files in the clone before it submits its answer.",
+   "evidence": [
+    "udebt/hosted/messages_llm.py:1-22"
+   ],
+   "orientation": {
+    "purpose": "HTTP worker service with LLM messages loop, GitHub and Supabase REST clients.",
+    "decision": "Stdlib-style REST clients instead of SDKs.",
+    "where": [
+     {
+      "path": "udebt/hosted/worker_service.py",
+      "what": ""
+     },
+     {
+      "path": "udebt/hosted/messages_llm.py",
+      "what": ""
+     },
+     {
+      "path": "udebt/hosted/supabase_rest.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "hosted-analysis/service",
+   "level": 2,
+   "question": "The hosted analysis service uses plain standard-library HTTP and REST clients instead of web frameworks or vendor SDKs. What constraint made that the better choice?",
+   "variants": [
+    "Why did the hosted service avoid frameworks and SDKs in favour of hand-written standard-library HTTP code?",
+    "What constraint favoured stdlib REST clients over SDKs for the Render analysis service?"
+   ],
+   "reference_answer": "The service has only a few JSON routes and runs on a small free instance, and the package is meant to keep no runtime dependency. Standard-library code is enough and keeps it dependency-free.",
+   "evidence": [
+    "udebt/hosted/worker_service.py:1-26",
+    "udebt/hosted/supabase_rest.py:1-6"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/service",
+   "level": 2,
+   "question": "The worker runs its own loop of model calls with read-only file tools instead of relying on the model gateway to provide file tools. What constraint forced that?",
+   "variants": [
+    "Why does the worker drive the tool loop itself rather than using tools provided by the model gateway?",
+    "What property of the gateway made the worker run the read-tool loop on its own side?"
+   ],
+   "reference_answer": "The gateway is a plain Messages API proxy with no file tools of its own and one model call per request. So the worker must supply the read tools over the clone and loop itself.",
+   "evidence": [
+    "udebt/hosted/messages_llm.py:1-22"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/service",
+   "level": 2,
+   "question": "The service writes to the database with the signed-in person's own token rather than a privileged service-level key. What constraint made that the better choice?",
+   "variants": [
+    "Why does the worker use the user's token for database writes instead of a service-role key?",
+    "What policy made per-user tokens preferable to an all-powerful key for the worker's database access?"
+   ],
+   "reference_answer": "Apps are never given the service-role key. Using the person's token means row-level security applies, so rows the worker writes belong to that person.",
+   "evidence": [
+    "udebt/hosted/supabase_rest.py:1-6"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/service",
+   "level": 3,
+   "question": "If the hosted service's hand-written web calls to Supabase were replaced by the official Supabase client library, what first project-level property would change?",
+   "variants": [
+    "If the service used an official Supabase SDK instead of hand-written HTTP calls, what would change about the package's dependencies?",
+    "What packaging property would be lost if the Render service adopted the Supabase SDK rather than plain standard-library REST calls?"
+   ],
+   "reference_answer": "The package would no longer be free of runtime dependencies, since it currently relies only on the standard library. The same would hold for a web framework or other SDKs.",
+   "evidence": [
+    "udebt/hosted/worker_service.py:6-8",
+    "udebt/hosted/supabase_rest.py:1-6"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/service",
+   "level": 3,
+   "question": "If the model calls were made through a provider SDK that ran its own file-reading agent, instead of the service's own loop, what part of the service would no longer be needed?",
+   "variants": [
+    "If an SDK agent handled file reading for the model, which of the service's own parts would become redundant?",
+    "What would become unnecessary if the model's tool use were handled by a provider's built-in agent rather than the service's loop?"
+   ],
+   "reference_answer": "The service's own tool loop and its read-only file tools over the clone, with their path checks and size caps, would be unneeded. They exist because the gateway proxies a single model call and offers no file tools.",
+   "evidence": [
+    "udebt/hosted/messages_llm.py:1-22"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/service",
+   "level": 3,
+   "question": "If the service were changed to act with a privileged database key instead of each person's own token, which database protection would the worker's writes first bypass?",
+   "variants": [
+    "If the worker used a service-level key rather than the signed-in person's token, what protection would stop applying to its writes?",
+    "Switching the worker from the person's token to an admin key would first sidestep which safeguard?"
+   ],
+   "reference_answer": "Row level security: with the person's token, rows the worker writes are that person's own. A privileged key would skip that ownership enforcement.",
+   "evidence": [
+    "udebt/hosted/supabase_rest.py:1-6"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/webhooks-checks",
+   "level": 1,
+   "question": "Why must a received GitHub delivery be signature-verified before anything acts on its routing result?",
+   "variants": [
+    "What would be at risk if a delivery were routed and acted on without first checking its signature?",
+    "Why does the receiver check the shared-secret signature on a delivery before queuing analyses or checks?"
+   ],
+   "reference_answer": "Without verification anyone could forge a delivery and trigger analyses, checks or acknowledgements; the signature proves it came from GitHub with the shared secret.",
+   "evidence": [
+    "udebt/webhooks.py:37-42",
+    "udebt/webhooks.py:1-5"
+   ],
+   "orientation": {
+    "purpose": "Routes GitHub webhooks and builds the pull-request check run.",
+    "decision": "Fixture-tested event routing.",
+    "where": [
+     {
+      "path": "udebt/webhooks.py",
+      "what": ""
+     },
+     {
+      "path": "udebt/checks.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "hosted-analysis/webhooks-checks",
+   "level": 1,
+   "question": "Why are event routing and check-building kept free of any web framework or database?",
+   "variants": [
+    "What does it let the receiving platform do that routing and check-building are plain functions with no framework or database?",
+    "Why can both a platform function and the worker use the same routing and check-building?"
+   ],
+   "reference_answer": "Whatever receives the webhook (a platform function or the worker) can call them and act on the result, and they can be tested against recorded event fixtures.",
+   "evidence": [
+    "udebt/webhooks.py:1-5",
+    "udebt/checks.py:1-4"
+   ],
+   "orientation": {
+    "purpose": "Routes GitHub webhooks and builds the pull-request check run.",
+    "decision": "Fixture-tested event routing.",
+    "where": [
+     {
+      "path": "udebt/webhooks.py",
+      "what": ""
+     },
+     {
+      "path": "udebt/checks.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "hosted-analysis/webhooks-checks",
+   "level": 1,
+   "question": "By default, what verdict does the pull-request check give for a change that lands in a high-risk unit?",
+   "variants": [
+    "Unless a repository owner opts in, does a high-risk change fail the pull-request check?",
+    "What conclusion does the check report by default when a change is rated high risk?"
+   ],
+   "reference_answer": "It passes (advisory) with the risk verdict in the title; only an owner-enabled soft block makes it fail until a lead acknowledges it.",
+   "evidence": [
+    "udebt/checks.py:5-11",
+    "udebt/checks.py:41-50"
+   ],
+   "orientation": {
+    "purpose": "Routes GitHub webhooks and builds the pull-request check run.",
+    "decision": "Fixture-tested event routing.",
+    "where": [
+     {
+      "path": "udebt/webhooks.py",
+      "what": ""
+     },
+     {
+      "path": "udebt/checks.py",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "hosted-analysis/webhooks-checks",
+   "level": 2,
+   "question": "Webhook verification and routing were written as pure functions with no web framework or database, instead of inside a particular receiving service. What constraint made that the better choice?",
+   "variants": [
+    "Why is webhook routing kept free of any framework or database rather than built into one receiver?",
+    "What requirement favoured pure, host-agnostic routing logic over logic embedded in a specific web service?"
+   ],
+   "reference_answer": "Different hosts, such as a platform function or the worker, can receive the delivery. Pure functions can be shared by all of them and tested against recorded events.",
+   "evidence": [
+    "udebt/webhooks.py:1-22"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/webhooks-checks",
+   "level": 2,
+   "question": "The pull-request check is advisory by default, with only an opt-in soft block that a lead can clear, rather than a hard block tied to quiz scores. What constraint motivated that?",
+   "variants": [
+    "Why does the pull-request check pass by default instead of blocking changes outright?",
+    "Why was a lead-clearable soft block chosen over a hard gate based on the author's understanding?"
+   ],
+   "reference_answer": "Nothing should wait on the author's quiz score, so a hard block is rejected. A lead's acknowledgement can clear the optional soft block, keeping a human in the loop.",
+   "evidence": [
+    "udebt/checks.py:1-12"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/webhooks-checks",
+   "level": 2,
+   "question": "Who is a lead is left to the caller to say instead of being decided inside the routing logic. What constraint made that the better choice?",
+   "variants": [
+    "Why does webhook routing not decide for itself who counts as a lead?",
+    "Why is the role lookup delegated to the host instead of built into the router?"
+   ],
+   "reference_answer": "Roles live wherever the host keeps them, and the routing code has no database. Letting the caller supply the role keeps routing pure and portable.",
+   "evidence": [
+    "udebt/webhooks.py:19-22"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/webhooks-checks",
+   "level": 3,
+   "question": "If webhook routing were folded into a web handler that also did the database and network work, what first property of the routing would be lost?",
+   "variants": [
+    "If routing GitHub events were mixed with the code that performs the actions, what would be lost?",
+    "What property of the event routing would be lost if it were no longer separate from its side effects?"
+   ],
+   "reference_answer": "It could no longer be tested on its own with recorded event fixtures, and no longer be reused by whatever receives the delivery (a platform function or the worker). The router currently only decides what to do and leaves doing it to the caller.",
+   "evidence": [
+    "udebt/webhooks.py:1-22"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/webhooks-checks",
+   "level": 3,
+   "question": "If the pull-request check were made a hard block on the author's quiz score, what other part of the system would first have to supply new information?",
+   "variants": [
+    "If the check blocked merges until the author passed a quiz, what component would first need to provide new data?",
+    "If the check became a hard gate on quiz results, what would the check need from the rest of the system?"
+   ],
+   "reference_answer": "The quiz evidence (understanding record) would have to be available to the check as a pass/fail requirement. Currently the check is advisory or soft-blocked and only a lead's acknowledgement clears it.",
+   "evidence": [
+    "udebt/checks.py:1-12"
+   ]
+  },
+  {
+   "unit_id": "hosted-analysis/webhooks-checks",
+   "level": 3,
+   "question": "If who counts as a lead were decided inside the routing code instead of by the caller, what other part would have to change?",
+   "variants": [
+    "If the router owned the notion of lead roles, what would have to move into it?",
+    "If role lookup were no longer supplied by the caller, what would the routing need that it does not have?"
+   ],
+   "reference_answer": "Whatever stores the roles would have to be reachable by the router, tying the router to the host's role storage. At present roles live wherever the host keeps them, so the routing stays free of a database.",
+   "evidence": [
+    "udebt/webhooks.py:1-22"
+   ]
+  },
+  {
+   "unit_id": "supabase-schema",
+   "level": 1,
+   "question": "Why does the project keep a SQLite copy of the hosted database schema alongside the Postgres one?",
+   "variants": [
+    "What is the SQLite twin of the Postgres schema for?",
+    "Why is the schema duplicated in SQLite when production uses Postgres on Supabase?"
+   ],
+   "reference_answer": "It lets the tests run the schema without a Supabase or Postgres server.",
+   "evidence": [
+    "tests/test_schema.py"
+   ],
+   "orientation": {
+    "purpose": "The hosted database. It holds the app_udebt Postgres schema, a SQLite copy for tests, migrations, and loaders that insert the sample data.",
+    "decision": "Supabase Postgres with row-level security, a SQLite twin for tests, and an idempotent SQL loader. An own API with its own database (the drafts) and NoSQL were rejected. Supabase provides auth, RLS and storage.",
+    "where": [
+     {
+      "path": "supabase",
+      "what": "migrations and README"
+     },
+     {
+      "path": "udebt/loadsql.py",
+      "what": "idempotent loader"
+     },
+     {
+      "path": "samples",
+      "what": "sample load SQL"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "supabase-schema",
+   "level": 1,
+   "question": "Why is the loader that inserts an analysis written to be idempotent?",
+   "variants": [
+    "What does it buy to make the analysis loader safe to run repeatedly?",
+    "What happens to existing rows for the same repository, commit and owner when the loader is rerun?"
+   ],
+   "reference_answer": "Running it again replaces the same repository-commit-owner analysis in one transaction rather than duplicating it, so loads can be repeated safely.",
+   "evidence": [
+    "udebt/loadsql.py:158-180"
+   ],
+   "orientation": {
+    "purpose": "The hosted database. It holds the app_udebt Postgres schema, a SQLite copy for tests, migrations, and loaders that insert the sample data.",
+    "decision": "Supabase Postgres with row-level security, a SQLite twin for tests, and an idempotent SQL loader. An own API with its own database (the drafts) and NoSQL were rejected. Supabase provides auth, RLS and storage.",
+    "where": [
+     {
+      "path": "supabase",
+      "what": "migrations and README"
+     },
+     {
+      "path": "udebt/loadsql.py",
+      "what": "idempotent loader"
+     },
+     {
+      "path": "samples",
+      "what": "sample load SQL"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "supabase-schema",
+   "level": 1,
+   "question": "In the loaded data, what does an analysis row with no owning user represent?",
+   "variants": [
+    "What kind of analysis is stored without a user owner?",
+    "What does a missing owner on a loaded analysis signify?"
+   ],
+   "reference_answer": "A shared sample analysis rather than a person's own analysis.",
+   "evidence": [
+    "udebt/loadsql.py:101",
+    "udebt/loadsql.py:158-162"
+   ],
+   "orientation": {
+    "purpose": "The hosted database. It holds the app_udebt Postgres schema, a SQLite copy for tests, migrations, and loaders that insert the sample data.",
+    "decision": "Supabase Postgres with row-level security, a SQLite twin for tests, and an idempotent SQL loader. An own API with its own database (the drafts) and NoSQL were rejected. Supabase provides auth, RLS and storage.",
+    "where": [
+     {
+      "path": "supabase",
+      "what": "migrations and README"
+     },
+     {
+      "path": "udebt/loadsql.py",
+      "what": "idempotent loader"
+     },
+     {
+      "path": "samples",
+      "what": "sample load SQL"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "supabase-schema",
+   "level": 2,
+   "question": "The hosted app stores its data in Supabase Postgres rather than in its own API with its own database. What constraint made that the better choice?",
+   "variants": [
+    "Why was Supabase chosen over building a custom API and database for the hosted app?",
+    "What did Supabase supply that made a self-built backend unnecessary?"
+   ],
+   "reference_answer": "Auth, row-level security and storage come with Supabase, so no separate backend had to be built. That fits an app that is mostly per-user rows.",
+   "evidence": [
+    "udebt/hosted/supabase_rest.py:1-6",
+    "udebt/loadsql.py:158-180"
+   ]
+  },
+  {
+   "unit_id": "supabase-schema",
+   "level": 2,
+   "question": "Alongside the hosted Postgres schema, a SQLite twin of the schema is kept. What constraint made that the better choice?",
+   "variants": [
+    "Why keep a SQLite copy of the Postgres schema?",
+    "What need is served by a SQLite twin of the hosted database schema?"
+   ],
+   "reference_answer": "Tests and local runs need a database without a Supabase instance. The twin lets the same schema be exercised with no hosted infrastructure.",
+   "evidence": [
+    "tests/test_schema.py"
+   ]
+  },
+  {
+   "unit_id": "supabase-schema",
+   "level": 2,
+   "question": "Analyses are loaded through generated SQL that deletes the existing analysis for that repository, commit and owner and then reinserts it in one transaction, rather than inserting blindly. What constraint made that better?",
+   "variants": [
+    "Why does the loader replace an existing analysis in a transaction instead of just inserting?",
+    "What requirement does the delete-and-reinsert loader satisfy?"
+   ],
+   "reference_answer": "The load must be safely repeatable: running it again for the same repository, commit and owner should yield the same state, not duplicates. The transaction keeps the replacement atomic.",
+   "evidence": [
+    "udebt/loadsql.py:158-180"
+   ]
+  },
+  {
+   "unit_id": "supabase-schema",
+   "level": 3,
+   "question": "If Supabase were replaced by the team's own API with its own database, what first built-in capability would the system have to build itself?",
+   "variants": [
+    "If the app dropped Supabase for its own backend, what capability would have to be created first?",
+    "What did Supabase supply out of the box that a self-built API would have to replace?"
+   ],
+   "reference_answer": "Sign-in and per-user access control, which Supabase supplies as auth and row level security (plus storage). A custom backend would have to implement them.",
+   "evidence": [
+    "udebt/hosted/supabase_rest.py:1-6",
+    "web/netlify/functions/lib/auth.ts:19-44"
+   ]
+  },
+  {
+   "unit_id": "supabase-schema",
+   "level": 3,
+   "question": "If the SQLite twin of the schema were removed, which part of the development process would first lose its test target?",
+   "variants": [
+    "If only Postgres existed with no SQLite twin, what would first be harder?",
+    "What would the schema tests lose if the lightweight second database copy were dropped?"
+   ],
+   "reference_answer": "Schema tests would need a Postgres instance, instead of running locally against the lightweight SQLite copy, and offline use of the same schema would also go.",
+   "evidence": [
+    "tests/test_schema.py"
+   ]
+  },
+  {
+   "unit_id": "supabase-schema",
+   "level": 3,
+   "question": "If the SQL loader were no longer idempotent, what first problem would appear when the same analysis is loaded twice?",
+   "variants": [
+    "If loading an analysis twice were not safe, what would happen to the stored data?",
+    "Without idempotent loading, what would rerunning a load do?"
+   ],
+   "reference_answer": "Duplicate analysis rows for the same repository and commit would accumulate, since the current loader deletes the matching analysis and reinserts it in one transaction.",
+   "evidence": [
+    "udebt/loadsql.py:158-180"
+   ]
+  },
+  {
+   "unit_id": "web-app",
+   "level": 1,
+   "question": "Why does the browser app attach the signed-in person's session token to every call to its server functions?",
+   "variants": [
+    "What do the server functions use the session token the browser sends for?",
+    "Why must each request from the app to the serverless endpoints carry the person's token?"
+   ],
+   "reference_answer": "The functions check the token with Supabase to learn who is asking and that the person has added the repository, since they hold no sign-in state of their own.",
+   "evidence": [
+    "web/src/model/client.ts:74-86",
+    "web/netlify/functions/lib/auth.ts:19-44"
+   ],
+   "orientation": {
+    "purpose": "The hosted browser app. Users sign in, view specs, take the quiz ladder, read walkthroughs, and see debt and review.",
+    "decision": "A vanilla TypeScript Vite SPA from the HintWise template, with Supabase auth, Netlify serverless functions, user-supplied model keys and a CSP. React and server rendering were rejected. The stated reason is reuse of an existing template; nothing else is clear.",
+    "where": [
+     {
+      "path": "web",
+      "what": "the Vite app, including src"
+     },
+     {
+      "path": "web/netlify/functions",
+      "what": "serverless endpoints"
+     },
+     {
+      "path": "netlify.toml",
+      "what": "Netlify config"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "web-app",
+   "level": 1,
+   "question": "What does a person see if the app tries to call the server while no one is signed in?",
+   "variants": [
+    "When there is no session token, what happens to a request the app makes to the server?",
+    "What message appears when the app needs the server but the person has not signed in?"
+   ],
+   "reference_answer": "The app raises a 'Sign in first' error before sending any request.",
+   "evidence": [
+    "web/src/model/client.ts:74-76"
+   ],
+   "orientation": {
+    "purpose": "The hosted browser app. Users sign in, view specs, take the quiz ladder, read walkthroughs, and see debt and review.",
+    "decision": "A vanilla TypeScript Vite SPA from the HintWise template, with Supabase auth, Netlify serverless functions, user-supplied model keys and a CSP. React and server rendering were rejected. The stated reason is reuse of an existing template; nothing else is clear.",
+    "where": [
+     {
+      "path": "web",
+      "what": "the Vite app, including src"
+     },
+     {
+      "path": "web/netlify/functions",
+      "what": "serverless endpoints"
+     },
+     {
+      "path": "netlify.toml",
+      "what": "Netlify config"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "web-app",
+   "level": 1,
+   "question": "Why does the app need a fallback for units that name only directories when it writes quiz questions?",
+   "variants": [
+    "What problem arises for a unit whose paths are all directories when the question writer has no read tools?",
+    "Why does the app pick representative files or list a directory from GitHub for some units?"
+   ],
+   "reference_answer": "The question writer cannot read files, so such a unit with no walkthrough or named file would be quizzed with no code; the fallback supplies representative files.",
+   "evidence": [
+    "udebt/topfiles.py:1-20",
+    "web/dev/api-plugin.ts:16-21"
+   ],
+   "orientation": {
+    "purpose": "The hosted browser app. Users sign in, view specs, take the quiz ladder, read walkthroughs, and see debt and review.",
+    "decision": "A vanilla TypeScript Vite SPA from the HintWise template, with Supabase auth, Netlify serverless functions, user-supplied model keys and a CSP. React and server rendering were rejected. The stated reason is reuse of an existing template; nothing else is clear.",
+    "where": [
+     {
+      "path": "web",
+      "what": "the Vite app, including src"
+     },
+     {
+      "path": "web/netlify/functions",
+      "what": "serverless endpoints"
+     },
+     {
+      "path": "netlify.toml",
+      "what": "Netlify config"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "web-app",
+   "level": 2,
+   "question": "The web app was built as a vanilla TypeScript single-page app from an existing template rather than with a framework like React. What constraint made that the better choice?",
+   "variants": [
+    "Why does the web app reuse an existing template with plain TypeScript instead of adopting a framework like React?",
+    "What favoured starting from the HintWise template over a framework-based rewrite?"
+   ],
+   "reference_answer": "An existing app template could be reused, which gave sign-in and structure for free. Beyond that reuse the rationale is not recorded.",
+   "evidence": [
+    "web/src/model/client.ts:74-86"
+   ]
+  },
+  {
+   "unit_id": "web-app",
+   "level": 2,
+   "question": "The web app does model-backed work in serverless functions that check the caller's token, rather than calling the model directly from the browser. What constraint made that the better choice?",
+   "variants": [
+    "Why do question and grading calls go through serverless functions instead of the browser?",
+    "What requirement made server-side functions better than direct browser calls for model work?"
+   ],
+   "reference_answer": "Requests must be authorised against the person's sign-in and the repositories they have added, and shared secrets and gateway access must stay off the client. Functions are the place to enforce that.",
+   "evidence": [
+    "web/netlify/functions/lib/auth.ts:19-44",
+    "web/netlify/functions/grade.ts:1-6"
+   ]
+  },
+  {
+   "unit_id": "web-app",
+   "level": 2,
+   "question": "What gap does the GitHub directory fallback fill for directory-only units?",
+   "variants": [
+    "For directory-only units, the web app falls back to listing the directory from GitHub at the pinned commit when no recorded file list exists. What constraint made that the better choice?",
+    "Why does the web app list a directory from GitHub when the specs lack a file list?"
+   ],
+   "reference_answer": "The question writer has no read tools, so a directory-only unit would be quizzed with no code. Listing the directory at the pinned commit supplies representative files when the worker did not record any.",
+   "evidence": [
+    "udebt/topfiles.py:1-20",
+    "web/dev/api-plugin.ts:16-21"
+   ]
+  },
+  {
+   "unit_id": "web-app",
+   "level": 3,
+   "question": "If the web app were rebuilt with a framework such as React instead of plain TypeScript, what first part of the project's existing foundation would be given up?",
+   "variants": [
+    "If a framework replaced the plain TypeScript front end, what would be given up first?",
+    "What reuse would be lost by switching the front end from the template's vanilla approach to React?"
+   ],
+   "reference_answer": "The reuse of the existing HintWise app template, which the app was imported from, would be lost, along with its UI code built without a framework.",
+   "evidence": [
+    "web/src/model/client.ts:74-86"
+   ]
+  },
+  {
+   "unit_id": "web-app",
+   "level": 3,
+   "question": "If the serverless functions were replaced by server rendering, which party would first need to hold the secrets the browser lacks today?",
+   "variants": [
+    "If pages were rendered on a server instead of through serverless functions, what would first need handling of secrets?",
+    "If server rendering replaced the function endpoints, what would have to take over the work the functions do?"
+   ],
+   "reference_answer": "The server itself would have to do what the functions do now: check the person's token against the database, and call the model and GitHub for questions, grading, excerpts and trees.",
+   "evidence": [
+    "web/netlify/functions/grade.ts:1-6",
+    "web/dev/api-plugin.ts:16-21",
+    "web/netlify/functions/lib/auth.ts:19-44"
+   ]
+  },
+  {
+   "unit_id": "web-app",
+   "level": 3,
+   "question": "If users' model keys were held by the server instead of being supplied by each user, what first other part of the system would have to change?",
+   "variants": [
+    "If the app stopped using bring-your-own model keys, what would need to change first?",
+    "If model access were paid for centrally rather than by each user's key, what new capability would be needed?"
+   ],
+   "reference_answer": "The system would need server-side key storage and cost controls, such as usage caps, because each user no longer carries their own cost and key.",
+   "evidence": [
+    "web/src/model/client.ts:74-86",
+    "udebt/hosted/worker_service.py:1-26"
+   ]
+  },
+  {
+   "unit_id": "web-app/functions",
+   "level": 1,
+   "question": "Why must the browser get code excerpts through the site's own server API instead of fetching them from GitHub directly?",
+   "variants": [
+    "What stops the web page from reading repository files straight from GitHub, so the server API has to relay them?",
+    "Why does the hosted app proxy file contents through its server API rather than letting the page call GitHub?"
+   ],
+   "reference_answer": "The page's security policy only lets it connect to its own site and a few named services, not GitHub's file host. The server side also validates the path and commit and caps file size before returning anything.",
+   "evidence": [
+    "web/dev/csp.ts:1-52",
+    "web/netlify/functions/lib/github.ts:1-60"
+   ],
+   "orientation": {
+    "purpose": "Server API for questions, grading, excerpts and tree, with GitHub access and fakes.",
+    "decision": "Handlers in lib shared by Netlify and a Vite dev plugin.",
+    "where": [
+     {
+      "path": "web/netlify/functions",
+      "what": ""
+     },
+     {
+      "path": "web/dev",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "web-app/functions",
+   "level": 1,
+   "question": "Why does the question-writing part of the server API check that the caller is authorized before it generates any questions?",
+   "variants": [
+    "What is the point of verifying the caller first in the question-writing endpoint, before the model is called?",
+    "Why must the authorization check come before question generation in the server API?"
+   ],
+   "reference_answer": "Generating questions spends the shared model gateway's budget, so the person must be verified first. Otherwise an unauthorized caller could use up the spending caps.",
+   "evidence": [
+    "web/netlify/functions/lib/handlers.ts:32-45"
+   ],
+   "orientation": {
+    "purpose": "Server API for questions, grading, excerpts and tree, with GitHub access and fakes.",
+    "decision": "Handlers in lib shared by Netlify and a Vite dev plugin.",
+    "where": [
+     {
+      "path": "web/netlify/functions",
+      "what": ""
+     },
+     {
+      "path": "web/dev",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "web-app/functions",
+   "level": 1,
+   "question": "What would a developer running the local dev server notice if the plugin that serves the server API were missing?",
+   "variants": [
+    "If the dev-server plugin that mounts the API were removed, what would break first for someone running the app locally?",
+    "What happens to the web page's API calls during local development without the plugin that serves the functions?"
+   ],
+   "reference_answer": "The page's calls for questions, grading, excerpts and the tree would find nothing to answer them, so the main flow could not be tried locally. The plugin is what lets local runs use the same function code as the live site.",
+   "evidence": [
+    "web/dev/api-plugin.ts:1-60"
+   ],
+   "orientation": {
+    "purpose": "Server API for questions, grading, excerpts and tree, with GitHub access and fakes.",
+    "decision": "Handlers in lib shared by Netlify and a Vite dev plugin.",
+    "where": [
+     {
+      "path": "web/netlify/functions",
+      "what": ""
+     },
+     {
+      "path": "web/dev",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "web-app/functions",
+   "level": 2,
+   "question": "The server API logic was written as plain request-to-response code that both the hosting platform's function runtime and the local development server call, rather than being written separately for each. What constraint made sharing one implementation the better choice?",
+   "variants": [
+    "Why was the server API written as web-standard request/response code shared by the hosted functions and the local dev server instead of separate implementations?",
+    "What constraint favored one shared implementation of the API over separate hosted and local versions?"
+   ],
+   "reference_answer": "The local dev server, the preview and the end-to-end tests needed to exercise exactly the code the live site runs, so one implementation avoids drift between a hosted copy and a dev copy.",
+   "evidence": [
+    "web/netlify/functions/lib/handlers.ts:1-7",
+    "web/dev/api-plugin.ts:1-8"
+   ]
+  },
+  {
+   "unit_id": "web-app/functions",
+   "level": 2,
+   "question": "The server functions can read repository files either from GitHub or from a local clone when fakes are on. What constraint made this switchable choice better than always calling GitHub?",
+   "variants": [
+    "Why can the file-fetching part read from a local clone instead of only GitHub?",
+    "What constraint motivated giving the GitHub-reading code a local-clone mode?"
+   ],
+   "reference_answer": "Dev, preview and end-to-end runs must work offline and deterministically without hitting GitHub (and its rate limit) or needing real credentials, so a local clone stands in for GitHub.",
+   "evidence": [
+    "web/netlify/functions/lib/github.ts:1-13",
+    "web/dev/api-plugin.ts:1-8"
+   ]
+  },
+  {
+   "unit_id": "web-app/functions",
+   "level": 2,
+   "question": "The GitHub tree listing is kept in memory per repository and commit rather than refetched on each request or stored in a database. What constraint made that the better choice?",
+   "variants": [
+    "Why is the tree listing cached in memory keyed by repository and commit, not stored persistently?",
+    "What property of a tree at a given commit makes a short in-memory cache sufficient?"
+   ],
+   "reference_answer": "A tree at a given commit never changes, so caching per commit is always valid and saves calls against GitHub's unauthenticated rate limit, with no need for persistent storage.",
+   "evidence": [
+    "web/netlify/functions/lib/github.ts:7-13"
+   ]
+  },
+  {
+   "unit_id": "web-app/functions",
+   "level": 3,
+   "question": "If the server API handlers were no longer written as plain request-to-response code shared with the local dev server, but tied to Netlify's own runtime, what first other part of the system would have to change?",
+   "variants": [
+    "If the API handlers depended on Netlify's runtime instead of standard request and response objects, which other component would break first?",
+    "What would the local development and preview server have to do differently if the API handlers became Netlify-runtime-specific?"
+   ],
+   "reference_answer": "The local dev/preview server plugin that mounts the same handlers at the API path would have to change, since it could no longer call them directly. The same-code-in-dev guarantee, which the browser end-to-end walkthrough relies on, would be lost.",
+   "evidence": [
+    "web/netlify/functions/lib/handlers.ts:1-7",
+    "web/dev/api-plugin.ts:1-21"
+   ]
+  },
+  {
+   "unit_id": "web-app/functions",
+   "level": 3,
+   "question": "If the code excerpts were fetched by the browser straight from the code host instead of through a server function, what first other part of the system would have to change?",
+   "variants": [
+    "If the browser fetched file contents directly from GitHub rather than via the server API, which other part would need to change?",
+    "What safeguard would have to move if the excerpt proxy were removed?"
+   ],
+   "reference_answer": "The page's security policy for allowed connections would need to permit the code host, and the safeguards on path, commit and size now enforced server-side would have to move into the browser. The fake-clone reading used in tests would also be bypassed.",
+   "evidence": [
+    "web/netlify/functions/lib/github.ts:1-13",
+    "web/dev/csp.ts:1-15"
+   ]
+  },
+  {
+   "unit_id": "web-app/core",
+   "level": 1,
+   "question": "If the Python scoring rules changed but the TypeScript copy used by the web app were not updated, what would a user of the web app see?",
+   "variants": [
+    "What would be the visible effect in the hosted app if its scoring logic drifted from the Python scoring?",
+    "What goes wrong for web users when the browser-side scoring no longer matches the command-line tool's scoring?"
+   ],
+   "reference_answer": "The debt and understanding numbers in the web app would disagree with what the Python tool computes for the same answers. The shared parity fixtures, generated from Python, exist to catch that drift in tests.",
+   "evidence": [
+    "web/src/core/scoring.ts:1-16",
+    "web/test/fixtures/parity.json:1-3",
+    "web/test/fixtures/review-parity.json:1-3"
+   ],
+   "orientation": {
+    "purpose": "TS ports of quiz, review, scoring, topfiles and prompts.",
+    "decision": "Duplicate logic in TS, checked against Python by parity fixtures.",
+    "where": [
+     {
+      "path": "web/src/core",
+      "what": ""
+     },
+     {
+      "path": "web/test/fixtures",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "web-app/core",
+   "level": 1,
+   "question": "Why does the hosted app treat a unit with no answers as fully misunderstood, unlike the command-line tool?",
+   "variants": [
+    "What is different about the hosted app's users that makes an unanswered unit count as zero understanding?",
+    "Why does the web app's scoring give no credit to units nobody has answered questions on?"
+   ],
+   "reference_answer": "The hosted app serves learners and has no prior based on the person's own commits. So without answers a unit's debt is its whole importance.",
+   "evidence": [
+    "web/src/core/scoring.ts:1-16"
+   ],
+   "orientation": {
+    "purpose": "TS ports of quiz, review, scoring, topfiles and prompts.",
+    "decision": "Duplicate logic in TS, checked against Python by parity fixtures.",
+    "where": [
+     {
+      "path": "web/src/core",
+      "what": ""
+     },
+     {
+      "path": "web/test/fixtures",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "web-app/core",
+   "level": 1,
+   "question": "What does the spaced-review logic do for a person after they miss a question?",
+   "variants": [
+    "What effect does the review logic have on a question a person got wrong?",
+    "After a miss, what does the ported review logic arrange for that question?"
+   ],
+   "reference_answer": "It brings the missed question back at growing intervals until the person answers it correctly enough times for it to stick. A wrong answer resets the interval to one day.",
+   "evidence": [
+    "web/src/core/review.ts:1-23"
+   ],
+   "orientation": {
+    "purpose": "TS ports of quiz, review, scoring, topfiles and prompts.",
+    "decision": "Duplicate logic in TS, checked against Python by parity fixtures.",
+    "where": [
+     {
+      "path": "web/src/core",
+      "what": ""
+     },
+     {
+      "path": "web/test/fixtures",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "web-app/core",
+   "level": 2,
+   "question": "The scoring, review and prompt logic was duplicated in TypeScript for the web app instead of calling the Python implementation. What constraint made that the better choice?",
+   "variants": [
+    "Why was the core logic reimplemented in TypeScript rather than having the web app call the Python code?",
+    "What constraint led to a TypeScript copy of the scoring and review logic?"
+   ],
+   "reference_answer": "The hosted app runs in the browser and serverless functions on Netlify, with no Python runtime to call, so the logic had to be ported to run there.",
+   "evidence": [
+    "web/src/core/scoring.ts:1-16",
+    "web/src/core/review.ts:1-23"
+   ]
+  },
+  {
+   "unit_id": "web-app/core",
+   "level": 2,
+   "question": "Having duplicated the logic, the project checks the copy against the original using generated data files rather than trusting the port. What risk made that the better choice?",
+   "variants": [
+    "Why are parity fixtures generated from the Python code used to test the TypeScript port?",
+    "What problem do generated fixtures from the original implementation solve for the duplicated logic?"
+   ],
+   "reference_answer": "Two implementations of the same scoring and review rules can silently drift apart, and generating fixtures from the Python original lets tests prove the port gives the same answers.",
+   "evidence": [
+    "web/test/fixtures/parity.json:1-2",
+    "web/test/fixtures/review-parity.json:1-2",
+    "web/src/core/review.ts:21-23"
+   ]
+  },
+  {
+   "unit_id": "web-app/core",
+   "level": 2,
+   "question": "The hosted scoring leaves out the own-commit prior that the command-line tool uses, so a unit with no answers counts as fully misunderstood. What about the hosted app's users made that the better choice?",
+   "variants": [
+    "Why does the hosted scoring treat an unanswered unit as understood zero?",
+    "Why does the hosted app drop the own-commit prior from scoring?"
+   ],
+   "reference_answer": "The hosted app serves learners rather than the repository's developers, so there is no history of the user's own commits to credit as prior understanding.",
+   "evidence": [
+    "web/src/core/scoring.ts:1-5"
+   ]
+  },
+  {
+   "unit_id": "web-app/core",
+   "level": 3,
+   "question": "If the browser app's scoring and review logic were no longer duplicated in TypeScript but called the Python implementation instead, what first other part of the system would become unnecessary or have to change?",
+   "variants": [
+    "If the TypeScript copies of scoring and spaced-review logic were dropped in favour of calling the Python originals, which other part would no longer be needed?",
+    "What would happen to the generated comparison fixtures if the TypeScript ports of the Python logic were replaced by calls to Python?"
+   ],
+   "reference_answer": "The parity fixtures generated from the Python code, and the tests that check the TypeScript ports against them, would become unnecessary. The hosted app would instead need a runtime or service to reach Python.",
+   "evidence": [
+    "web/test/fixtures/parity.json:1-2",
+    "web/test/fixtures/review-parity.json:1-2",
+    "web/src/core/review.ts:17-23"
+   ]
+  },
+  {
+   "unit_id": "web-app/core",
+   "level": 3,
+   "question": "If the quiz prompts were written separately in the web app rather than shared with the Python side, what first other part of the system would be affected?",
+   "variants": [
+    "If the web app kept its own prompts instead of sharing them with Python, what would be affected first?",
+    "What consistency would be lost if prompts were no longer shared between the CLI and the web app?"
+   ],
+   "reference_answer": "Questions and grading would drift between the two clients, so records from one would not be comparable with the other. The parity checks would need to cover the prompts too.",
+   "evidence": [
+    "web/src/core/scoring.ts:1-16",
+    "web/test/fixtures/parity.json:1-2"
+   ]
+  },
+  {
+   "unit_id": "web-app/data-auth",
+   "level": 1,
+   "question": "Why does email sign-in go through the platform's sign-in-link service rather than the identity provider's built-in one-time link call?",
+   "variants": [
+    "What does the platform's own sign-in-link service add over sending the email link directly through the auth provider?",
+    "Why isn't the email sign-in link requested straight from Supabase's built-in method?"
+   ],
+   "reference_answer": "The platform service limits how often links go to one address or browser and asks for a Cloudflare Turnstile check when requests are too frequent. This guards against abuse.",
+   "evidence": [
+    "web/src/lib/auth.ts:1-16"
+   ],
+   "orientation": {
+    "purpose": "Store interface with Supabase and in-memory implementations, sign-in and LLM caps.",
+    "decision": "Store abstraction swappable for fakes.",
+    "where": [
+     {
+      "path": "web/src/data",
+      "what": ""
+     },
+     {
+      "path": "web/src/lib",
+      "what": ""
+     },
+     {
+      "path": "web/src/fake",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "web-app/data-auth",
+   "level": 1,
+   "question": "Why does the live data store use the signed-in person's own session when talking to the database?",
+   "variants": [
+    "What does using the person's session for database access let the database do?",
+    "Why is the person's own login session, not a shared key, used by the live store?"
+   ],
+   "reference_answer": "The database's row-level security then scopes data per person: shared repositories are visible to all, while records and sessions are only the person's own. The database also fills in the owner from the session.",
+   "evidence": [
+    "web/src/data/supabase-store.ts:1-6"
+   ],
+   "orientation": {
+    "purpose": "Store interface with Supabase and in-memory implementations, sign-in and LLM caps.",
+    "decision": "Store abstraction swappable for fakes.",
+    "where": [
+     {
+      "path": "web/src/data",
+      "what": ""
+     },
+     {
+      "path": "web/src/lib",
+      "what": ""
+     },
+     {
+      "path": "web/src/fake",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "web-app/data-auth",
+   "level": 1,
+   "question": "What does the in-memory store, with the fake sign-in, make possible for a developer?",
+   "variants": [
+    "What can be run without a real backend because of the in-memory store and fake sign-in?",
+    "Why can the preview and end-to-end walkthrough run without Supabase?"
+   ],
+   "reference_answer": "The real sign-in panel and screens can run in dev, preview and the browser walkthrough without Supabase. Data is seeded from fixtures and nothing leaves the tab.",
+   "evidence": [
+    "web/src/data/memory.ts:1-5",
+    "web/src/fake/auth.ts:1-6"
+   ],
+   "orientation": {
+    "purpose": "Store interface with Supabase and in-memory implementations, sign-in and LLM caps.",
+    "decision": "Store abstraction swappable for fakes.",
+    "where": [
+     {
+      "path": "web/src/data",
+      "what": ""
+     },
+     {
+      "path": "web/src/lib",
+      "what": ""
+     },
+     {
+      "path": "web/src/fake",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "web-app/data-auth",
+   "level": 2,
+   "question": "The app reads and writes data through a store interface with a live database implementation and an in-memory one, rather than calling the database directly. What constraint made that the better choice?",
+   "variants": [
+    "Why put a swappable store interface between the screens and the database?",
+    "What constraint favored a store abstraction with an in-memory implementation over direct database calls?"
+   ],
+   "reference_answer": "Dev, preview and end-to-end runs need to work without a real Supabase backend or signed-in user, so an in-memory store seeded from fixtures must be able to stand in for the live one.",
+   "evidence": [
+    "web/src/data/memory.ts:1-5",
+    "web/src/data/supabase-store.ts:1-6"
+   ]
+  },
+  {
+   "unit_id": "web-app/data-auth",
+   "level": 2,
+   "question": "Data scoping to each person is left to the database's row-level security with the signed-in person's session, rather than enforced by the app's own server code. What constraint made that the better choice?",
+   "variants": [
+    "Why rely on the database's row-level security for per-person data instead of app-side filtering?",
+    "What made database-enforced scoping better than checks in the app's own code?"
+   ],
+   "reference_answer": "The browser talks to the database directly with the person's session, so the isolation must be enforced where the data lives; client or app code could be bypassed.",
+   "evidence": [
+    "web/src/data/supabase-store.ts:1-6"
+   ]
+  },
+  {
+   "unit_id": "web-app/data-auth",
+   "level": 2,
+   "question": "Email sign-in links go through the platform's sign-in-link function rather than the auth library's built-in one-time-password email. What constraint made that the better choice?",
+   "variants": [
+    "Why use the platform's own sign-in-link service instead of the library's built-in email sign-in?",
+    "What abuse-related need led to routing email sign-in through a platform function?"
+   ],
+   "reference_answer": "The platform function spaces out links per address and browser and asks for a bot check when requests are too frequent, protecting against abuse that the built-in method would not limit.",
+   "evidence": [
+    "web/src/lib/auth.ts:1-16"
+   ]
+  },
+  {
+   "unit_id": "web-app/data-auth",
+   "level": 3,
+   "question": "If the app talked to the hosted database directly everywhere instead of through a swappable store interface, what first other part of the system would break?",
+   "variants": [
+    "If the swappable data store abstraction were removed in favour of direct database calls, which workflow would stop working first?",
+    "What would the no-backend preview and browser end-to-end walkthrough lose if the store interface were removed?"
+   ],
+   "reference_answer": "The preview and end-to-end walkthrough that run with an in-memory store seeded from fixtures, with no real backend, would break. The screens would all need a live database and sign-in.",
+   "evidence": [
+    "web/src/data/memory.ts:1-5",
+    "web/src/data/supabase-store.ts:1-6",
+    "web/src/fake/auth.ts:1-6"
+   ]
+  },
+  {
+   "unit_id": "web-app/ui",
+   "level": 1,
+   "question": "What does the Review tab on a repository page tell a person before they open it?",
+   "variants": [
+    "What extra information does the Review tab's label carry on the repository page?",
+    "How does the repository page signal that review work is waiting?"
+   ],
+   "reference_answer": "It shows a badge with the number of review items currently due.",
+   "evidence": [
+    "web/src/ui/screens/repo.ts:1-7",
+    "web/src/ui/screens/repo.ts:20-31"
+   ],
+   "orientation": {
+    "purpose": "App shell and screens for quiz, repo, review, debt, settings.",
+    "decision": "Plain DOM screens.",
+    "where": [
+     {
+      "path": "web/src/ui",
+      "what": ""
+     },
+     {
+      "path": "web/src/model",
+      "what": ""
+     },
+     {
+      "path": "web/e2e",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "web-app/ui",
+   "level": 1,
+   "question": "Why does the browser walkthrough test fail on any content-security-policy violation?",
+   "variants": [
+    "What does failing on policy violations in the end-to-end test protect against?",
+    "Why does the Playwright walkthrough watch for blocked-resource errors from the page's security policy?"
+   ],
+   "reference_answer": "The preview sends the same security headers as the live site. A screen that loads something the policy forbids would work in dev but break in production, so the test catches it.",
+   "evidence": [
+    "web/e2e/walkthrough.spec.ts:1-10",
+    "web/dev/csp.ts:1-5"
+   ],
+   "orientation": {
+    "purpose": "App shell and screens for quiz, repo, review, debt, settings.",
+    "decision": "Plain DOM screens.",
+    "where": [
+     {
+      "path": "web/src/ui",
+      "what": ""
+     },
+     {
+      "path": "web/src/model",
+      "what": ""
+     },
+     {
+      "path": "web/e2e",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "web-app/ui",
+   "level": 1,
+   "question": "What does a repository page's header tell the person about whose analysis they are looking at?",
+   "variants": [
+    "What provenance note does the repository header show for the displayed analysis?",
+    "How does the header indicate where the analysis behind a repository came from?"
+   ],
+   "reference_answer": "It labels the analysis as prepared by HintWise, as the person's own, or as shared by another person.",
+   "evidence": [
+    "web/src/ui/screens/repo.ts:41-51"
+   ],
+   "orientation": {
+    "purpose": "App shell and screens for quiz, repo, review, debt, settings.",
+    "decision": "Plain DOM screens.",
+    "where": [
+     {
+      "path": "web/src/ui",
+      "what": ""
+     },
+     {
+      "path": "web/src/model",
+      "what": ""
+     },
+     {
+      "path": "web/e2e",
+      "what": ""
+     }
+    ],
+    "shaped_by": "From its history: Claude [ai].",
+    "fallback": true
+   }
+  },
+  {
+   "unit_id": "web-app/ui",
+   "level": 2,
+   "question": "The screens are built with plain DOM helpers instead of a UI framework. What constraint made that the better choice here?",
+   "variants": [
+    "Why were the screens written with plain DOM code rather than a frontend framework?",
+    "What constraint favored plain DOM screens over a framework?"
+   ],
+   "reference_answer": "The app is small and runs under a strict content security policy with no inline code, so plain DOM construction keeps the bundle and dependencies minimal and compatible with that policy.",
+   "evidence": [
+    "web/src/ui/screens/quiz.ts:1-60",
+    "web/dev/csp.ts:1-15"
+   ]
+  },
+  {
+   "unit_id": "web-app/ui",
+   "level": 2,
+   "question": "The end-to-end test runs the full user flow against the preview server with fakes instead of against live services. What constraint made that the better choice?",
+   "variants": [
+    "Why does the browser walkthrough test run on fakes rather than the live backend?",
+    "What constraint favored running the end-to-end flow on a fake gateway and fake GitHub?"
+   ],
+   "reference_answer": "The flow needs real sign-in, model calls and GitHub, which would be slow, costly and nondeterministic; fakes make it repeatable and free while still using the real function code and the live site's headers.",
+   "evidence": [
+    "web/e2e/walkthrough.spec.ts:1-10",
+    "web/dev/api-plugin.ts:1-8"
+   ]
+  },
+  {
+   "unit_id": "web-app/ui",
+   "level": 2,
+   "question": "The browser lets the person choose between the shared HintWise key and their own key for writing and grading questions. What constraint made offering both modes the better choice?",
+   "variants": [
+    "Why offer a bring-your-own-key mode alongside the shared gateway?",
+    "What constraint led to supporting both gateway and own-key modes?"
+   ],
+   "reference_answer": "The shared key has spending caps, so people who reach them or want their own billing can use their own key directly with the model provider, while the gateway mode serves everyone else.",
+   "evidence": [
+    "web/src/model/client.ts:1-12",
+    "web/src/model/client.ts:40-43"
+   ]
+  },
+  {
+   "unit_id": "web-app/ui",
+   "level": 3,
+   "question": "If the screens were rebuilt on a component framework instead of plain DOM code, what first other part of the system would have to change?",
+   "variants": [
+    "If a UI framework replaced the plain DOM screens, which other part would need updating first?",
+    "What would need rewriting outside the screens themselves if the plain DOM approach were swapped for a framework?"
+   ],
+   "reference_answer": "The browser end-to-end walkthrough tests, which drive the rendered screens by their headings, labels and buttons, would need to be revisited. The build setup would also have to change to compile the framework.",
+   "evidence": [
+    "web/e2e/walkthrough.spec.ts:1-10",
+    "web/src/ui/screens/repo.ts:1-7"
+   ]
+  },
+  {
+   "unit_id": "provenance-responsibility",
+   "level": 1,
+   "question": "Why is a commit made by automation counted as AI-authored when it carries an agent's attribution?",
+   "variants": [
+    "Why does a bot's commit that commits an agent's work count as AI rather than bot?",
+    "What is the reasoning for classing automation-made commits of an agent's work as AI-authored?"
+   ],
+   "reference_answer": "Automation that commits an agent's work has no human in the loop. So the work is still the agent's, not just a bot's.",
+   "evidence": [
+    "udebt/provenance.py:359-379"
+   ],
+   "orientation": {
+    "purpose": "Works out from git history who wrote what and which decisions were made. It tracks which developer is responsible for which unit.",
+    "decision": "Understanding debt is tracked per developer, with a scope per person, an OUTSIDE risk class and a prior for a developer's own commits. Decision candidates are mined from history. Ignoring authorship and hand-kept ownership files were rejected, because AI-authored code is the focus.",
+    "where": [
+     {
+      "path": "udebt/provenance.py",
+      "what": "authorship from history"
+     },
+     {
+      "path": "udebt/responsibility.py",
+      "what": "responsibility sets"
+     },
+     {
+      "path": "udebt/decisions.py",
+      "what": "decision mining"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits on 2026-11-12."
+   }
+  },
+  {
+   "unit_id": "provenance-responsibility",
+   "level": 1,
+   "question": "How does an AI-authored commit count toward a person's responsibility for a unit, compared with a human's commit?",
+   "variants": [
+    "How is the weight of an agent's commit treated against a human commit in responsibility shares?",
+    "Who gets credit for an AI-authored commit when responsibility for a unit is worked out?"
+   ],
+   "reference_answer": "It is credited to the person who directed the agent, at half the weight of a human commit. An AI commit with no director counts for no one.",
+   "evidence": [
+    "udebt/responsibility.py:170-185"
+   ],
+   "orientation": {
+    "purpose": "Works out from git history who wrote what and which decisions were made. It tracks which developer is responsible for which unit.",
+    "decision": "Understanding debt is tracked per developer, with a scope per person, an OUTSIDE risk class and a prior for a developer's own commits. Decision candidates are mined from history. Ignoring authorship and hand-kept ownership files were rejected, because AI-authored code is the focus.",
+    "where": [
+     {
+      "path": "udebt/provenance.py",
+      "what": "authorship from history"
+     },
+     {
+      "path": "udebt/responsibility.py",
+      "what": "responsibility sets"
+     },
+     {
+      "path": "udebt/decisions.py",
+      "what": "decision mining"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits on 2026-11-12."
+   }
+  },
+  {
+   "unit_id": "provenance-responsibility",
+   "level": 1,
+   "question": "Why does seeding responsibility from commit footprint skip developers already named by an ownership file?",
+   "variants": [
+    "What is the consequence of an ownership file naming someone for a unit when responsibility is seeded by footprint?",
+    "Why do explicitly named owners not get a second footprint-based assignment?"
+   ],
+   "reference_answer": "Explicit ownership takes precedence over inference. Footprint only fills in units for people the ownership file did not name.",
+   "evidence": [
+    "udebt/responsibility.py:356-408"
+   ],
+   "orientation": {
+    "purpose": "Works out from git history who wrote what and which decisions were made. It tracks which developer is responsible for which unit.",
+    "decision": "Understanding debt is tracked per developer, with a scope per person, an OUTSIDE risk class and a prior for a developer's own commits. Decision candidates are mined from history. Ignoring authorship and hand-kept ownership files were rejected, because AI-authored code is the focus.",
+    "where": [
+     {
+      "path": "udebt/provenance.py",
+      "what": "authorship from history"
+     },
+     {
+      "path": "udebt/responsibility.py",
+      "what": "responsibility sets"
+     },
+     {
+      "path": "udebt/decisions.py",
+      "what": "decision mining"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits on 2026-11-12."
+   }
+  },
+  {
+   "unit_id": "provenance-responsibility",
+   "level": 2,
+   "question": "Responsibility is computed per developer rather than as one shared view for the whole repository. What constraint made that the better choice?",
+   "variants": [
+    "Why is understanding debt scoped to each developer?",
+    "What made per-developer scope better than a single repo-wide view?"
+   ],
+   "reference_answer": "Understanding is a property of a person: what one developer knows says nothing about another, so debt must be measured against the units each person is responsible for.",
+   "evidence": [
+    "udebt/responsibility.py:170-185"
+   ]
+  },
+  {
+   "unit_id": "provenance-responsibility",
+   "level": 2,
+   "question": "Commits are classified by whether an AI agent, a bot, an assisted human or a human wrote them, rather than ignoring authorship. What constraint made that the better choice?",
+   "variants": [
+    "Why does the history mining distinguish AI-authored commits from human ones?",
+    "What made classifying commit authorship better than ignoring it?"
+   ],
+   "reference_answer": "The tool targets understanding debt in AI-authored code, and AI-written code was not authored by a person who understands it, so authorship has to be known to find who directed it and who is responsible.",
+   "evidence": [
+    "udebt/provenance.py:359-379",
+    "udebt/responsibility.py:170-185"
+   ]
+  },
+  {
+   "unit_id": "provenance-responsibility",
+   "level": 2,
+   "question": "Unit ownership is seeded from the history, using code-owner rules where present and otherwise commit footprint, instead of relying only on hand-written ownership files. What constraint made that the better choice?",
+   "variants": [
+    "Why derive ownership from commit history instead of only manual ownership files?",
+    "What made footprint-based seeding better than requiring hand-maintained ownership?"
+   ],
+   "reference_answer": "Most repositories have no maintained ownership file, so ownership must be inferred from who actually did the work; lead-added assignments are kept on top of the seeded ones.",
+   "evidence": [
+    "udebt/responsibility.py:356-408"
+   ]
+  },
+  {
+   "unit_id": "provenance-responsibility",
+   "level": 3,
+   "question": "If responsibility were not tracked per developer but one shared set of units applied to everyone, what first other part of the system would have to change?",
+   "variants": [
+    "If per-developer scope were dropped for a single team-wide scope, which other component would need changing first?",
+    "What downstream part would break if unit ownership stopped being per person?"
+   ],
+   "reference_answer": "The scoring and quizzing that decide which units count toward a person's debt would have to change, since they rely on each developer's responsibility set. Authorship mining from history would no longer feed who is asked about what.",
+   "evidence": [
+    "udebt/responsibility.py:356-408",
+    "udebt/provenance.py:359-379"
+   ]
+  },
+  {
+   "unit_id": "provenance-responsibility",
+   "level": 3,
+   "question": "If authorship were ignored and units were assigned only by hand-written ownership files, what first part of the system would lose its input?",
+   "variants": [
+    "If history-based authorship were replaced by manual ownership files only, which component would lose its data?",
+    "What would stop working if the system no longer mined git history for who wrote each unit?"
+   ],
+   "reference_answer": "The footprint-based seeding of each developer's units from commit history would lose its input, and the prior that treats a person's own commits as understood would too. Only the owner-file route would remain.",
+   "evidence": [
+    "udebt/responsibility.py:170-185",
+    "udebt/responsibility.py:384-397"
+   ]
+  },
+  {
+   "unit_id": "provenance-responsibility",
+   "level": 3,
+   "question": "If AI-authored commits were counted like human ones instead of being classified separately, what first part of the system would have to change?",
+   "variants": [
+    "If commit classification no longer separated AI from human, which other part would need to change?",
+    "What would break downstream if the AI/human/bot classification of commits were removed?"
+   ],
+   "reference_answer": "The responsibility calculation would have to change, because it excludes bots, discounts AI commits and credits the directing human. Without the classification it could not do that.",
+   "evidence": [
+    "udebt/provenance.py:359-379",
+    "udebt/responsibility.py:170-185"
+   ]
+  },
+  {
+   "unit_id": "structural-discovery",
+   "level": 1,
+   "question": "If the part that proposes units from the code produced a poor grouping, which kind of evidence about the codebase would a user most likely notice is missing from the groups' boundaries?",
+   "variants": [
+    "If the automatic unit proposal gave poor groups, what kind of evidence would the groups be failing to reflect?",
+    "What would a developer notice the proposed unit boundaries ignoring when the automatic discovery step is working badly?"
+   ],
+   "reference_answer": "The boundaries would fail to reflect how files actually depend on each other and how they change together over history; groups would look arbitrary rather than grounded in code and history.",
+   "evidence": [
+    "udebt/structure.py:229-251"
+   ],
+   "orientation": {
+    "purpose": "Proposes units automatically from the code. It builds graphs of imports and of files that change together, and partitions them into groups.",
+    "decision": "Louvain community detection over merged import and co-change graphs, giving a two-level hierarchy. Directory-based units and LLM-only mapping were rejected. The goal is units grounded in code and history.",
+    "where": [
+     {
+      "path": "udebt/structure.py",
+      "what": "discovery and partitioning"
+     },
+     {
+      "path": "udebt/graph.py",
+      "what": "graph building"
+     },
+     {
+      "path": "udebt/imports.py",
+      "what": "import extraction"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote both commits on 2026-11-12."
+   }
+  },
+  {
+   "unit_id": "structural-discovery",
+   "level": 1,
+   "question": "Why does the unit-discovery step need to produce a partition of the whole set of source files before any later step can ask a developer about a unit?",
+   "variants": [
+    "Why must unit discovery run before quizzing on units can start?",
+    "What do the later steps of the system depend on unit discovery for?"
+   ],
+   "reference_answer": "Quizzing, scoring and the rest of the system are organised per unit, so discovery must first define which files belong to which unit; every source file needs a home so nothing is left unmeasured.",
+   "evidence": [
+    "udebt/structure.py:243-251"
+   ],
+   "orientation": {
+    "purpose": "Proposes units automatically from the code. It builds graphs of imports and of files that change together, and partitions them into groups.",
+    "decision": "Louvain community detection over merged import and co-change graphs, giving a two-level hierarchy. Directory-based units and LLM-only mapping were rejected. The goal is units grounded in code and history.",
+    "where": [
+     {
+      "path": "udebt/structure.py",
+      "what": "discovery and partitioning"
+     },
+     {
+      "path": "udebt/graph.py",
+      "what": "graph building"
+     },
+     {
+      "path": "udebt/imports.py",
+      "what": "import extraction"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote both commits on 2026-11-12."
+   }
+  },
+  {
+   "unit_id": "structural-discovery",
+   "level": 1,
+   "question": "What would a developer notice first if the history-based half of the unit discovery had no commit history to work from?",
+   "variants": [
+    "If there were no commit history, what part of the unit discovery input would be empty?",
+    "What does unit discovery lose when a repository has no usable history of files changing together?"
+   ],
+   "reference_answer": "The grouping would rest only on import relationships, since there would be no co-change signal; the history-grounded half of the evidence would be missing.",
+   "evidence": [
+    "udebt/structure.py:167-191",
+    "udebt/structure.py:243-247"
+   ],
+   "orientation": {
+    "purpose": "Proposes units automatically from the code. It builds graphs of imports and of files that change together, and partitions them into groups.",
+    "decision": "Louvain community detection over merged import and co-change graphs, giving a two-level hierarchy. Directory-based units and LLM-only mapping were rejected. The goal is units grounded in code and history.",
+    "where": [
+     {
+      "path": "udebt/structure.py",
+      "what": "discovery and partitioning"
+     },
+     {
+      "path": "udebt/graph.py",
+      "what": "graph building"
+     },
+     {
+      "path": "udebt/imports.py",
+      "what": "import extraction"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote both commits on 2026-11-12."
+   }
+  },
+  {
+   "unit_id": "structural-discovery",
+   "level": 2,
+   "question": "Units are proposed by clustering a graph built from code dependencies and from files that change together, rather than by simply taking the folder layout. What constraint made that the better choice?",
+   "variants": [
+    "Why were units derived by clustering dependency and co-change relationships instead of just using the directory structure?",
+    "What limitation of grouping code by folder led to units being found by partitioning dependency and history graphs?"
+   ],
+   "reference_answer": "Folders often don't match how code actually fits together or changes, so units need to be grounded in real dependencies and commit history. Clustering those relationships gives units that reflect actual coupling rather than a layout that may be arbitrary.",
+   "evidence": [
+    "udebt/structure.py:229-251",
+    "udebt/imports.py:199-215"
+   ]
+  },
+  {
+   "unit_id": "structural-discovery",
+   "level": 2,
+   "question": "Units are found by algorithmic clustering over code and history rather than by asking a language model alone to map the repository. What constraint favors the clustering approach?",
+   "variants": [
+    "Why was graph clustering chosen over an LLM-only mapping of the repository into units?",
+    "What advantage of clustering dependency and history graphs over a model-only mapping justified the choice?"
+   ],
+   "reference_answer": "The units need to be grounded in evidence from the code and its history, so they are reproducible and checkable. A model-only mapping would be unanchored and could vary between runs.",
+   "evidence": [
+    "udebt/structure.py:229-251"
+   ]
+  },
+  {
+   "unit_id": "structural-discovery",
+   "level": 2,
+   "question": "Unit discovery combines the dependency graph with the co-change graph instead of using only one of them. What constraint makes combining them the better choice?",
+   "variants": [
+    "Why does unit discovery merge import relationships and co-change history rather than relying on a single graph?",
+    "What weakness of using only dependencies or only commit history led to merging both signals before clustering?"
+   ],
+   "reference_answer": "Each signal alone is incomplete: dependencies miss files that evolve together without importing each other, and history alone misses structural coupling that rarely changes. Merging them, with the dependency share scaled to a set proportion, grounds units in both code and history.",
+   "evidence": [
+    "udebt/structure.py:243-251",
+    "udebt/structure.py:167-202"
+   ]
+  },
+  {
+   "unit_id": "structural-discovery",
+   "level": 3,
+   "question": "If the proposed units were taken from the folder layout instead of from clustering relationships between files, which input-gathering part of the system would become unnecessary?",
+   "variants": [
+    "If units came from the folder layout rather than clustering, which part that collects relationships between files would no longer be needed?",
+    "Which data-gathering stage would be dropped if unit boundaries were simply the directory tree instead of a clustering result?"
+   ],
+   "reference_answer": "The part that builds the graphs of file relationships (reading imports and mining commit history for files changed together) would no longer be needed, since folders need no such input.",
+   "evidence": [
+    "udebt/structure.py:229-251",
+    "udebt/imports.py:199-215"
+   ]
+  },
+  {
+   "unit_id": "structural-discovery",
+   "level": 3,
+   "question": "If units were proposed by asking a language model alone to map the repository, which signal derived from version-control history would the unit discovery no longer need to compute?",
+   "variants": [
+    "If an LLM alone produced the unit map, which history-derived signal would no longer be computed?",
+    "Replacing clustering with an LLM-only mapping would make which history-based relationship measure unnecessary?"
+   ],
+   "reference_answer": "The co-change signal, i.e. which files tend to be modified together in commits (with its commit weighting and filtering), would no longer be needed.",
+   "evidence": [
+    "udebt/structure.py:167-191",
+    "udebt/structure.py:229-251"
+   ]
+  },
+  {
+   "unit_id": "structural-discovery",
+   "level": 3,
+   "question": "If the discovery step stopped merging the two kinds of file relationships and used only the history-based one, which kind of source file would lose its connections to the rest of the graph?",
+   "variants": [
+    "If only the history-based relationship were used for clustering, which files would lose their links?",
+    "Dropping the code-dependency graph from the merge would leave which kind of file with no connections?"
+   ],
+   "reference_answer": "Files that are rarely or never changed together with others (e.g. new or stable files) would be left isolated, since only the import relationships connected them to related files.",
+   "evidence": [
+    "udebt/structure.py:243-251"
+   ]
+  },
+  {
+   "unit_id": "teaching-layer",
+   "level": 1,
+   "question": "If the local browser server were not running, what would a learner lose access to that the terminal-based measuring does not provide?",
+   "variants": [
+    "What would a user lose if they could not open the local web interface for the teaching features?",
+    "What does the browser-served interface offer learners beyond measuring debt?"
+   ],
+   "reference_answer": "They would lose the interactive browser experience for tours, review sittings, tutoring and teach-back, which is how debt gets paid down rather than just measured.",
+   "evidence": [
+    "udebt/serve.py:377-388",
+    "udebt/serve.py:564-587"
+   ],
+   "orientation": {
+    "purpose": "Helps people pay debt down, not just measure it. It offers tours, a tutor, a spaced review queue, teach-back, change digests and a local browser UI.",
+    "decision": "Spaced review and walkthroughs sit on top of the quiz ladder. They are served by a stdlib HTTP server with static JS. A terminal-only tool and a framework web app were rejected. The aim is to turn measurement into learning.",
+    "where": [
+     {
+      "path": "udebt/serve.py",
+      "what": "the `udebt serve` HTTP server"
+     },
+     {
+      "path": "udebt/review.py",
+      "what": "review queue"
+     },
+     {
+      "path": "udebt/tour.py",
+      "what": "architecture tour"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits, 2026-11-14 to 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "teaching-layer",
+   "level": 1,
+   "question": "Why does the spaced review queue depend on the earlier quiz results being recorded?",
+   "variants": [
+    "What does the review queue draw on to decide what to ask again?",
+    "Why can the review part not schedule anything for a developer who has never answered a quiz question?"
+   ],
+   "reference_answer": "The queue is built from the stored history of answered questions per unit and level, so it can only schedule re-asks of things already answered; with no records it has nothing to schedule.",
+   "evidence": [
+    "udebt/review.py:139-163",
+    "udebt/serve.py:377-388"
+   ],
+   "orientation": {
+    "purpose": "Helps people pay debt down, not just measure it. It offers tours, a tutor, a spaced review queue, teach-back, change digests and a local browser UI.",
+    "decision": "Spaced review and walkthroughs sit on top of the quiz ladder. They are served by a stdlib HTTP server with static JS. A terminal-only tool and a framework web app were rejected. The aim is to turn measurement into learning.",
+    "where": [
+     {
+      "path": "udebt/serve.py",
+      "what": "the `udebt serve` HTTP server"
+     },
+     {
+      "path": "udebt/review.py",
+      "what": "review queue"
+     },
+     {
+      "path": "udebt/tour.py",
+      "what": "architecture tour"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits, 2026-11-14 to 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "teaching-layer",
+   "level": 1,
+   "question": "Why does the local server restrict which hosts and callers it answers, given it is a local tool?",
+   "variants": [
+    "What risk does the local teaching server guard against by checking the requested host and a token?",
+    "Why does a tool meant only for the local machine still check who is calling it?"
+   ],
+   "reference_answer": "It serves a learner's private data and can trigger model calls, so it only answers requests addressed to the local loopback host and carrying its token, preventing other web pages or machines from using it.",
+   "evidence": [
+    "udebt/serve.py:730-756"
+   ],
+   "orientation": {
+    "purpose": "Helps people pay debt down, not just measure it. It offers tours, a tutor, a spaced review queue, teach-back, change digests and a local browser UI.",
+    "decision": "Spaced review and walkthroughs sit on top of the quiz ladder. They are served by a stdlib HTTP server with static JS. A terminal-only tool and a framework web app were rejected. The aim is to turn measurement into learning.",
+    "where": [
+     {
+      "path": "udebt/serve.py",
+      "what": "the `udebt serve` HTTP server"
+     },
+     {
+      "path": "udebt/review.py",
+      "what": "review queue"
+     },
+     {
+      "path": "udebt/tour.py",
+      "what": "architecture tour"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits, 2026-11-14 to 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "teaching-layer",
+   "level": 2,
+   "question": "The browser interface is served by a small standard-library HTTP server with plain static scripts rather than a web framework. What constraint made that the better choice for this tool?",
+   "variants": [
+    "Why does the local browser UI use a minimal built-in HTTP server instead of a framework-based web app?",
+    "What about a locally run command-line tool favored a bare standard-library server over a web framework?"
+   ],
+   "reference_answer": "It is a local tool run by one developer on their own machine, so it should add no dependencies or build step. A bare server on localhost is enough, whereas a framework would be unnecessary weight.",
+   "evidence": [
+    "udebt/serve.py:730-756"
+   ]
+  },
+  {
+   "unit_id": "teaching-layer",
+   "level": 2,
+   "question": "Spaced review and guided walkthroughs were added on top of the quiz ladder instead of only measuring understanding. What constraint or goal made that the better choice?",
+   "variants": [
+    "Why add review scheduling and walkthroughs rather than stopping at scoring comprehension debt?",
+    "What problem with a measurement-only tool led to adding spaced review and tours?"
+   ],
+   "reference_answer": "Measuring debt alone doesn't reduce it; developers need a way to build and retain understanding. Spaced review and walkthroughs turn the measurement into paying the debt down, with understanding that is refreshed before it fades.",
+   "evidence": [
+    "udebt/review.py:139-163",
+    "udebt/serve.py:377-388"
+   ]
+  },
+  {
+   "unit_id": "teaching-layer",
+   "level": 2,
+   "question": "The teaching features are available in a browser as well as the terminal. What constraint made a browser UI better than terminal-only for them?",
+   "variants": [
+    "Why was a browser front end added instead of keeping the teaching layer terminal only?",
+    "What limitation of a terminal made a web UI worthwhile for tours, review and answering questions?"
+   ],
+   "reference_answer": "Tours, review sittings and answering questions involve reading longer material and writing answers. A browser handles that interaction more comfortably than a terminal, and a local server provides it without hosting anything.",
+   "evidence": [
+    "udebt/serve.py:564-587",
+    "udebt/serve.py:730-756"
+   ]
+  },
+  {
+   "unit_id": "teaching-layer",
+   "level": 3,
+   "question": "If the browser interface were replaced by a terminal-only experience, which part of the local server's request handling would become unnecessary?",
+   "variants": [
+    "If the teaching layer were terminal only, which request-protection mechanism of the local server would no longer be needed?",
+    "Removing the browser UI would make which local-server safeguard against other web pages pointless?"
+   ],
+   "reference_answer": "The checks protecting the local HTTP server from other websites and processes (the host check and the per-session token requirement on API calls) would no longer be needed, as there would be no server.",
+   "evidence": [
+    "udebt/serve.py:730-756"
+   ]
+  },
+  {
+   "unit_id": "teaching-layer",
+   "level": 3,
+   "question": "If spaced review were removed from the teaching layer, which stored data that the server reads when serving review questions would stop being used for that purpose?",
+   "variants": [
+    "Without spaced review, what persisted data would the server no longer consult to choose questions?",
+    "If review scheduling were dropped, which saved history would no longer drive question selection?"
+   ],
+   "reference_answer": "The user's stored answer records (history of graded quiz attempts per unit and level), which the review scheduler folds into due dates, would no longer be used for selecting review questions.",
+   "evidence": [
+    "udebt/serve.py:377-388",
+    "udebt/review.py:139-163"
+   ]
+  },
+  {
+   "unit_id": "teaching-layer",
+   "level": 3,
+   "question": "If the server graded each answer immediately instead of grading a whole sitting in one batch at its end, which part of the server's in-memory state handling would have to change first?",
+   "variants": [
+    "If answers were graded one at a time, what server-side bookkeeping of served questions would need to change?",
+    "Switching from end-of-sitting batch grading to immediate grading would first affect how the server tracks what?"
+   ],
+   "reference_answer": "The server's tracking of outstanding served questions would change: it keeps them until the batch is graded and then discards them together (including dropped unanswered ones), whereas immediate grading would discard each as it is answered.",
+   "evidence": [
+    "udebt/serve.py:564-587"
+   ]
+  },
+  {
+   "unit_id": "parity-tests",
+   "level": 1,
+   "question": "If the generated shared fixtures were not regenerated after the Python scoring changed, what would the tests reveal?",
+   "variants": [
+    "What does a stale shared fixture signal to a developer changing the Python side?",
+    "What failure would a developer see after changing Python scoring without refreshing the shared test data?"
+   ],
+   "reference_answer": "The test that checks the fixture is current would fail, telling the developer the shared fixture is stale and must be regenerated so the TypeScript side is checked against the new Python behaviour.",
+   "evidence": [
+    "tests/test_hosted_parity.py:204-225"
+   ],
+   "orientation": {
+    "purpose": "Keeps the Python and TypeScript implementations behaving the same. Shared prompt parts and fixture-based tests catch drift.",
+    "decision": "The logic is implemented twice and checked against generated shared fixtures, rather than run on one runtime. Calling Python from the web and rewriting in one language were rejected. The hosted functions can't run the Python CLI.",
+    "where": [
+     {
+      "path": "tests/test_hosted_parity.py",
+      "what": "Python-side parity tests"
+     },
+     {
+      "path": "web/test/parity.test.ts",
+      "what": "TypeScript-side parity test"
+     },
+     {
+      "path": "udebt/hosted/prompt_parts.py",
+      "what": "shared prompt parts"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "parity-tests",
+   "level": 1,
+   "question": "Why do the web app's quiz prompts come from a generated file rather than being written separately in the web code?",
+   "variants": [
+    "What problem does generating the web app's prompt text from the CLI's prompts avoid?",
+    "Why is the shared prompt data generated rather than hand-edited?"
+   ],
+   "reference_answer": "Generating it from the CLI's prompts guarantees both implementations use the same wording and rules, so the hosted app cannot silently drift from the CLI's quiz behaviour.",
+   "evidence": [
+    "udebt/hosted/prompt_parts.py:22-45",
+    "tests/test_hosted_parity.py:215-225"
+   ],
+   "orientation": {
+    "purpose": "Keeps the Python and TypeScript implementations behaving the same. Shared prompt parts and fixture-based tests catch drift.",
+    "decision": "The logic is implemented twice and checked against generated shared fixtures, rather than run on one runtime. Calling Python from the web and rewriting in one language were rejected. The hosted functions can't run the Python CLI.",
+    "where": [
+     {
+      "path": "tests/test_hosted_parity.py",
+      "what": "Python-side parity tests"
+     },
+     {
+      "path": "web/test/parity.test.ts",
+      "what": "TypeScript-side parity test"
+     },
+     {
+      "path": "udebt/hosted/prompt_parts.py",
+      "what": "shared prompt parts"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "parity-tests",
+   "level": 1,
+   "question": "What consequence follows for the hosted web app from the fact that the hosted functions cannot run the Python command-line tool?",
+   "variants": [
+    "Why does the hosted app need its own implementation of the scoring and review logic?",
+    "What does the inability to run the CLI in hosted functions force the project to maintain?"
+   ],
+   "reference_answer": "The scoring, review and prompt logic must exist a second time in TypeScript, which is why a parity contract is needed to keep the two copies in agreement.",
+   "evidence": [
+    "tests/test_hosted_parity.py:59-85",
+    "udebt/hosted/prompt_parts.py:22-37"
+   ],
+   "orientation": {
+    "purpose": "Keeps the Python and TypeScript implementations behaving the same. Shared prompt parts and fixture-based tests catch drift.",
+    "decision": "The logic is implemented twice and checked against generated shared fixtures, rather than run on one runtime. Calling Python from the web and rewriting in one language were rejected. The hosted functions can't run the Python CLI.",
+    "where": [
+     {
+      "path": "tests/test_hosted_parity.py",
+      "what": "Python-side parity tests"
+     },
+     {
+      "path": "web/test/parity.test.ts",
+      "what": "TypeScript-side parity test"
+     },
+     {
+      "path": "udebt/hosted/prompt_parts.py",
+      "what": "shared prompt parts"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) wrote all three commits on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "parity-tests",
+   "level": 2,
+   "question": "The hosted web app has its own TypeScript copy of the logic, kept in sync by shared test fixtures, instead of calling the Python command-line tool. What constraint forced that choice?",
+   "variants": [
+    "Why does the web app reimplement the Python logic in TypeScript rather than invoke the Python tool?",
+    "What hosting limitation ruled out running the Python CLI from the web app?"
+   ],
+   "reference_answer": "The hosted app's serverless functions can't run the Python command-line tool. So the logic is duplicated in TypeScript, and shared fixtures keep the two behaving identically.",
+   "evidence": [
+    "tests/test_hosted_parity.py:204-225",
+    "udebt/hosted/prompt_parts.py:22-37"
+   ]
+  },
+  {
+   "unit_id": "parity-tests",
+   "level": 2,
+   "question": "The prompt text is generated from the Python source into a shared file consumed by the web app, rather than being written separately in each language. What constraint made generation better?",
+   "variants": [
+    "Why are the quiz prompts generated from one source for the web app instead of maintained by hand in both languages?",
+    "What risk of duplicate implementations is avoided by generating the shared prompt data from Python?"
+   ],
+   "reference_answer": "With two implementations, hand-maintained copies of the prompts would drift apart and produce different questions and grading. Generating from one source, with a test that fails when the copy is stale, keeps them identical.",
+   "evidence": [
+    "udebt/hosted/prompt_parts.py:22-37",
+    "tests/test_hosted_parity.py:215-219"
+   ]
+  },
+  {
+   "unit_id": "parity-tests",
+   "level": 2,
+   "question": "Parity is enforced with fixtures generated from the Python implementation and replayed against the TypeScript one, rather than rewriting everything in a single language. What constraint made keeping both languages workable?",
+   "variants": [
+    "Why keep both implementations and verify them with shared fixtures instead of rewriting in one language?",
+    "What made duplicated Python and TypeScript code acceptable provided it is checked against shared cases?"
+   ],
+   "reference_answer": "The CLI must stay in Python while the hosted app must run in a language its functions support, so both are needed. Shared generated cases make the duplication safe because any divergence fails a test.",
+   "evidence": [
+    "tests/test_hosted_parity.py:59-85",
+    "tests/test_hosted_parity.py:204-225"
+   ]
+  },
+  {
+   "unit_id": "parity-tests",
+   "level": 3,
+   "question": "If the hosted web app called the Python implementation instead of keeping a duplicate TypeScript one, what would the generated shared test data and shared prompt files become?",
+   "variants": [
+    "If the web app ran the Python code directly, what would happen to the generated shared fixtures?",
+    "Calling Python from the web instead of duplicating it would make which generated artifacts redundant?"
+   ],
+   "reference_answer": "They would become unnecessary, because the shared fixtures and prompt files exist only to keep two separate implementations in agreement; with one runtime there is nothing to compare.",
+   "evidence": [
+    "udebt/hosted/prompt_parts.py:22-45",
+    "tests/test_hosted_parity.py:204-225"
+   ]
+  },
+  {
+   "unit_id": "parity-tests",
+   "level": 3,
+   "question": "If the quiz prompt wording is changed on the Python side, what other part of the system must be updated for the checks to keep passing?",
+   "variants": [
+    "After editing the Python quiz prompts, what must be regenerated so the test suite passes?",
+    "When the Python prompt rules change, which copy consumed by the web app has to be refreshed?"
+   ],
+   "reference_answer": "The generated shared prompt-parts file used by the web app must be regenerated from the Python prompts, otherwise the staleness test fails.",
+   "evidence": [
+    "udebt/hosted/prompt_parts.py:22-45",
+    "tests/test_hosted_parity.py:215-225"
+   ]
+  },
+  {
+   "unit_id": "parity-tests",
+   "level": 3,
+   "question": "If the Python scoring rules changed in how understanding and debt are computed, which other implementation would have to be brought in line to satisfy the parity contract?",
+   "variants": [
+    "Which second implementation must follow a change to Python's scoring logic?",
+    "After changing Python's debt scoring, what other code must be updated so the shared test cases still match?"
+   ],
+   "reference_answer": "The TypeScript implementation used by the hosted web app must be updated, with the shared fixture regenerated, so it produces the same scores as Python.",
+   "evidence": [
+    "tests/test_hosted_parity.py:59-85",
+    "tests/test_hosted_parity.py:204-213"
+   ]
+  },
+  {
+   "unit_id": "drafts-hosted-api",
+   "level": 1,
+   "question": "If the parked first hosted-API draft were deleted, what effect would that have on the running product?",
+   "variants": [
+    "What would a user of the running system notice if the parked hosted-API draft disappeared?",
+    "Does removing the superseded hosted service draft change how the live system behaves?"
+   ],
+   "reference_answer": "None; the draft is not part of the running system, so removing it would only lose a reference for the earlier design.",
+   "evidence": [
+    "drafts/hosted-api/app.py:109-126"
+   ],
+   "orientation": {
+    "purpose": "A parked first draft of a hosted API service with row-level-security migrations. It is not part of the running system.",
+    "decision": "It was kept under drafts/ as reference, not used, instead of being deleted. It was superseded by the Supabase and Netlify design in HOSTING.md. The history doesn't say why it was kept.",
+    "where": [
+     {
+      "path": "drafts/hosted-api",
+      "what": "the draft service and migrations"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) parked it in one commit on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "drafts-hosted-api",
+   "level": 1,
+   "question": "What does the draft hosted service's per-request database access illustrate that a reader might want to reuse from the design?",
+   "variants": [
+    "What security idea about database access does the parked draft demonstrate for reference?",
+    "What does the draft's way of running reads as the calling user show about how it protected data?"
+   ],
+   "reference_answer": "It shows reads running as the calling user so the database's row-level security enforces who may see what, instead of relying only on application checks.",
+   "evidence": [
+    "drafts/hosted-api/app.py:281-286",
+    "drafts/hosted-api/db.py:122-147"
+   ],
+   "orientation": {
+    "purpose": "A parked first draft of a hosted API service with row-level-security migrations. It is not part of the running system.",
+    "decision": "It was kept under drafts/ as reference, not used, instead of being deleted. It was superseded by the Supabase and Netlify design in HOSTING.md. The history doesn't say why it was kept.",
+    "where": [
+     {
+      "path": "drafts/hosted-api",
+      "what": "the draft service and migrations"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) parked it in one commit on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "drafts-hosted-api",
+   "level": 1,
+   "question": "Why would a developer wanting the current hosting design be misled by reading the parked draft instead of the hosting document?",
+   "variants": [
+    "Why should the hosting document, not the draft service, be trusted for the current hosting design?",
+    "What makes the parked draft an unreliable guide to how the system is hosted now?"
+   ],
+   "reference_answer": "The draft was superseded by a different design built on Supabase and Netlify, so it describes a service shape that is no longer used.",
+   "evidence": [
+    "drafts/hosted-api/app.py:109-126",
+    "drafts/hosted-api/auth.py:67-86"
+   ],
+   "orientation": {
+    "purpose": "A parked first draft of a hosted API service with row-level-security migrations. It is not part of the running system.",
+    "decision": "It was kept under drafts/ as reference, not used, instead of being deleted. It was superseded by the Supabase and Netlify design in HOSTING.md. The history doesn't say why it was kept.",
+    "where": [
+     {
+      "path": "drafts/hosted-api",
+      "what": "the draft service and migrations"
+     }
+    ],
+    "shaped_by": "[ai] Claude (claude-code) parked it in one commit on 2026-11-15."
+   }
+  },
+  {
+   "unit_id": "drafts-hosted-api",
+   "level": 2,
+   "question": "The abandoned first hosted-service design was parked in a drafts folder rather than deleted. What reason favored keeping it?",
+   "variants": [
+    "Why was the superseded hosted API draft retained as reference instead of being removed?",
+    "What value did keeping the replaced hosted service draft offer over deleting it?"
+   ],
+   "reference_answer": "It holds worked-out design ideas, such as per-user row-level security and token authentication, that remain useful as reference for the replacement design. It is kept out of the live code, so it doesn't affect anything.",
+   "evidence": [
+    "drafts/hosted-api/app.py:281-286",
+    "drafts/hosted-api/db.py:122-147",
+    "drafts/hosted-api/auth.py:67-86"
+   ]
+  },
+  {
+   "unit_id": "drafts-hosted-api",
+   "level": 2,
+   "question": "The first hosted design, a standalone Python web service, was replaced by a Supabase and Netlify design. What constraint made the replacement necessary?",
+   "variants": [
+    "Why was the standalone Python service draft superseded by a Supabase and Netlify approach?",
+    "What made the first hosted-API design unsuitable for the deployment the project chose?"
+   ],
+   "reference_answer": "The project was moving to hosting on managed platforms with serverless functions, which can't run the Python tool or a long-lived service like the draft. The hosting plan therefore replaced the draft.",
+   "evidence": [
+    "drafts/hosted-api/app.py:109-126",
+    "drafts/hosted-api/db.py:122-147"
+   ]
+  },
+  {
+   "unit_id": "drafts-hosted-api",
+   "level": 2,
+   "question": "Why is the parked draft kept in a separate drafts area instead of being left in the main code tree?",
+   "variants": [
+    "What reason led to placing the superseded service under drafts rather than alongside live code?",
+    "Why isolate the superseded hosted draft from the main package instead of leaving it among active modules?"
+   ],
+   "reference_answer": "It is superseded and not used, so keeping it apart prevents it being mistaken for the live implementation or being maintained as one. It stays available as reference without being part of the product.",
+   "evidence": [
+    "drafts/hosted-api/app.py:109-126"
+   ]
+  },
+  {
+   "unit_id": "drafts-hosted-api",
+   "level": 3,
+   "question": "If the parked hosted service draft were revived as the real backend instead of relying on the managed database platform, which part of the system would have to take over per-user data isolation?",
+   "variants": [
+    "If the draft backend became the real one, what would have to enforce that users see only their own data?",
+    "Reviving the old draft instead of the managed platform would make which component responsible for access control on data?"
+   ],
+   "reference_answer": "The backend's own database layer would have to enforce it, using Postgres row-level security by running transactions as the calling user, plus its own authentication of bearer tokens.",
+   "evidence": [
+    "drafts/hosted-api/app.py:281-286",
+    "drafts/hosted-api/db.py:122-147"
+   ]
+  },
+  {
+   "unit_id": "drafts-hosted-api",
+   "level": 3,
+   "question": "If the draft service replaced the serverless functions design, which new kind of operational component would the hosted app need to run?",
+   "variants": [
+    "Adopting the draft backend would require deploying what kind of long-running component?",
+    "If the draft were used instead of serverless functions, what must be hosted and operated?"
+   ],
+   "reference_answer": "A continuously running web application server (an ASGI service handling requests, auth and database connections) would need to be deployed and operated.",
+   "evidence": [
+    "drafts/hosted-api/app.py:109-126"
+   ]
+  },
+  {
+   "unit_id": "drafts-hosted-api",
+   "level": 3,
+   "question": "If the draft were deleted rather than kept, what would the repository lose that the current hosted design could still draw on?",
+   "variants": [
+    "What would be lost by deleting the parked draft instead of keeping it?",
+    "Removing the superseded draft would discard which reusable resource for the current hosted design?"
+   ],
+   "reference_answer": "A worked reference for the earlier design's authentication, permission checks, error mapping and row-level-security approach, which the current design could consult; nothing running depends on it.",
+   "evidence": [
+    "drafts/hosted-api/auth.py:67-86",
+    "drafts/hosted-api/db.py:122-147"
+   ]
+  }
+ ]
+}

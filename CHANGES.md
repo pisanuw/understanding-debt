@@ -167,3 +167,4 @@
 2026-11-15 [decision] No-login choices (15-minute rule): functions not browser for excerpts, self-checked at full weight, off-mode users get advance quizzes too; BRIEFING open questions.
 
 2026-11-15 [decision] Owner on use without signing in: advance quizzes for everybody (model quiz one choice away); self-checked at full weight; copies keep browser answers and their review states; no excerpt caching yet; 51 calls stand.
+2026-11-15 [note] Advance quizzes (levels 1-3) for all four samples: 719 of 738 planned questions, 51 calls on the subscription ($5.82 CLI-reported); index.json lists them.
