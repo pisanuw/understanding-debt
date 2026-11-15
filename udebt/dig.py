@@ -4,7 +4,9 @@ The model traces one real request through a unit in three to six steps, each a f
 line range with narration, and writes one check question per ladder level (`TASK:
 walkthrough`, one call). `dig` prints the unit's orientation, then each step's narration next
 to the actual lines from the working tree (excerpts.py, at most 25 each), then asks the check
-question at the developer's level and grades it against its reference.
+question at the developer's level and grades it against its reference. The check rotates
+(pick_check): a variant of a missed question, the walkthrough's own check, then the unit's
+pooled questions at that level, so a second `dig` does not repeat the first one's question.
 
 The walkthrough is cached on the unit in map.json (`walkthrough`), shared by the team, with
 the head it was written at, the unit's orientation basis and a hash of the contents of the
@@ -126,7 +128,80 @@ def ensure(
     if w["steps"]:
         unit["walkthrough"] = w
         store.save_map(map_data)
+        # its checks join the unit's question pool, so `dig` and the quiz can rotate through
+        # them as well as through the quiz's own questions
+        from .quiz import pool_add
+
+        checks = [check_question(w, unit, int(n)) for n in sorted(checks)]
+        pool_add(store, map_data, [q for q in checks if q is not None])
     return w, True
+
+
+def pick_check(
+    w: dict[str, Any], unit: dict[str, Any], level: int, records_on_unit: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """The check question `dig` asks at `level`, rotating rather than repeating (Phase 3.4):
+    a stored variant of a question the developer missed and saw the answer to there, else
+    the walkthrough's own check if they have not been asked it, else a pooled question at
+    that level they have not been asked (the quiz's, and earlier walkthroughs' checks), else
+    the one of these they were asked longest ago, marked `repeat` (`dig` then asks the model
+    for a new one, fresh_check). None when there is none at that level."""
+    from .quiz import pooled, revealed_variant
+
+    got = revealed_variant(unit, level, records_on_unit)
+    if got is not None:
+        return got
+    last: dict[str, str] = {}
+    for r in records_on_unit:
+        q = str(r.get("question"))
+        last[q] = max(last.get(q, ""), str(r.get("ts", "")))
+    own = check_question(w, unit, level)
+    if own is not None and own["question"] not in last:
+        return own
+    pool = pooled(unit, level)
+    fresh = next((q for q in pool if q["question"] not in last), None)
+    if fresh is not None:
+        return fresh
+    seen: dict[str, dict[str, Any]] = {}
+    for q in ([own] if own else []) + pool:
+        seen.setdefault(q["question"], q)
+    if not seen:
+        return None
+    return {**min(seen.values(), key=lambda q: last.get(q["question"], "")), "repeat": True}
+
+
+def fresh_check(
+    root: Path,
+    store: Store,
+    llm: LLM,
+    map_data: dict[str, Any],
+    unit: dict[str, Any],
+    level: int,
+    records_on_unit: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """A new check question at `level` when every pooled one has been asked (one call, the
+    quiz's question writer, told what was asked so it says it in other words), pooled for
+    the next time; its first phrasing the developer has not been asked. None if the model
+    returned only questions already asked."""
+    from .quiz import generate_questions, pool_add, revealed_on
+
+    asked = {str(r.get("question")) for r in records_on_unit}
+    u = {**unit, "level": level}
+    seen = [q for q in revealed_on(records_on_unit, level)] or [
+        str(r["question"])
+        for r in ladder._ordered(records_on_unit)
+        if ladder.level_of(r) == level and r.get("question")
+    ][-3:]
+    if seen:
+        u["revealed"] = seen
+    qs = generate_questions(root, llm, [u])
+    pool_add(store, map_data, qs)
+    for q in qs:
+        for text in [q["question"], *(q.get("variants") or [])]:
+            if text not in asked:
+                rest = [v for v in [q["question"], *(q.get("variants") or [])] if v != text]
+                return {**q, "question": text, "variants": rest[:2]}
+    return None
 
 
 def check_question(w: dict[str, Any], unit: dict[str, Any], level: int) -> dict[str, Any] | None:

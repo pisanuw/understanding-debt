@@ -163,8 +163,9 @@ def test_review_teachback_and_tutor(server):
     tb_body = {"unit": "scoring", "explanation": "It sends email.", "confidence": 3}
     st, tb, _ = call(app, "POST", "/api/teachback", tb_body)
     assert tb["verdict"] == "wrong" and tb["misconception"] and tb["revealed"]
+    assert "reference_answer" not in tb and tb["label"].startswith("level 1 of 5")
     rec = store.load_records("dev1@example.com")[-1]
-    assert rec["type"] == "teachback" and rec["level"] == 2
+    assert rec["type"] == "teachback" and rec["level"] == 1, "no evidence there: level 1"
     assert call(app, "POST", "/api/teachback", {"unit": "scoring", "explanation": " "})[0] == 400
     # the tutor: a session id on the first turn, resume after; "check me" brings the check
     st, v, _ = call(app, "POST", "/api/tutor", {"unit": "scoring", "message": "What is this?"})

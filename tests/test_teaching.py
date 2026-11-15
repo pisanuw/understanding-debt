@@ -338,26 +338,50 @@ def test_review_brings_a_missed_question_back_in_other_words(fixture_repo, monke
     assert lad.next_level(store.load_records("dev1@example.com")) == 2
 
 
-def test_teachback_is_level_2_evidence_with_right_missing_and_misconception(
+def test_teachback_is_graded_at_the_current_level_with_right_missing_and_misconception(
     fixture_repo, monkeypatch, capsys
 ):
+    from conftest import understood
+
     root = fixture_repo
     store = _mapped(root, capsys)
     answers = iter(["It keeps state; half of it is files.", "", "2"])
     monkeypatch.setattr("builtins.input", lambda _p="": next(answers))
     rc, out = run(root, capsys, "teachback", "storage")
-    assert rc == 0 and "[PARTIAL] level 2" in out
+    assert rc == 0 and "graded at your level there, level 1 of 5" in out, "no evidence: level 1"
+    assert "[PARTIAL] level 1" in out and "where it sits in the system" in out
     assert "What was right: The purpose is right." in out and "Misconception: none found" in out
+    assert "The answer: It returns a default, by design." in out, "partial at 1-2: revealed"
     (rec,) = store.load_records("dev1@example.com")
-    assert rec["type"] == "teachback" and rec["source"] == "teachback" and rec["level"] == 2
-    assert rec["answer"].startswith("It keeps state") and rec["missing"]
+    assert rec["type"] == "teachback" and rec["source"] == "teachback" and rec["level"] == 1
+    assert rec["answer"].startswith("It keeps state") and rec["missing"] and rec["revealed"]
+    # level 1 passed: the next teach-back is graded at level 2
+    one = understood("storage", ts="2030-01-01T00:00:00+00:00")[0]
+    store.append_record("dev1@example.com", {**one, "dev": "dev1@example.com"})
     answers = iter(["It sends email.", "", "3"])
     rc, out = run(root, capsys, "teachback", "storage")
     assert "[WRONG] level 2" in out and "Misconception: It does not send email." in out
     assert "The answer: It returns a default, by design." in out, "level 2: revealed"
+    assert store.load_records("dev1@example.com")[-1]["level"] == 2
+    # levels 1-3 passed: level 4, where a miss gets feedback but not the answer
+    for r in understood("storage", ts="2031-01-01T00:00:00+00:00"):
+        store.append_record("dev1@example.com", {**r, "dev": "dev1@example.com"})
+    answers = iter(["It sends email.", "", "3"])
+    rc, out = run(root, capsys, "teachback", "storage")
+    assert "[WRONG] level 4" in out and "The answer:" not in out
     answers = iter([""])
     rc, out = run(root, capsys, "teachback", "storage")
-    assert "nothing recorded" in out and len(store.load_records("dev1@example.com")) == 2
+    assert "nothing recorded" in out
+
+
+def test_teachback_prompt_names_the_level():
+    from udebt.prompts import teachback_prompt
+
+    u = {"id": "u", "name": "U", "paths": ["a.py"]}
+    one = teachback_prompt(u, "It does x.", None, 1)
+    three = teachback_prompt(u, "It does x.", None, 3)
+    assert "level 1 of the question ladder" in one and "level: 1 (purpose" in one
+    assert "if it were reversed" in three and "consequence of reversing it" in three
 
 
 def test_decision_records_are_opt_in_and_record_who_confirmed(fixture_repo, monkeypatch, capsys):

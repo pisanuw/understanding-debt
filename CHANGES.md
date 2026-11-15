@@ -96,4 +96,12 @@
 2026-11-14 [code] serve fixes from 52 screenshots: tutor Markdown rendered (escaped), a stale series replayed in memory, full-bleed dashboard tab; tutor reattaches by URL.
 2026-11-14 [doc] README `udebt serve`, BRIEFING serve decisions and open questions, ROADMAP Phase 3.3 done and what Phase 4 reuses from serve; Handoff statuses final.
 2026-11-15 [note] Level-3 synthetic, 3 question sets on hf bb3d3b55: 0.81/0.88/0.96, no decay signal (pooled rho 0.29 p 0.18); same-day reports overwrite.
+2026-11-15 [decision] Phase 3.4: partial answers at levels 1-2 reveal the reference; teach-back is graded at the developer's next ladder level (1 with no evidence).
+2026-11-15 [code] dig rotates its check: missed-question variant, own check, unasked pooled, least recent; walkthrough checks join the pool; an exhausted pool gets one new question.
+2026-11-15 [code] Tutor sessions persist in gitignored .udebt/tutor/<dev>/<unit>.json; a restart reattaches; a saved conversation offers resume or start over.
+2026-11-15 [code] Browser quiz and review graded in one call per sitting (/api/answers); "I don't know" reveals at levels 1-2 with no call (/api/dontknow).
+2026-11-15 [decision] Unit graph ignores files more than two units list (connections only, not mass). digitalme uses edges 30 -> 20, co-change pairs 64 -> 59; tour rewritten.
+2026-11-15 [code] udebt digest and a Digest tab: per unit below threshold, commits since last evidence (or --since, else 30 days), one cached call; risk links to it.
+2026-11-15 [note] digitalme digest --since 2026-07-01: 11 units, 66 commits, 1 call of 32 s, 6 decisions held, 5 extended. Sample in .udebt/samples/digitalme-digest.md.
+2026-11-15 [doc] README digest section, serve batch grading and tutor persistence, why reference answers stay in map.json; BRIEFING and ROADMAP Phase 3.4.
 2026-11-15 [plan] HOSTING.md: hosted udebt on the HintWise platform (Google/email via Supabase, gateway or BYOK, option B footer), 3 cached samples, 7 owner decisions.

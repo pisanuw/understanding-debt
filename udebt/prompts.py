@@ -209,6 +209,41 @@ TEACHBACK_SCHEMA: dict[str, Any] = {
     "required": ["verdict", "right", "missing", "misconception", "reference_answer"],
 }
 
+DIGEST_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "digests": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "unit_id": {"type": "string"},
+                    "headline": {"type": "string"},
+                    "changes": {
+                        "type": "array",
+                        "maxItems": 4,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "what": {"type": "string"},
+                                "commits": {"type": "array", "items": {"type": "string"}},
+                            },
+                            "required": ["what", "commits"],
+                        },
+                    },
+                    "decision": {"type": "string", "enum": ["held", "extended", "changed"]},
+                    "decision_note": {"type": "string"},
+                    "look_at": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
+                },
+                "required": [
+                    "unit_id", "headline", "changes", "decision", "decision_note", "look_at",
+                ],
+            },
+        }
+    },
+    "required": ["digests"],
+}  # fmt: skip
+
 GRADE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -695,31 +730,59 @@ when if that helps.
 """
 
 
-def teachback_prompt(unit: dict[str, Any], explanation: str, orientation: str | None) -> str:
+# per level, what a teach-back verdict of correct and partial means
+_TEACHBACK_VERDICT = {
+    1: ("the purpose and the unit's place in the system are right",
+        "the purpose is roughly right but its place (what relies on it, or on what it relies) is "
+        "missing or vague"),
+    2: ("the purpose and the decision are right",
+        "the purpose is right but the decision or its main reason is missing or vague"),
+    3: ("the decision and at least one real consequence of reversing it for another part of the "
+        "system are right",
+        "the decision is right but no consequence beyond the unit is named, or the one named is "
+        "vague"),
+    4: ("the behaviour under at least one real failure (a part failing, a timeout, bad input, "
+        "running twice) matches the code",
+        "the failure named is real but what the code then does is incomplete"),
+    5: ("the main code path and why it is written that way match the code",
+        "the main path is right but a step that matters is missing"),
+}  # fmt: skip
+
+
+def teachback_prompt(
+    unit: dict[str, Any], explanation: str, orientation: str | None, level: int = 2
+) -> str:
     """A teach-back (teachback.py): the developer explains the unit in their own words; the
-    grader says what was right, what was missing and one misconception, graded as level 2
-    (the decision and its alternatives)."""
+    grader says what was right, what was missing and one misconception, graded at the
+    developer's current ladder `level` for the unit (Phase 3.4)."""
+    from .teachback import ASKS
+
+    lv = ladder.LEVELS[level]
+    ok, half = _TEACHBACK_VERDICT[level]
     seen = f"\nThe orientation they may have read: {orientation}\n" if orientation else ""
+    names = (
+        "worded differently and without any file or function name"
+        if level in ladder.ARCHITECTURAL
+        else "worded differently"
+    )
     return f"""TASK: teachback
 
 A developer is explaining, in their own words, one architectural unit of the repository in the
-current directory: what it is for, the decision behind it and the alternatives it rejected.
-Check the explanation against the code with the read-only tools (trust the code over the unit
-description if they disagree) and reply in plain language, as a colleague would:
+current directory. They were asked to explain {ASKS[level]}: level {level} of the question ladder
+({lv.name}: {lv.asks}). Check the explanation against the code with the read-only tools (trust
+the code over the unit description if they disagree) and reply in plain language, as a colleague
+would:
 
 - right: one or two sentences on what the explanation got right.
-- missing: one or two sentences on the most important thing it left out.
+- missing: one or two sentences on the most important thing it left out, for level {level}.
 - misconception: one sentence on a claim it makes that the code contradicts, and what the
   code does instead; an empty string when there is none.
-- verdict, on level 2 of the question ladder (decision and alternatives): correct when the
-  purpose and the decision are right, even if worded differently and without any file or
-  function name; partial when the purpose is right but the decision or its main reason is
-  missing or vague; wrong when it contradicts how the code works; unknown when it says
-  nothing about the unit.
-- reference_answer: two plain sentences a correct explanation must contain.
+- verdict, at level {level}: correct when {ok}, even if {names}; partial when {half}; wrong
+  when it contradicts how the code works; unknown when it says nothing about the unit.
+- reference_answer: two plain sentences a correct explanation at level {level} must contain.
 
 Unit:
-{_unit_lines({**unit, "level": 2})}
+{_unit_lines({**unit, "level": level})}
 {seen}
 THE DEVELOPER'S EXPLANATION:
 {explanation}
@@ -768,4 +831,60 @@ exactly as given.
 
 Units:
 {chr(10).join(blocks)}
+"""
+
+
+def digest_prompt(blocks: list[dict[str, Any]]) -> str:
+    """Change digests (digest.py), one call for every unit of a run: what landed in each unit
+    since the developer last showed what they know there, read against the unit's decision."""
+    parts = []
+    for b in blocks:
+        u, r = b["unit"], b["range"]
+        commits = "\n".join(
+            f"    - {c['sha'][:7]} {c['date']} [{c['klass']}"
+            + (f"/{c['agent']}" if c.get("agent") else "")
+            + f"] {c['who']}: weight {c['weight']:.2f}, mass in unit {c['mass']:.2f}: "
+            f"{c['subject']}" + (f" (files: {', '.join(c['files'])})" if c.get("files") else "")
+            for c in b["commits"]
+        )
+        more = f"\n    ({b['more']} lighter commit(s) not shown)" if b.get("more") else ""
+        diff = (
+            f"\n  diff of the range under the unit's paths (truncated):\n{b['diff']}"
+            if b.get("diff")
+            else ""
+        )
+        start = (r.start or "")[:7] or "the first commit"
+        parts.append(
+            f"### unit_id: {u['id']}\n"
+            + _unit_lines(u, history=False, level=False)
+            + f"\n  range: after {start} up to {r.end[:7]} ({r.note})"
+            + f"\n  commits in the range that touch the unit, oldest first:\n{commits}{more}"
+            + diff
+        )
+    return f"""TASK: digest
+
+A developer on the repository in the current directory is catching up on parts of the system
+that moved since they last showed what they know about them. For each unit below, write a
+short briefing of what landed in that unit over the range given: a colleague bringing them up
+to date over coffee, never a warning or a judgement of who did what. Read the code as it is now
+with the read-only tools where the commit list and the diff leave you unsure (`git` is not
+available).
+
+- headline: one sentence on what the range did to the unit, in plain language.
+- changes: one to four items, the most important first, each one sentence on what changed in
+  terms of the unit's decision (what it now does, allows or relies on that it did not), not a
+  list of files, with the short shas of the commits that did it (from the list).
+- decision: `held` when the unit's decision (below) still stands and the changes work within
+  it; `extended` when it still stands but now covers more (a new case, a new area, a new
+  dependency in the same spirit); `changed` when the decision itself was replaced, reversed or
+  relaxed.
+- decision_note: one sentence: why it held, what it now also covers, or what was chosen
+  instead and what that means for someone who knew the old way.
+- look_at: one to three paths, relative to the repository root and under the unit's paths,
+  where a reader sees the change best.
+
+Name components by their role rather than by function names where you can. Return `unit_id`
+exactly as given.
+
+{chr(10).join(parts)}
 """

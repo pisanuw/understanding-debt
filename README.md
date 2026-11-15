@@ -28,7 +28,8 @@ human commits, AI-assisted commits and AI-authored commits, and uses the `claude
    against a bus-factor target, with a weak prior from the developer's own commits so the
    view is useful before the first quiz;
 7. **flag** changes that land weight in units the author does not understand, most strongly
-   outside their responsibility set;
+   outside their responsibility set, and **brief** a developer on what landed in those units
+   since they last showed what they know there (`udebt digest`);
 8. **teach** the architecture, not only test it: a ten-minute tour of the whole system, a
    learning path in dependency order, walkthroughs that trace one real request through a
    unit's code, the answer shown after a miss, spaced review of what was missed, teach-back
@@ -76,7 +77,8 @@ udebt tour [--refresh]         # a ten-minute architecture overview, one call, c
 udebt path [--all]             # your learning path: dependency order, minutes, next action per unit
 udebt dig [unit] [--refresh]   # one real request traced through the unit's code, then a check
 udebt review [-n 5] [--all]    # spaced review of the questions you missed, in other words
-udebt teachback <unit>         # explain a unit; right, missing, misconception; graded as level 2
+udebt teachback <unit>         # explain a unit; right, missing, misconception; graded at your level
+udebt digest [--since R|DATE] [--unit U]   # what landed in the units you know least, as a briefing
 udebt decisions [write] [--dir docs/decisions]   # one decision record per top-level unit (opt-in)
 udebt serve [--port N] [--open]   # all of it in the browser on 127.0.0.1, with a tutor
 udebt risk [range|--staged]    # weight a change lands in each unit vs your understanding; --deep per sub-unit
@@ -305,7 +307,8 @@ unit by unit:
   Reference answers at levels 1-3 are at most two plain sentences, because the developer
   reads them.
 - **A miss teaches.** At levels 1 and 2 a blank answer prints the reference answer at once and
-  a wrong one prints it after grading; the record says `revealed: true` and keeps the
+  a wrong or partial one prints it after grading (partial since Phase 3.4: its feedback names
+  what was missing, the reference shows the whole answer); the record says `revealed: true` and keeps the
   question's variants. It counts as the miss it was (unknown or wrong evidence, no penalty for
   the reveal), the next sitting at that level asks the same fact in other words (the question
   writer is given the revealed questions), and `udebt review` brings it back the next day.
@@ -337,8 +340,12 @@ none costs more than one call; what the model writes for the team is cached in `
 - **`udebt tour`**: the architecture as one ten-minute read, before any question. The units
   come in learning order (each after the units it uses) with a map of their connections: a
   unit *uses* another when its files import the other's, and they *change together* by the
-  commits that touch both (`udebt/unitgraph.py`, no model call; a file several units list is
-  split among them, so a hub file every flow passes through does not connect everything). One
+  commits that touch both (`udebt/unitgraph.py`, no model call; a file two units list is split
+  between them, and a file more than two units list connects nothing, Phase 3.4: a hub file
+  every flow passes through says only that they share an entry point. It still counts, split,
+  wherever mass is attributed. On digitalme, `backend/main.py` (five units) and the frontend's
+  `netlify.toml` are left out: import edges strong enough to order the path 30 to 20, all
+  import edges 47 to 30, co-change pairs 64 to 59 of 66). One
   `TASK: tour` call writes an overview and a paragraph per unit: purpose, placement among its
   connections, the decision, the alternative not chosen, who shaped it and when. Cached in
   `map.json` (`tour`) with a basis hash of the units and their order; `--refresh` rewrites it.
@@ -355,8 +362,12 @@ none costs more than one call; what the model writes for the team is cached in `
   through the unit in three to six steps, each a file and a line range with narration; `dig`
   prints the orientation, then each step's narration beside the actual lines from the working
   tree, numbered, at most 25 per step (tracked files only: an untracked or ignored file is
-  never read), then the misconception most likely, then a check question at your ladder level
-  from the walkthrough's own checks (one per level, each with a reference). Cached on the unit
+  never read), then the misconception most likely, then a check question at your ladder level.
+  The check rotates (Phase 3.4): a variant of a question you missed and saw the answer to,
+  else the walkthrough's own check for that level if you have not had it, else a question
+  from the unit's pool at that level you have not had (the quiz's questions and every
+  walkthrough's checks, which join the pool when written); only when you have had them all
+  does one call write a new one, told what you were asked so it says it in other words. Cached on the unit
   (`walkthrough`) with the head, the unit's basis and a hash of its files' contents; any change
   to a file of the unit, committed or not, rewrites it on the next `dig`.
 - **`udebt review`**: about five minutes of the questions you missed, SM-2 style, one item per
@@ -373,8 +384,12 @@ none costs more than one call; what the model writes for the team is cached in `
   | quality >= 3 | next in 1 day, then 3 days, then the last interval x ease; ease + 0.1 - (5 - q)(0.08 + 0.02(5 - q)), from 2.5 |
 
 - **`udebt teachback <unit>`**: you explain the unit; one call says what was right, what was
-  missing and one misconception if there is one, and grades it as level 2 (decision and
-  alternatives), recorded with `type: teachback`. A miss shows the reference answer.
+  missing and one misconception if there is one, and grades it at your current ladder level on
+  the unit (Phase 3.4; level 1 with no evidence there): the explanation asked for grows with
+  the level (what it is for and where it sits; then the decision and what was not chosen; then
+  what reversing it would change; then failure behaviour; then how the code does it), and a
+  pass moves the ladder like a quiz answer. Recorded with `type: teachback`; a miss at levels
+  1-2 (partial included) shows the reference answer.
 - **`udebt decisions write [--dir docs/decisions]`**: opt-in, nothing writes them otherwise.
   One short decision record per top-level unit (context, decision, alternatives not chosen,
   the commits that shaped it and who made them, where it lives) and an index, from the map
@@ -407,8 +422,11 @@ Tabs:
 - **Unit**: understanding with its basis (measured or estimated), depth and next level; the
   orientation and connections; the walkthrough, each step beside its real lines (fetched
   from `/api/excerpt`, numbered); the decision record; your answers and review items.
-- **Quiz** and **Review**: free text, graded one answer at a time with the CLI's code, the
-  answer shown after a miss at levels 1-2, recorded exactly as the CLI records it. A quiz
+- **Quiz** and **Review**: free text, graded with the CLI's code and recorded exactly as the
+  CLI records it. A sitting is graded in one call at its end, or at "Finish now" (Phase 3.4;
+  before, every answer was its own call and its own sitting): "I don't know" needs no call
+  and at levels 1-2 shows the answer at once (that question then stays blank), a typed
+  answer's verdict and, at levels 1-2 on a miss, its answer come with the batch. A quiz
   asks, per unit at your level, a stored variant of a question you just missed, else a
   question already generated for that unit and level (pooled in `map.json`, `questions`,
   by the CLI's quizzes too), and only then the model (one call for all new ones).
@@ -419,8 +437,25 @@ Tabs:
   you and explains it, asks back, and after four turns or "check me" proposes a check
   question at your level, whose reference is stripped from the page; your answer is graded
   and recorded (`source: tutor`). It shows the elapsed time and suggests stopping at ten
-  minutes. A reload reattaches (`#tutor/<session>`) while the server runs.
-- **Teach-back**, as above.
+  minutes. Conversations persist (Phase 3.4): each turn saves the transcript, the `claude`
+  session id, the level and any pending check question to `.udebt/tutor/<developer>/<unit>.json`
+  (gitignored), so a reload or a server restart reattaches (`#tutor/<session>`), and opening
+  the tutor on a unit with a saved conversation offers **Resume it** (the CLI session is
+  resumed with `--resume`) or **Start over** (a new session replaces it). Back after more than
+  half an hour, the ten-minute timer starts again.
+- **Digest**: the change digest below, for your units under the threshold or one unit, from
+  your last answer or a date or commit you type; a button writes the missing briefings (one
+  call), every GET only reads the cache.
+- **Teach-back**, as above, at your level on the unit.
+
+**Reference answers are in the committed `map.json`**, with the pooled questions and the
+walkthroughs' checks, so a teammate can read the answer to a question before being asked it.
+That is accepted on purpose: the questions come in several phrasings (`variants`, a new
+phrasing after a reveal, a rotating pool) and grading is against the code, not against the
+reference's words, so what earns a pass is understanding the fact, not remembering a
+sentence; and reading the answer to an architectural question is learning the architecture,
+which is the point. A team that wants them out of git can gitignore `map.json`'s generated
+caches by keeping the map elsewhere, at the cost of every developer paying for their own.
 
 Generation (tour, walkthrough, questions) is a POST that fills the caches in `map.json`;
 every GET only reads. Security: it binds 127.0.0.1 and refuses any other Host header (no
@@ -429,6 +464,32 @@ constant time (another origin cannot set it without a CORS preflight, which is n
 answered); POST bodies are JSON, at most 1 MB; `/api/excerpt` reads tracked files only;
 every response has a same-origin Content-Security-Policy, `Referrer-Policy: no-referrer`
 (the token is in the URL) and `no-store`; the request log never prints the token.
+
+### Change digests: `udebt digest`
+
+`udebt digest` is a briefing, not a warning: for each unit you understand below the threshold
+(in your set, or every top-level unit with `--all`; one unit with `--unit`, whatever your
+understanding), what landed there since you last showed what you know there:
+
+- the range starts at the commit of your latest answer on the unit, or at `--since <rev|date>`
+  (a date takes the last first-parent commit at or before it), or, with no evidence on the
+  unit, `--days` (30) days before HEAD's commit date; it ends at HEAD;
+- the commits of the range that touch the unit, with who made them (the agent, and who
+  directed it, for an AI commit), their class, weight and the mass each landed in the unit;
+  bots, which land none, are left out;
+- one call for every unit of the run (`TASK: digest`, the heaviest 15 commits per unit, the
+  range's diff stat and the first 160 diff lines under the unit's paths, the code readable with
+  the read-only tools) writes per unit a headline, one to four changes in terms of the unit's
+  decision with the commits that made them, whether the decision itself moved (`held`: the
+  changes work within it; `extended`: it stands and now covers more; `changed`: it was
+  replaced, reversed or relaxed) with one sentence on how, and where to look;
+- it ends with the next step, `udebt dig <unit>` or `udebt quiz --unit <unit>`.
+
+Briefings are cached per (unit, start sha, end sha) in `.udebt/digests/` (gitignored), so two
+developers with the same range share one, and a unit where nothing landed costs no call.
+`udebt risk` names the digest for every unit it flags ("Read the digest: `udebt digest --unit
+X`"). On digitalme, `--since 2026-07-01` briefed 11 units (66 commits) in one call of 32 s:
+six decisions held, five extended (`.udebt/samples/digitalme-digest.md`).
 
 ## Units and sub-units
 

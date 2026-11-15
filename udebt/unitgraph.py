@@ -10,6 +10,12 @@ together* by the commits that touch both: each commit of at most `cochange_max_f
 adds its landed weight / (units touched - 1) to every pair of units it touches, as the file
 co-change graph does for files.
 
+A file listed under more than `MAX_OWNERS` (two) top-level units is ignored when drawing
+connections (Phase 3.4, owner): neither its imports nor the commits touching it connect
+anything, since a hub file every flow passes through (digitalme's `backend/main.py`, in five
+units) says only that the units share an entry point. It still counts, split, wherever mass
+is attributed (units.Membership); only the connections leave it out. `hubs` lists them.
+
 `udebt path` orders units by the uses edges (what others use first) and `udebt tour` lists
 both kinds of connection; neither calls the model.
 """
@@ -25,6 +31,7 @@ from .imports import parser_for, scan
 from .provenance import Commit, _under, landed
 
 MIN_USES = 0.5
+MAX_OWNERS = 2  # a file more top-level units list than this connects nothing
 
 
 @dataclass
@@ -32,6 +39,7 @@ class UnitGraph:
     ids: list[str]
     uses: dict[tuple[str, str], float] = field(default_factory=dict)  # (a, b) -> strength
     together: dict[tuple[str, str], float] = field(default_factory=dict)  # sorted pair -> w
+    hubs: list[str] = field(default_factory=list)  # files ignored: listed by > MAX_OWNERS units
 
     def depends_on(self, a: str, floor: float = MIN_USES) -> list[str]:
         """The units `a` uses with at least `floor` strength, strongest first."""
@@ -68,8 +76,10 @@ def build(
     *,
     max_files: int = 30,
     files: list[str] | None = None,
+    max_owners: int = MAX_OWNERS,
 ) -> UnitGraph:
-    """The graph over the top-level units of `units` (sub-units are not split out)."""
+    """The graph over the top-level units of `units` (sub-units are not split out). Files
+    more than `max_owners` units list are left out of both kinds of connection."""
     ids = [u["id"] for u in units]
     tracked = files if files is not None else repo.tracked_files(root)
     owners: dict[str, list[str]] = {}
@@ -77,8 +87,11 @@ def build(
         for u in units:
             if _under(f, u.get("paths", [])):
                 owners.setdefault(f, []).append(u["id"])
+    hubs = sorted(f for f, o in owners.items() if len(o) > max_owners)
+    for f in hubs:
+        del owners[f]
     sources = sorted(f for f in owners if parser_for(f) is not None)
-    g = UnitGraph(ids)
+    g = UnitGraph(ids, hubs=hubs)
     for f, imp in scan(root, sources).items() if sources else []:
         mine = set(owners.get(f, []))
         for dst in imp.internal:
