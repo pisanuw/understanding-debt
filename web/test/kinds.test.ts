@@ -242,6 +242,19 @@ describe('the quiz-kind choice', () => {
     expect(app.anonymous || !app.user).toBe(true);
   });
 
+  it('keeps a sitting in progress when the session\'s token is refreshed', async () => {
+    await start();
+    await go('#/r/1/quiz');
+    await click('button', 'Start', 30);
+    const asked = byText('p', /^\[1\//)?.textContent;
+    expect(asked).toBeTruthy();
+    const auth = app.deps.auth as unknown as { listeners: ((e: string, s: unknown) => void)[]; auth: { getSession(): Promise<{ data: { session: unknown } }> } };
+    const { data } = await auth.auth.getSession();
+    for (const l of [...auth.listeners]) l('TOKEN_REFRESHED', data.session);
+    await tick(20);
+    expect(byText('p', /^\[1\//)?.textContent).toBe(asked);
+  });
+
   it('says so when the allowance runs out during a sitting', async () => {
     await start();
     await go('#/r/1/quiz');

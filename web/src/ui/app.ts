@@ -134,6 +134,9 @@ export class App {
       const first = !this.authKnown;
       this.authKnown = true;
       this.user = user;
+      // The same person with a new token (TOKEN_REFRESHED, about hourly, or after a refused call):
+      // nothing to draw again, and drawing would throw away a sitting in progress.
+      if (!changed && !first) return;
       if (changed) this.cache.clear();
       if (changed && !first && this.deps.anon) {
         // Repository ids differ between the browser's samples and the signed-in store: signing in

@@ -188,6 +188,11 @@ describe('the functions in live mode', () => {
     const denied = await handleGrade(req(), { env: LIVE, fetch: liveFetch({ repo: () => Response.json({ code: '42501', message: 'permission denied for table repositories' }, { status: 403 }) }) });
     expect([denied.status, await denied.json()]).toEqual([401, { error: 'The database refused this for your account. Sign in again.', detail: 'database 403: permission denied for table repositories' }]);
     resetAuthCache();
+    // The site's anon key is not the project's: the server's setting, so a 503 the page does not retry.
+    const key = await handleGrade(req(), { env: LIVE, fetch: liveFetch({ repo: () => Response.json({ message: 'Invalid API key', hint: 'Double check your Supabase `anon` or `service_role` API key.' }, { status: 401 }) }) });
+    expect(key.status).toBe(503);
+    expect(await key.json()).toEqual({ error: "The server is misconfigured: its database key (SUPABASE_ANON_KEY on Netlify) is not this project's. Nothing is wrong with your sign-in.", detail: 'database 401: Invalid API key' });
+    resetAuthCache();
     const gw = await handleGrade(req(), { env: LIVE, fetch: liveFetch({ gateway: () => Response.json({ error: 'auth', message: 'The session token is invalid or expired; sign in again.' }, { status: 401 }) }) });
     expect([gw.status, await gw.json()]).toEqual([401, { error: 'Your sign-in has expired. Sign in again.', detail: 'gateway 401: The session token is invalid or expired; sign in again.' }]);
   });

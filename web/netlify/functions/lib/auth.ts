@@ -34,10 +34,17 @@ export async function authorize(token: string, repoUrl: string, env: FnEnv, doFe
     throw new HttpError(502, 'Could not reach the sign-in service.', { error: 'Could not reach the sign-in service. Try again.' });
   }
   if (res.status === 401 || res.status === 403) {
-    // 401: PostgREST did not accept the token (expired, revoked, or the anon key is wrong);
-    // 403: it accepted it and refused the read. Both go to the page as 401, which refreshes the
-    // session once and retries; the detail says which it was.
-    const detail = upstreamDetail('database', res.status, await res.json().catch(() => ({})));
+    const data: unknown = await res.json().catch(() => ({}));
+    const detail = upstreamDetail('database', res.status, data);
+    // The site's SUPABASE_ANON_KEY is not this project's key: the server's setting, not the
+    // person's sign-in, so not a 401 (the page would refresh the session and try again for nothing).
+    const said = data && typeof data === 'object' ? String((data as { message?: unknown }).message ?? '') : '';
+    if (res.status === 401 && /invalid api key/i.test(said)) {
+      throw new HttpError(503, 'The functions have the wrong Supabase key.', { error: 'The server is misconfigured: its database key (SUPABASE_ANON_KEY on Netlify) is not this project\'s. Nothing is wrong with your sign-in.', detail });
+    }
+    // 401: PostgREST did not accept the token (expired or revoked); 403: it accepted it and refused
+    // the read. Both go to the page as 401, which refreshes the session once and retries; the
+    // detail says which it was.
     throw new HttpError(401, 'Sign in again.', { error: res.status === 401 ? 'Your sign-in has expired. Sign in again.' : 'The database refused this for your account. Sign in again.', detail });
   }
   if (!res.ok) throw new HttpError(502, 'The database answered an error.', { error: `The database answered ${res.status}.` });
