@@ -46,6 +46,8 @@ export interface AppDeps {
   quiz: (mode?: LlmMode) => QuizClient | null;
   /** The signed-in person's HintWise allowance, through /api/allowance (no model call). */
   allowance?: () => Promise<AllowanceAnswer | null>;
+  /** Visitors who are not signed in may use the HintWise key, sharing one allowance (VITE_UDEBT_ANON_MODEL=1). */
+  anonModel?: boolean;
   /** A line range of a file at a commit, through /api/excerpt (no model call). */
   excerpt: (repoUrl: string, sha: string, ref: ExcerptRef) => Promise<Excerpt>;
   /** The top files under directories at a commit, through /api/tree (the tree fallback; none: no fallback). */
@@ -164,22 +166,34 @@ export class App {
     return !this.user && !!this.deps.anon;
   }
 
-  /**
-   * The quiz client: signed in, the person's mode (the gateway, their own key, or off); not signed
-   * in, their own key when they saved one, else none (the questions written in advance). Never
-   * the gateway without signing in.
-   */
-  quiz(): QuizClient | null {
-    if (this.user || !this.deps.anon) return this.deps.quiz(this.mode());
-    const storage = this.deps.storage;
-    return getMode(storage) === 'byok' && getByokKey(storage) ? this.deps.quiz('byok') : null;
+  /** True when visitors who are not signed in may use the HintWise key (one shared allowance; VITE_UDEBT_ANON_MODEL). */
+  get anonModel(): boolean {
+    return !!this.deps.anonModel;
   }
 
-  /** The mode quizzes run in now ('off': no model, the questions written in advance). */
+  /**
+   * The quiz client for the mode in use (mode()), or null with no model: signed in, the person's
+   * mode; not signed in, their own key when they saved one, the HintWise key on the shared
+   * allowance when that is on, else none (the questions written in advance).
+   */
+  quiz(): QuizClient | null {
+    const m = this.mode();
+    if (this.user || !this.deps.anon) return this.deps.quiz(m);
+    return m === 'off' ? null : this.deps.quiz(m);
+  }
+
+  /**
+   * The mode quizzes run in now ('off': no model, the questions written in advance). Signed in
+   * and not chosen: the HintWise key. Not signed in: their own key if they chose it and saved
+   * one; the HintWise key (the shared allowance) if they did not choose otherwise and it is on.
+   */
   mode(): LlmMode {
-    if (this.user) return getMode(this.deps.storage, 'gateway');
-    if (!this.deps.anon) return getMode(this.deps.storage);
-    return this.quiz() ? 'byok' : 'off';
+    const storage = this.deps.storage;
+    if (this.user) return getMode(storage, 'gateway');
+    if (!this.deps.anon) return getMode(storage);
+    const m = getMode(storage, this.anonModel ? 'gateway' : 'off');
+    if (m === 'byok') return getByokKey(storage) ? 'byok' : 'off';
+    return m === 'gateway' && this.anonModel ? 'gateway' : 'off';
   }
 
   /**
@@ -188,7 +202,7 @@ export class App {
    * in, not on the HintWise key) or could not be read: the cap still shows on the call itself then.
    */
   allowance(): Promise<AllowanceAnswer | null> {
-    if (!this.user || this.mode() !== 'gateway' || !this.deps.allowance) return Promise.resolve(null);
+    if ((!this.user && !this.anonModel) || this.mode() !== 'gateway' || !this.deps.allowance) return Promise.resolve(null);
     return this.deps.allowance().catch(() => null);
   }
 

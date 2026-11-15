@@ -33,8 +33,8 @@ export interface Served extends Question {
 }
 
 /** What to say for an error from writing or grading. */
-export function errorText(e: unknown): string {
-  if (e instanceof CapError || (e instanceof Error && e.name === 'CapReached' && 'scope' in e)) return capMessage(e as CapError);
+export function errorText(e: unknown, anonymous = false): string {
+  if (e instanceof CapError || (e instanceof Error && e.name === 'CapReached' && 'scope' in e)) return capMessage(e as CapError, new Date(), anonymous);
   if (e instanceof ApiError && e.detail) return `${e.message} (${e.detail})`;
   return e instanceof Error ? e.message : String(e);
 }
@@ -228,7 +228,7 @@ export function askFlow(app: App, view: RepoView, box: HTMLElement, questions: S
       onDone?.();
     } catch (e) {
       done();
-      box.append(h('p', { class: 'error' }, errorText(e)));
+      box.append(h('p', { class: 'error' }, errorText(e, app.anonymous)));
     }
   }
 
@@ -348,7 +348,7 @@ export function selfCheckFlow(app: App, view: RepoView, box: HTMLElement, questi
       onDone?.();
     } catch (e) {
       done();
-      box.append(h('p', { class: 'error' }, errorText(e)));
+      box.append(h('p', { class: 'error' }, errorText(e, app.anonymous)));
     }
   }
 
@@ -444,7 +444,8 @@ function startSelects(units: SpecUnit[], unit: string | null, offered: (u: SpecU
 
 /** What a sitting of the model's quiz costs in the person's mode. */
 function modelCost(app: App): string {
-  return app.mode() === 'byok' ? 'with your own Anthropic key, straight from this browser' : 'through the HintWise key: each sitting counts against your daily allowance';
+  if (app.mode() === 'byok') return 'with your own Anthropic key, straight from this browser';
+  return app.anonymous ? 'through the HintWise key: each sitting counts against one daily allowance shared by everyone who is not signed in' : 'through the HintWise key: each sitting counts against your daily allowance';
 }
 
 /** The quiz-kind choice for a person who has both kinds; `pick` runs on a change. */
@@ -528,7 +529,7 @@ function modelTab(app: App, v: RepoView, unit: string | null, both: Both | null,
   const sel = startSelects(a.specs.units, unit);
   const note =
     mode === 'gateway'
-      ? 'Questions are written in one call and your answers graded in one more, through the HintWise key (they count against your daily allowance). A question you missed comes back in other words without a call.'
+      ? `Questions are written in one call and your answers graded in one more, through the HintWise key (they count against ${app.anonymous ? 'one daily allowance shared by everyone who is not signed in' : 'your daily allowance'}). A question you missed comes back in other words without a call.`
       : mode === 'byok'
         ? 'Questions are written and graded with your own Anthropic key, straight from this browser: two calls per sitting.'
         : null;
@@ -548,7 +549,7 @@ function modelTab(app: App, v: RepoView, unit: string | null, both: Both | null,
       .catch((e: unknown) => {
         done();
         both?.lock(false);
-        clear(flow).append(h('p', { class: 'error' }, errorText(e)));
+        clear(flow).append(h('p', { class: 'error' }, errorText(e, app.anonymous)));
       });
   }, 'primary');
   go.disabled = mode === 'off' || blocked;
@@ -586,7 +587,7 @@ export async function quizTab(app: App, v: RepoView): Promise<HTMLElement> {
   // the model's quiz out of reach until it resets or the person signs in again.
   const signedOut = allowance === 'signed-out';
   const usedUp = signedOut || (allowance !== null && !allowance.allowed);
-  const notice = signedOut ? sessionBanner(app, file !== null) : allowance !== null && usedUp ? capBanner(allowance as Allowance, file !== null) : null;
+  const notice = signedOut ? sessionBanner(app, file !== null) : allowance !== null && usedUp ? capBanner(allowance as Allowance, file !== null, app.anonymous) : null;
   const withNotice = (el: HTMLElement): HTMLElement => (notice ? h('div', null, notice, el) : el);
   if (!file) return withNotice(modelTab(app, v, unit, null, usedUp));
   if (app.mode() === 'off') return advanceTab(app, v, file, unit, null);
@@ -605,7 +606,7 @@ export async function quizTab(app: App, v: RepoView): Promise<HTMLElement> {
       draw(k, slot.querySelector<HTMLSelectElement>('#quiz-unit')?.value || null);
       choice.querySelector<HTMLInputElement>('input:checked')?.focus();
     },
-    signedOut ? 'Not available until you sign in again (see above).' : usedUp ? 'Not available until your HintWise allowance resets (see above).' : null,
+    signedOut ? 'Not available until you sign in again (see above).' : usedUp ? `Not available until ${app.anonymous ? 'the shared' : 'your'} HintWise allowance resets (see above).` : null,
   );
   const both: Both = {
     choice,
@@ -629,6 +630,6 @@ function sessionBanner(app: App, hasAdvance: boolean): HTMLElement {
 }
 
 /** The notice on top of the Quiz tab while the person's HintWise allowance is used up. */
-function capBanner(a: Allowance, hasAdvance: boolean): HTMLElement {
-  return h('p', { class: 'warn cap-notice', role: 'status', 'data-testid': 'cap-notice' }, capNotice(a, hasAdvance));
+function capBanner(a: Allowance, hasAdvance: boolean, anonymous: boolean): HTMLElement {
+  return h('p', { class: 'warn cap-notice', role: 'status', 'data-testid': 'cap-notice' }, capNotice(a, hasAdvance, new Date(), anonymous));
 }

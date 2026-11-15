@@ -38,10 +38,10 @@ export function anonDeps(source: SampleSource, local?: Storage): Pick<AppDeps, '
   return { anon: new LocalStore(source, local ?? null), advance: (repoUrl, sha) => advance.for(repoUrl, sha) };
 }
 
-export function previewDeps(fixture: Fixture, opts: { doFetch?: typeof fetch; session?: Storage; local?: Storage; quizzes?: unknown[] } = {}): AppDeps {
+export function previewDeps(fixture: Fixture, opts: { doFetch?: typeof fetch; session?: Storage; local?: Storage; quizzes?: unknown[]; anonModel?: boolean } = {}): AppDeps {
   const fake = new FakeAuth(opts.session ?? null);
   const client = fake as unknown as AuthClient;
-  const clientDeps: ClientDeps = { getToken: () => fake.token(), fetch: opts.doFetch };
+  const clientDeps: ClientDeps = { getToken: () => fake.token(), fetch: opts.doFetch, anonModel: opts.anonModel ?? false };
   const signIn: SignInOptions = {
     client,
     profileClient: false,
@@ -64,6 +64,7 @@ export function previewDeps(fixture: Fixture, opts: { doFetch?: typeof fetch; se
     tree: treeVia(clientDeps),
     worker: null,
     preview: true,
+    anonModel: opts.anonModel ?? false,
     storage: opts.local,
     ...anonDeps(new FixtureSamples(fixture, opts.quizzes ?? []), opts.local),
   };
@@ -76,7 +77,8 @@ export function liveDeps(): AppDeps {
     const { data, error } = await client.auth.refreshSession();
     return error ? null : (data.session?.access_token ?? null);
   };
-  const clientDeps: ClientDeps = { getToken, refreshToken };
+  const anonModel = import.meta.env.VITE_UDEBT_ANON_MODEL === '1';
+  const clientDeps: ClientDeps = { getToken, refreshToken, anonModel };
   const base = workerUrl();
   const gateway = new GatewayClient(clientDeps);
   return {
@@ -90,6 +92,7 @@ export function liveDeps(): AppDeps {
     tree: treeVia(clientDeps),
     worker: base ? new HttpWorkerClient(base) : null,
     preview: false,
+    anonModel,
     storage: safeStorage('localStorage'),
     ...anonDeps(new StaticSamples('samples/'), safeStorage('localStorage')),
   };

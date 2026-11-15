@@ -250,6 +250,19 @@ the walkthroughs add one per unit.
       questions written in advance, and disables the model's quiz until it resets. A cap reached
       during a sitting shows the same message.
     - Visitors who are not signed in are unchanged: the gateway serves signed-in users only.
+12. **The model for visitors who are not signed in (owner, 2026-11-15):** "Enable use of the model
+    for users who are not signed in as well. All unsigned users are considered "one user" in terms
+    of quota". The owner chose option A ("1a"): an anonymous mode in llm-gateway, per app. It is
+    the Plabs session's to build, and deploying it needs the owner's yes there.
+    - The gateway counts every visitor of udebt who is not signed in as one stand-in user: one
+      `cap_user_day_usd` ($1.00 today), inside the app's caps.
+    - udebt's side is built and switched off until then (`VITE_UDEBT_ANON_MODEL=1` turns it on).
+      - Visitors on the HintWise key by default, with the model's quiz first, on the samples at
+        their pins only.
+      - Calls are made from the Netlify functions, marked anonymous and carrying no token.
+      - Progress stays in the browser.
+      - The cap notice names the shared allowance and suggests signing in for one's own.
+    - Option B was rejected: a shared udebt account would need a password secret on Netlify.
 
 ## Use without signing in, as built (2026-11-15)
 

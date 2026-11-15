@@ -16,6 +16,13 @@ export interface FnEnv {
   fakeRepos: Record<string, string>;
   /** With the fakes: the person's daily allowance is used up (UDEBT_FAKE_CAP=1), for the walkthrough of the cap notice. */
   fakeCap?: boolean;
+  /**
+   * The HintWise key for visitors who are not signed in (owner, 2026-11-15: "All unsigned users
+   * are considered "one user" in terms of quota"), on the samples at their pins only:
+   * VITE_UDEBT_ANON_MODEL=1, set once on Netlify for builds (the page) and functions (here).
+   * Off until the gateway's anonymous mode exists.
+   */
+  anonModel?: boolean;
 }
 
 export { PREVIEW_TOKEN as FAKE_TOKEN } from '../../../src/core/preview';
@@ -41,5 +48,6 @@ export function readEnv(env: Record<string, string | undefined> = process.env): 
     fakes: env.UDEBT_FAKES === '1' && !onNetlify,
     fakeRepos: parseRepos(env.UDEBT_FAKE_REPOS),
     fakeCap: env.UDEBT_FAKES === '1' && !onNetlify && env.UDEBT_FAKE_CAP === '1',
+    anonModel: env.VITE_UDEBT_ANON_MODEL === '1',
   };
 }

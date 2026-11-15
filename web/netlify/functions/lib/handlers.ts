@@ -14,7 +14,7 @@ import { authorize } from './auth';
 import { readEnv, type FnEnv } from './env';
 import { callGateway, checkAllowance } from './gateway';
 import { GitHubRefused, dirFiles, excerpt } from './github';
-import { HttpError, bearer, bearerOrNull, errorResponse, json, readJson } from './http';
+import { HttpError, bearerOrNull, errorResponse, json, readJson } from './http';
 import { insertRecords, priorRecords } from './records';
 import { openToAnyone } from './samples';
 
@@ -40,7 +40,20 @@ async function mayRead(req: Request, repoUrl: string, sha: string, env: FnEnv, d
   if (!open(repoUrl, sha)) throw new HttpError(401, 'Sign in first.', { error: 'Sign in first: without signing in, only the samples at their pinned commits can be read.' });
 }
 
-function deps(token: string, env: FnEnv, doFetch: typeof fetch): Deps {
+/**
+ * A model call for a visitor who is not signed in: only with the switch on (env.anonModel), and
+ * only for a registered sample at its pinned commit, so the shared allowance serves the samples
+ * and nothing else. With the switch off the answer is the 401 it always was.
+ */
+function anonymousModel(env: FnEnv): void {
+  if (!env.anonModel) throw new HttpError(401, 'Sign in first.', { error: 'Sign in first.' });
+}
+
+function anonymousRepo(repoUrl: string, sha: string, open: (u: string, s: string) => boolean): void {
+  if (!open(repoUrl, sha)) throw new HttpError(401, 'Sign in first.', { error: 'Sign in first: without signing in, only the samples at their pinned commits can be quizzed.' });
+}
+
+function deps(token: string | null, env: FnEnv, doFetch: typeof fetch): Deps {
   return {
     excerpt: (g, sha, ref) => excerpt(g, sha, ref, env, doFetch),
     ask: (body) => callGateway(body, token, env, doFetch),
@@ -52,9 +65,11 @@ export async function handleQuestions(req: Request, opts: HandlerDeps = {}): Pro
   const env = opts.env ?? readEnv();
   const doFetch = opts.fetch ?? fetch;
   try {
-    const token = bearer(req);
+    const token = bearerOrNull(req);
+    if (!token) anonymousModel(env);
     const body = readQuestionsRequest(await readJson(req));
-    await authorize(token, body.repo, env, doFetch);
+    if (token) await authorize(token, body.repo, env, doFetch);
+    else anonymousRepo(body.repo, body.sha, opts.open ?? openToAnyone);
     const questions = await writeQuestions(body, deps(token, env, doFetch));
     return json(200, { questions });
   } catch (e) {
@@ -77,9 +92,15 @@ export async function handleGrade(req: Request, opts: HandlerDeps = {}): Promise
   const env = opts.env ?? readEnv();
   const doFetch = opts.fetch ?? fetch;
   try {
-    const token = bearer(req);
+    const token = bearerOrNull(req);
+    if (!token) anonymousModel(env);
     const raw = await readJson(req);
     const body = readGradeRequest(raw);
+    if (!token) {
+      // Not signed in: graded through the shared allowance, recorded by the page in this browser.
+      anonymousRepo(body.repo, body.sha, opts.open ?? openToAnyone);
+      return json(200, { grades: await gradeAnswers(body, deps(null, env, doFetch)), recorded: null });
+    }
     const repoId = await authorize(token, body.repo, env, doFetch);
     const grades = await gradeAnswers(body, deps(token, env, doFetch));
     const record = (raw as { record?: { repo_id?: unknown; ts?: unknown; source?: unknown } }).record;
@@ -177,7 +198,9 @@ export async function handleAllowance(req: Request, opts: HandlerDeps = {}): Pro
   const doFetch = opts.fetch ?? fetch;
   try {
     if (req.method !== 'POST') throw new HttpError(405, 'POST only.', { error: 'Use POST.' });
-    return json(200, await checkAllowance(bearer(req), env, doFetch));
+    const token = bearerOrNull(req);
+    if (!token) anonymousModel(env);
+    return json(200, await checkAllowance(token, env, doFetch));
   } catch (e) {
     return errorResponse(e);
   }

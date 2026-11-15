@@ -73,6 +73,11 @@ export interface ClientDeps {
   askDeps?: AskDeps;
   /** A new token from the session's refresh token, or null: used once after a 401, then the call is sent again. */
   refreshToken?: () => Promise<string | null>;
+  /**
+   * Visitors who are not signed in may use the HintWise key (VITE_UDEBT_ANON_MODEL=1): only then
+   * do the model calls (questions, grade, allowance) leave the page without a token.
+   */
+  anonModel?: boolean;
 }
 
 /**
@@ -124,10 +129,13 @@ export type AllowanceAnswer = Allowance | 'signed-out';
 export function allowanceVia(deps: ClientDeps): () => Promise<AllowanceAnswer | null> {
   return async () => {
     let a: Partial<Allowance>;
+    const signedIn = (await deps.getToken()) !== null;
     try {
-      a = await call<Partial<Allowance>>(deps, '/api/allowance', { method: 'POST', body: '{}' });
+      // Without a token too: a visitor who is not signed in asks about the shared allowance.
+      a = await call<Partial<Allowance>>(deps, '/api/allowance', { method: 'POST', body: '{}' }, deps.anonModel === true);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) return 'signed-out';
+      // Refused with a token: the session ended. Without one: the shared allowance is not on.
+      if (e instanceof ApiError && e.status === 401) return signedIn ? 'signed-out' : null;
       throw e;
     }
     return typeof a.allowed === 'boolean' ? { allowed: a.allowed, scope: a.scope ?? null, resets_at: a.resets_at ?? null, app_open: a.app_open, calls_left: a.calls_left ?? null } : null;
@@ -148,12 +156,14 @@ export class GatewayClient implements QuizClient {
   readonly mode = 'gateway' as const;
   constructor(private readonly deps: ClientDeps) {}
 
+  // Without a token only when the shared allowance is on (deps.anonModel): the functions then answer
+  // for a sample at its pin and refuse anything else.
   async writeQuestions(req: QuestionsRequest): Promise<Question[]> {
-    return (await call<{ questions: Question[] }>(this.deps, '/api/questions', { method: 'POST', body: JSON.stringify(req) })).questions;
+    return (await call<{ questions: Question[] }>(this.deps, '/api/questions', { method: 'POST', body: JSON.stringify(req) }, this.deps.anonModel === true)).questions;
   }
 
   async grade(req: Parameters<QuizClient['grade']>[0], record?: RecordHint): Promise<GradeOutcome> {
-    const out = await call<{ grades: Grade[]; recorded?: EvidenceRow[] | null }>(this.deps, '/api/grade', { method: 'POST', body: JSON.stringify({ ...req, ...(record ? { record } : {}) }) });
+    const out = await call<{ grades: Grade[]; recorded?: EvidenceRow[] | null }>(this.deps, '/api/grade', { method: 'POST', body: JSON.stringify({ ...req, ...(record ? { record } : {}) }) }, this.deps.anonModel === true);
     return { grades: out.grades ?? [], recorded: out.recorded ?? null };
   }
 
@@ -197,9 +207,12 @@ export function quizClient(deps: ClientDeps, mode: LlmMode = getMode()): QuizCli
 }
 
 /** Which allowance a cap scope is, and when it resets in local time (" until 1:00 AM", or ""). */
-function capParts(e: { scope: string; resetsAt: string }, now: Date): { what: string; when: string } {
+function capParts(e: { scope: string; resetsAt: string }, now: Date, anonymous = false): { what: string; when: string } {
   const s = e.scope;
-  const what = s.startsWith('app-user-week')
+  const person = !s.startsWith('app-') || s.startsWith('app-user');
+  const what = anonymous && person
+    ? 'The allowance shared by everyone who is not signed in is used up'
+    : s.startsWith('app-user-week')
     ? 'Your weekly allowance in this app is used up'
     : s.startsWith('app-user-day')
       ? 'Your daily allowance in this app is used up'
@@ -214,19 +227,22 @@ function capParts(e: { scope: string; resetsAt: string }, now: Date): { what: st
 }
 
 /** A cap answer in plain words (docs/new-app-guide.md section 7), with when it resets in local time. */
-export function capMessage(e: { scope: string; resetsAt: string }, now: Date = new Date()): string {
-  const { what, when } = capParts(e, now);
-  return `${what}${when}. You can use your own Anthropic key in Settings; no allowance applies to it.`;
+export function capMessage(e: { scope: string; resetsAt: string }, now: Date = new Date(), anonymous = false): string {
+  const { what, when } = capParts(e, now, anonymous);
+  return `${what}${when}. ${anonymous ? 'Sign in for an allowance of your own, or use' : 'You can use'} your own Anthropic key in Settings; no allowance applies to it.`;
 }
 
 /**
  * The quiz page's notice once the HintWise allowance is used up: which one, until when, and what
  * still works (the questions written in advance, when the repository has them; the person's own key).
  */
-export function capNotice(a: { scope: string | null; resets_at: string | null }, hasAdvance: boolean, now: Date = new Date()): string {
-  const { what, when } = capParts({ scope: a.scope ?? '', resetsAt: a.resets_at ?? '' }, now);
+export function capNotice(a: { scope: string | null; resets_at: string | null }, hasAdvance: boolean, now: Date = new Date(), anonymous = false): string {
+  const { what, when } = capParts({ scope: a.scope ?? '', resetsAt: a.resets_at ?? '' }, now, anonymous);
+  const own = anonymous ? 'sign in for an allowance of your own, or use your own Anthropic key in Settings' : 'you can use your own Anthropic key in Settings';
   const meanwhile = hasAdvance
-    ? 'Until then the quiz uses the questions written in advance (no model call), or you can use your own Anthropic key in Settings.'
-    : 'Until then you can use your own Anthropic key in Settings; no allowance applies to it.';
+    ? `Until then the quiz uses the questions written in advance (no model call), or ${own}.`
+    : anonymous
+      ? 'Until then sign in for an allowance of your own, or use your own Anthropic key in Settings; no allowance applies to it.'
+      : 'Until then you can use your own Anthropic key in Settings; no allowance applies to it.';
   return `${what}${when}. ${meanwhile}`;
 }

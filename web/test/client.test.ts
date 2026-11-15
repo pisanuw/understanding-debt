@@ -126,6 +126,21 @@ describe("the person's own key", () => {
     expect(((await g3.grade({ repo: 'https://github.com/a/b', sha: 'a'.repeat(40), items: [] }).catch((x: unknown) => x)) as ApiError).status).toBe(401);
   });
 
+  it('sends the model calls without a token only when the shared allowance is on', async () => {
+    const heads: (string | null)[] = [];
+    const fetchOk = (async (_u: RequestInfo | URL, init?: RequestInit) => {
+      heads.push((init?.headers as Record<string, string>).authorization ?? null);
+      return Response.json({ questions: [], grades: [], recorded: null });
+    }) as typeof fetch;
+    const off = new GatewayClient({ getToken: async () => null, fetch: fetchOk });
+    await expect(off.writeQuestions({ repo: 'https://github.com/a/b', sha: 'a'.repeat(40), units: [] })).rejects.toThrow('Sign in first.');
+    expect(heads).toEqual([]);
+    const on = new GatewayClient({ getToken: async () => null, fetch: fetchOk, anonModel: true });
+    await on.writeQuestions({ repo: 'https://github.com/a/b', sha: 'a'.repeat(40), units: [] });
+    await on.grade({ repo: 'https://github.com/a/b', sha: 'a'.repeat(40), items: [] });
+    expect(heads).toEqual([null, null]);
+  });
+
   it('reads the allowance through /api/allowance, and nothing that is not one', async () => {
     const seen: string[] = [];
     const fetchWith = (body: unknown, status = 200) =>
@@ -138,7 +153,14 @@ describe("the person's own key", () => {
     expect(seen).toEqual(['POST /api/allowance']);
     expect(await allowanceVia(deps({ nope: 1 }))()).toBeNull();
     await expect(allowanceVia(deps({ error: 'x' }, 502))()).rejects.toThrow('x');
-    expect(await allowanceVia({ getToken: async () => null, fetch: fetchWith({}) })()).toBe('signed-out');
+    // Not signed in and the shared allowance off: nothing to say (no call leaves the page).
+    seen.length = 0;
+    expect(await allowanceVia({ getToken: async () => null, fetch: fetchWith({}) })()).toBeNull();
+    expect(seen).toEqual([]);
+    // Not signed in with it on: asked without a token; a refusal means it is off on the server.
+    expect(await allowanceVia({ getToken: async () => null, fetch: fetchWith({ allowed: true, scope: null, resets_at: null }), anonModel: true })()).toEqual({ allowed: true, scope: null, resets_at: null, app_open: undefined, calls_left: null });
+    expect(seen).toEqual(['POST /api/allowance']);
+    expect(await allowanceVia({ getToken: async () => null, fetch: fetchWith({ error: 'Sign in first.' }, 401), anonModel: true })()).toBeNull();
     // Refused even after one refresh: the session ended elsewhere.
     let refreshed = 0;
     expect(await allowanceVia({ getToken: async () => 'old', fetch: fetchWith({ error: 'x', detail: 'gateway 401: no session' }, 401), refreshToken: async () => (refreshed++, 'new') })()).toBe('signed-out');

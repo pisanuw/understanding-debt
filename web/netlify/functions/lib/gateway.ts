@@ -12,6 +12,19 @@ import { HttpError, upstreamDetail } from './http';
 
 export const APP = 'udebt';
 
+/**
+ * How a call for a visitor who is not signed in is marked to the gateway's anonymous mode, which
+ * counts every such visitor of the app as one stand-in user (owner's choice A, 2026-11-15). The
+ * exact mark is the Plabs session's to define; until the gateway has the mode, VITE_UDEBT_ANON_MODEL
+ * stays off and no anonymous call is made.
+ */
+export const ANON_HEADER = 'x-hintwise-anonymous';
+
+/** The gateway's headers: the person's token, or the anonymous mark when there is none. */
+function gatewayHeaders(token: string | null): Record<string, string> {
+  return { ...(token ? { authorization: `Bearer ${token}` } : { [ANON_HEADER]: '1' }), 'content-type': 'application/json' };
+}
+
 /** The gateway body: `app` and the five fields it passes, nothing else. */
 export function gatewayBody(req: ModelRequest): Record<string, unknown> {
   const body: Record<string, unknown> = { app: APP, max_tokens: Math.min(MAX_TOKENS, Math.max(1, Math.floor(req.max_tokens || MAX_TOKENS))), messages: req.messages };
@@ -21,7 +34,7 @@ export function gatewayBody(req: ModelRequest): Record<string, unknown> {
   return body;
 }
 
-export async function callGateway(req: ModelRequest, token: string, env: FnEnv, doFetch: typeof fetch = fetch): Promise<ModelMessage> {
+export async function callGateway(req: ModelRequest, token: string | null, env: FnEnv, doFetch: typeof fetch = fetch): Promise<ModelMessage> {
   const body = gatewayBody(req);
   const text = JSON.stringify(body);
   if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) throw new HttpError(413, 'Too large for the gateway.', { error: 'The request is larger than the gateway accepts.' });
@@ -32,7 +45,7 @@ export async function callGateway(req: ModelRequest, token: string, env: FnEnv, 
   try {
     res = await doFetch(`${env.supabaseUrl}/functions/v1/llm-gateway`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      headers: gatewayHeaders(token),
       body: text,
     });
   } catch {
@@ -59,7 +72,7 @@ function fakeCapAnswer(now: Date = new Date()): Record<string, unknown> {
  * call and answers the person's allowance (allowed, scope, resets_at, app_open, limits,
  * calls_left), so the page can say a cap is reached before anyone starts a sitting.
  */
-export async function checkAllowance(token: string, env: FnEnv, doFetch: typeof fetch = fetch): Promise<Record<string, unknown>> {
+export async function checkAllowance(token: string | null, env: FnEnv, doFetch: typeof fetch = fetch): Promise<Record<string, unknown>> {
   if (env.fakes) {
     if (!env.fakeCap) return { allowed: true, uses_credit: false, scope: null, resets_at: null, app_open: true, limits: [], calls_left: null };
     const cap = fakeCapAnswer();
@@ -70,7 +83,7 @@ export async function checkAllowance(token: string, env: FnEnv, doFetch: typeof 
   try {
     res = await doFetch(`${env.supabaseUrl}/functions/v1/llm-gateway`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      headers: gatewayHeaders(token),
       body: JSON.stringify({ app: APP, check: true }),
     });
   } catch {

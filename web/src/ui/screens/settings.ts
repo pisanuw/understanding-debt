@@ -11,11 +11,18 @@ import { button, h, toast } from '../dom';
 
 export function settingsScreen(app: App): HTMLElement {
   const storage = app.deps.storage;
-  // Signed in and not chosen yet: the HintWise key (App.mode); not signed in: the stored choice.
-  const current = app.anonymous ? getMode(storage) : app.mode();
+  // Not chosen yet: the HintWise key when it serves this visitor (signed in, or the shared
+  // allowance for visitors who are not); else the stored choice.
   const anonymous = app.anonymous;
+  const shared = anonymous && app.anonModel;
+  const current = anonymous ? getMode(storage, shared ? 'gateway' : 'off') : app.mode();
+  const gatewayText = !anonymous
+    ? 'The default: questions are written and graded through HintWise, within a daily allowance per person. Nothing to set up.'
+    : shared
+      ? 'The default: questions are written and graded through HintWise, from one daily allowance shared by everyone who is not signed in. Sign in for an allowance of your own.'
+      : 'Sign in to use it: questions are written and graded through HintWise, within a daily allowance per person.';
   const modes: [LlmMode, string, string][] = [
-    ['gateway', 'The HintWise key', anonymous ? 'Sign in to use it: questions are written and graded through HintWise, within a daily allowance per person.' : 'The default: questions are written and graded through HintWise, within a daily allowance per person. Nothing to set up.'],
+    ['gateway', 'The HintWise key', gatewayText],
     ['byok', 'My own Anthropic key', 'Your key stays in this browser and goes only to api.anthropic.com, except when you ask udebt to analyse a new repository: then it is sent once to udebt’s analysis service, used for that job only and never stored. No allowance applies. No account needed.'],
     ['off', 'Off', 'No model call: read the specs and walkthroughs, and answer the questions written in advance for the samples, checking yourself against the reference answer.'],
   ];
@@ -35,7 +42,7 @@ export function settingsScreen(app: App): HTMLElement {
   );
   const fs = h('fieldset', { class: 'modes' }, h('legend', null, 'How udebt calls the model'));
   for (const [m, title, text] of modes) {
-    const inp = h('input', { type: 'radio', name: 'llm-mode', value: m, checked: m === current, disabled: anonymous && m === 'gateway' });
+    const inp = h('input', { type: 'radio', name: 'llm-mode', value: m, checked: m === current, disabled: anonymous && !shared && m === 'gateway' });
     inp.addEventListener('change', () => {
       setMode(m, storage);
       keyBox.hidden = m !== 'byok';
@@ -43,7 +50,7 @@ export function settingsScreen(app: App): HTMLElement {
     });
     fs.append(h('label', { class: 'mode' }, inp, h('span', null, h('strong', null, title), h('span', { class: 'small muted' }, text))));
   }
-  if (anonymous && current === 'gateway') fs.append(h('p', { class: 'small warn' }, 'Not signed in: until you sign in or choose your own key, quizzes use the questions written in advance.'));
+  if (anonymous && !shared && current === 'gateway') fs.append(h('p', { class: 'small warn' }, 'Not signed in: until you sign in or choose your own key, quizzes use the questions written in advance.'));
   const account = h('div', { id: 'account' });
   app.onLeave(mountSignIn(account, app.deps.signIn));
   const stored = anonymous

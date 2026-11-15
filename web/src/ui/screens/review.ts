@@ -122,7 +122,7 @@ export function reviewTab(app: App, v: RepoView): HTMLElement {
       );
     } else {
       if (by.self.length) notes.push(h('p', { class: 'muted small', 'data-testid': 'review-self-note' }, mixed ? `${by.self.length} item(s) marked ` : 'Marked ', selfBadge(), ': you checked these yourself when you missed them (questions written in advance), so you check them again against the reference answer, with no model call.'));
-      const cost = mode === 'gateway' ? 'One grading call per sitting through the HintWise key (it counts against your daily allowance); no call writes questions, and "I don\'t know" costs none.' : 'One grading call per sitting with your own Anthropic key, straight from this browser; no call writes questions.';
+      const cost = mode === 'gateway' ? `One grading call per sitting through the HintWise key (it counts against ${app.anonymous ? 'one daily allowance shared by everyone who is not signed in' : 'your daily allowance'}); no call writes questions, and "I don't know" costs none.` : 'One grading call per sitting with your own Anthropic key, straight from this browser; no call writes questions.';
       if (by.model.length) notes.push(h('p', { class: 'muted small' }, mixed ? `The other ${by.model.length} were graded by the model when you missed them, and are again: ${cost.charAt(0).toLowerCase()}${cost.slice(1)}` : cost));
     }
     start.append(itemList(v, due, now, 'review-due', mode === 'off' ? [] : by.self), h('div', { class: 'row gap-top' }, h('label', { for: 'review-n' }, 'Items'), nSel, ...buttons), ...notes);

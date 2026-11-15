@@ -42,10 +42,10 @@ const apiFetch: typeof fetch = (async (input: RequestInfo | URL, init?: RequestI
   const req = new Request(new URL(String(input), 'http://site'), init);
   const path = new URL(req.url).pathname;
   seen.push(path);
-  if (path === '/api/questions') return handleQuestions(req, { env: { ...env, fakeCap: capped } });
-  if (path === '/api/grade') return handleGrade(req, { env: { ...env, fakeCap: capped } });
+  if (path === '/api/questions') return handleQuestions(req, { env: { ...env, fakeCap: capped, anonModel: true }, open });
+  if (path === '/api/grade') return handleGrade(req, { env: { ...env, fakeCap: capped, anonModel: true }, open });
   if (path === '/api/allowance' && dead) return Response.json({ error: 'Your sign-in has expired. Sign in again.', detail: 'gateway 401: The session token is invalid or expired; sign in again.' }, { status: 401 });
-  if (path === '/api/allowance') return handleAllowance(req, { env: { ...env, fakeCap: capped } });
+  if (path === '/api/allowance') return handleAllowance(req, { env: { ...env, fakeCap: capped, anonModel: true } });
   if (path === '/api/excerpt') return handleExcerpt(req, { env, open });
   if (path === '/api/tree') return handleTree(req, { env, open });
   return new Response('{}', { status: 404 });
@@ -78,7 +78,7 @@ const at = (iso: string) => vi.setSystemTime(new Date(iso));
 let app: App;
 let local: Storage;
 
-async function start(opts: { signedIn?: boolean; mode?: LlmMode; quizzes?: unknown[]; local?: Storage } = {}): Promise<App> {
+async function start(opts: { signedIn?: boolean; mode?: LlmMode; quizzes?: unknown[]; local?: Storage; anonModel?: boolean } = {}): Promise<App> {
   const session = memoryStorage();
   if (opts.signedIn ?? true) session.setItem('udebt.previewSignedIn', '1');
   local = opts.local ?? memoryStorage();
@@ -86,7 +86,7 @@ async function start(opts: { signedIn?: boolean; mode?: LlmMode; quizzes?: unkno
   const root = document.createElement('div');
   root.id = 'app';
   document.body.replaceChildren(root);
-  app = new App(root, previewDeps(fixture as unknown as Fixture, { doFetch: apiFetch, session, local, quizzes: opts.quizzes ?? [quizzes] }));
+  app = new App(root, previewDeps(fixture as unknown as Fixture, { doFetch: apiFetch, session, local, quizzes: opts.quizzes ?? [quizzes], anonModel: opts.anonModel }));
   window.location.hash = '#/';
   app.start();
   await tick();
@@ -253,6 +253,34 @@ describe('the quiz-kind choice', () => {
     for (const l of [...auth.listeners]) l('TOKEN_REFRESHED', data.session);
     await tick(20);
     expect(byText('p', /^\[1\//)?.textContent).toBe(asked);
+  });
+
+  it('gives a visitor who is not signed in the HintWise key from the shared allowance when it is on, kept in this browser', async () => {
+    await start({ signedIn: false, anonModel: true });
+    await go('#/r/1/quiz');
+    expect(checkedKind()).toBe('model');
+    expect(byText('label', /each sitting counts against one daily allowance shared by everyone who is not signed in/)).toBeTruthy();
+    await modelSitting('cost-control', 'It keeps the cost of each visitor within the daily budget.');
+    expect(byText('p', /^1 correct \(one grading call\)\./)).toBeTruthy();
+    const kept = JSON.parse(local.getItem(`${LOCAL_PREFIX}digitalme`) ?? '{}') as { records: EvidenceRow[] };
+    expect(kept.records.map((r) => [r.source, r.unit_id, r.verdict])).toEqual([['quiz', 'cost-control', 'correct']]);
+    // Settings: the HintWise key on offer, and said to be shared.
+    await go('#/settings');
+    const radio = $<HTMLInputElement>('input[name=llm-mode][value=gateway]');
+    expect([radio?.disabled, radio?.checked]).toEqual([false, true]);
+    expect(byText('label', /from one daily allowance shared by everyone who is not signed in/)).toBeTruthy();
+    // The shared allowance used up: said as the shared one.
+    capped = true;
+    await go('#/r/1/quiz');
+    expect($('[data-testid=cap-notice]')?.textContent).toMatch(/^The allowance shared by everyone who is not signed in is used up until .+\. Until then the quiz uses the questions written in advance \(no model call\), or sign in for an allowance of your own, or use your own Anthropic key in Settings\.$/);
+    expect(checkedKind()).toBe('advance');
+    // With the switch off, as before: no HintWise key without signing in.
+    app.stop();
+    capped = false;
+    await start({ signedIn: false });
+    await go('#/r/1/quiz');
+    expect(kind()).toBeNull();
+    expect(byText('p', /^Questions written in advance/)).toBeTruthy();
   });
 
   it('says so when the allowance runs out during a sitting', async () => {

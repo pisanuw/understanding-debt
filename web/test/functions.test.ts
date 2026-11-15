@@ -14,7 +14,7 @@ import allowanceFn, { config as allowanceConfig } from '../netlify/functions/all
 import { authorize, resetAuthCache } from '../netlify/functions/lib/auth';
 import { FAKE_TOKEN, readEnv, type FnEnv } from '../netlify/functions/lib/env';
 import { fakeGateway, fakeUnits } from '../netlify/functions/lib/fake';
-import { callGateway, gatewayBody } from '../netlify/functions/lib/gateway';
+import { ANON_HEADER, callGateway, gatewayBody } from '../netlify/functions/lib/gateway';
 import { excerpt, fetchFile } from '../netlify/functions/lib/github';
 import { handleAllowance, handleExcerpt, handleGrade, handleQuestions } from '../netlify/functions/lib/handlers';
 import { HttpError, bearer, errorResponse, readJson } from '../netlify/functions/lib/http';
@@ -197,6 +197,41 @@ describe('the functions in live mode', () => {
     expect([gw.status, await gw.json()]).toEqual([401, { error: 'Your sign-in has expired. Sign in again.', detail: 'gateway 401: The session token is invalid or expired; sign in again.' }]);
   });
 
+  it('serves visitors who are not signed in from the shared allowance, only with the switch on and only for a sample at its pin', async () => {
+    const anon = { ...LIVE, anonModel: true };
+    const open = (u: string, s: string) => u === REPO && s === SHA;
+    const body = { repo: REPO, sha: SHA, units: [unit] };
+    // Off (the default): the 401 it always was, and nothing leaves the function.
+    const offCalls: Call[] = [];
+    expect((await handleQuestions(post('/api/questions', body, null), { env: LIVE, fetch: liveFetch({}, offCalls), open })).status).toBe(401);
+    expect(offCalls).toEqual([]);
+    // On: the gateway is asked with the anonymous mark and no token, and PostgREST is not asked at all.
+    const calls: Call[] = [];
+    const q = await handleQuestions(post('/api/questions', body, null), { env: anon, fetch: liveFetch({}, calls), open });
+    expect(q.status).toBe(200);
+    const gw = calls.filter((c) => c.url.includes('llm-gateway'));
+    expect(gw).toHaveLength(1);
+    expect(gw[0].init?.headers).toEqual({ [ANON_HEADER]: '1', 'content-type': 'application/json' });
+    expect(calls.some((c) => c.url.includes('/rest/v1/'))).toBe(false);
+    // Another repository or commit: refused.
+    const other = await handleQuestions(post('/api/questions', { ...body, sha: 'a'.repeat(40) }, null), { env: anon, fetch: liveFetch(), open });
+    expect([other.status, ((await other.json()) as { error: string }).error]).toEqual([401, 'Sign in first: without signing in, only the samples at their pinned commits can be quizzed.']);
+    // Grading: graded, never recorded on the server (the page keeps it in this browser).
+    const gcalls: Call[] = [];
+    const g = await handleGrade(post('/api/grade', { repo: REPO, sha: SHA, items: [{ question: 'Q?', answer: 'a' }], record: { repo_id: 7, ts: '2026-11-15T10:00:00Z' } }, null), { env: anon, fetch: liveFetch({}, gcalls), open });
+    expect(g.status).toBe(200);
+    expect(((await g.json()) as { recorded: unknown }).recorded).toBeNull();
+    expect(gcalls.some((c) => c.url.includes('/rest/v1/'))).toBe(false);
+    // The allowance check, the same way.
+    const acalls: Call[] = [];
+    const a = await handleAllowance(post('/api/allowance', {}, null), { env: anon, fetch: liveFetch({ gateway: () => Response.json({ allowed: true, scope: null, resets_at: null }) }, acalls) });
+    expect(a.status).toBe(200);
+    expect(JSON.parse(String(acalls[0].init?.body))).toEqual({ app: 'udebt', check: true });
+    expect((acalls[0].init?.headers as Record<string, string>).authorization).toBeUndefined();
+    expect((await handleAllowance(post('/api/allowance', {}, null), { env: LIVE, fetch: liveFetch() })).status).toBe(401);
+    expect(readEnv({ VITE_UDEBT_ANON_MODEL: '1' }).anonModel).toBe(true);
+  });
+
   it('refuses a missing or expired token, an unknown repository and a bad request', async () => {
     expect((await handleQuestions(post('/api/questions', {}, null), { env: LIVE, fetch: liveFetch() })).status).toBe(401);
     expect((await handleQuestions(post('/api/questions', { repo: REPO, sha: SHA, units: [unit] }), { env: LIVE, fetch: liveFetch({ repo: () => new Response('{}', { status: 401 }) }) })).status).toBe(401);
@@ -298,7 +333,7 @@ describe('the functions with the fakes', () => {
 
 describe('the small parts', () => {
   it('reads its settings and never fakes on Netlify', () => {
-    expect(readEnv({ SUPABASE_URL: 'https://a/', SUPABASE_ANON_KEY: 'k' })).toEqual({ supabaseUrl: 'https://a', anonKey: 'k', fakes: false, fakeRepos: {}, fakeCap: false });
+    expect(readEnv({ SUPABASE_URL: 'https://a/', SUPABASE_ANON_KEY: 'k' })).toEqual({ supabaseUrl: 'https://a', anonKey: 'k', fakes: false, fakeRepos: {}, fakeCap: false, anonModel: false });
     expect(readEnv({ VITE_SUPABASE_URL: 'https://b', UDEBT_FAKES: '1', UDEBT_FAKE_REPOS: '{"a/b":"/x","c":3}' })).toMatchObject({ supabaseUrl: 'https://b', fakes: true, fakeRepos: { 'a/b': '/x' } });
     expect(readEnv({ UDEBT_FAKES: '1', NETLIFY: 'true' }).fakes).toBe(false);
     expect(readEnv({ UDEBT_FAKES: '1', AWS_LAMBDA_FUNCTION_NAME: 'f' }).fakes).toBe(false);
