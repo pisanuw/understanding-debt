@@ -74,6 +74,17 @@ acceptable.
   seeded then lead-curated; refine the heaviest 40 commits; metadata-only AI heuristics;
   languages Python, JS/TS, C++, Rust, Java; live dashboard with sync and export.
 
+- **Owner answers 2026-11-15 (hosting, HOSTING.md)**: these supersede the org API key above.
+  - The UDebt session builds the hosted app on the HintWise platform at
+    `udebt.hintwise.org`, without renaming the repository.
+  - Google and email sign-in go through HintWise Supabase Auth.
+  - Samples are precomputed on the subscription; quizzes go through the HintWise LLM
+    gateway; a new repository needs the person's own key.
+  - The worker runs on a Render free instance, with gateway limits set after measuring the
+    samples.
+  - Only public repositories are accepted, and analyses of them are shared.
+  - The samples are huggingface_hub, sentry-javascript and mlflow, with no stored code.
+
 - **Commit weight (Phase 1)**: heuristic weight in [0, 1] per commit, LLM-refined for the
   heaviest, cached in `.udebt/commits.json`; split across units by line share. Every former
   commit count (churn, decay, provenance, prior) is now weighted mass.
