@@ -2,10 +2,11 @@
 
 Stdlib only: `ThreadingHTTPServer`, JSON endpoints, and a hand-written page under
 `udebt/static/` (no CDN, no build step). Tabs: Dashboard (the Phase 3 dashboard page, which
-fetches `/api/dashboard` when its data blob is empty), Tour, Path, Unit, Quiz, Review, Tutor
-and Teach-back. Every answer is graded and recorded by the same code the CLI uses
+fetches `/api/dashboard` when its data blob is empty), Tour, Path, Unit, Quiz, Review, Digest,
+Tutor and Teach-back. Every answer is graded and recorded by the same code the CLI uses
 (quiz.grade, quiz.mark_revealed, quiz.record), so a record from the browser is the record
-the CLI would have written.
+the CLI would have written; a quiz or review sitting is graded in one call at its end
+(/api/answers), as the CLI grades a run.
 
 Security, for a server that can read the repository and call the model on your account:
 - it binds 127.0.0.1 and refuses a request whose Host is not 127.0.0.1 or localhost at its
@@ -59,11 +60,13 @@ from .quiz import (
     pool_pick,
     reveal_text,
     revealed_on,
+    reveals,
 )
 from .quiz import record as record_results
 from .store import Store
 
 MAX_BODY = 1_000_000
+UNKNOWN_QUESTION = "Unknown question (answered already, or the server restarted)."
 STATIC = {
     "app.js": "text/javascript; charset=utf-8",
     "app.css": "text/css; charset=utf-8",
@@ -80,10 +83,11 @@ CSP_DASHBOARD = (
 
 
 class HTTPError(Exception):
-    def __init__(self, status: int, message: str):
+    def __init__(self, status: int, message: str, data: dict[str, Any] | None = None):
         super().__init__(message)
         self.status = status
         self.message = message
+        self.data = data or {}
 
 
 def _int(v: Any, default: int, lo: int, hi: int) -> int:
@@ -158,31 +162,57 @@ class App:
 
     def answered(self, q: dict[str, Any], answer: str, confidence: int) -> dict[str, Any]:
         """Grade one answer, reveal at levels 1-2, record it as the CLI would."""
+        return self.answered_all([(q, answer, confidence)])[0]
+
+    def answered_all(self, items: list[tuple[dict[str, Any], str, int]]) -> list[dict[str, Any]]:
+        """Grade a sitting's answers in one call (none when every answer is blank), reveal at
+        levels 1-2, record them as the CLI would: questions of one kind share one timestamp,
+        so on a unit they are one sitting."""
+        answered = []
+        for q, answer, confidence in items:
+            text = answer.strip()
+            a = {**q, "answer": text, "confidence": confidence if text else 1}
+            if not text and reveals(q, "unknown") and reveal_text(q):
+                a["revealed"] = True
+            answered.append(a)
         with self.lock:
-            prior = self.store.load_records(self.email)
-            a = {**q, "answer": answer.strip(), "confidence": confidence if answer.strip() else 1}
-            results = mark_revealed(grade(self.root, self.llm(), [a]))
-            written = record_results(
-                self.store, self.root, self.email, results, source=q.get("source", "quiz"),
-                forced=bool(q.get("forced")), prior=prior, kind=q.get("kind", "quiz"),
-            )  # fmt: skip
-        r, rec = results[0], written[0]
-        on = [x for x in self.store.load_records(self.email) if x.get("unit") == r["unit_id"]]
-        return {
-            "unit_id": r["unit_id"],
-            "level": rec["level"],
-            "verdict": r["verdict"],
-            "feedback": r["feedback"],
-            "revealed": bool(r.get("revealed")),
-            "reference": reveal_text(r).replace("The answer: ", "").strip()
-            if r.get("revealed")
-            else None,
-            "next_level": ladder.next_level(on),
-            "review_due": (rec.get("review") or {}).get("due"),
-            "right": r.get("right"),
-            "missing": r.get("missing"),
-            "misconception": r.get("misconception"),
-        }
+            results = mark_revealed(grade(self.root, self.llm(), answered))
+            written: dict[int, dict[str, Any]] = {}
+            groups: dict[tuple[str, bool, str], list[int]] = {}
+            for i, q in enumerate(answered):
+                key = (q.get("source", "quiz"), bool(q.get("forced")), q.get("kind", "quiz"))
+                groups.setdefault(key, []).append(i)
+            for (source, forced, kind), idx in groups.items():
+                prior = self.store.load_records(self.email)
+                recs = record_results(
+                    self.store, self.root, self.email, [results[i] for i in idx], source=source,
+                    forced=forced, prior=prior, kind=kind,
+                )  # fmt: skip
+                written.update(zip(idx, recs, strict=True))
+            all_recs = self.store.load_records(self.email)
+        out = []
+        for i, r in enumerate(results):
+            rec = written[i]
+            on = [x for x in all_recs if x.get("unit") == r["unit_id"]]
+            out.append(
+                {
+                    "unit_id": r["unit_id"],
+                    "level": rec["level"],
+                    "question": r["question"],
+                    "verdict": r["verdict"],
+                    "feedback": r["feedback"],
+                    "revealed": bool(r.get("revealed")),
+                    "reference": reveal_text(r).replace("The answer: ", "").strip()
+                    if r.get("revealed")
+                    else None,
+                    "next_level": ladder.next_level(on),
+                    "review_due": (rec.get("review") or {}).get("due"),
+                    "right": r.get("right"),
+                    "missing": r.get("missing"),
+                    "misconception": r.get("misconception"),
+                }
+            )
+        return out
 
     # -- GET -------------------------------------------------------------------------
     def get_state(self, q):
@@ -353,10 +383,83 @@ class App:
             "next_due": upcoming[0].state.due if upcoming else None,
         }
 
+    def _digest_items(self, q: dict[str, Any]):
+        from . import digest
+        from .mapping import commits_for, weights_for
+
+        m, recs, resp, _ = self.context()
+        units = m["units"]
+        cfg = self.store.config
+        commits = commits_for(self.root, self.store)
+        weights = weights_for(self.root, self.store, commits)
+        scores = {
+            x.unit_id: x
+            for x in compute_scores(
+                self.root,
+                self.store,
+                units,
+                self.email,
+                records=recs,
+                commits=commits,
+                weights=weights,
+                resp=resp,
+            )  # fmt: skip
+        }
+        mine = resp.ids(cfg.primary(self.email)) & set(hier.index(units))
+        within = hier.at_level(mine, units, False) if mine and not q.get("all") else None
+        try:
+            picked = digest.pick(units, scores, cfg.known_threshold,
+                                 only=q.get("unit") or None, within=within)  # fmt: skip
+        except SystemExit as e:
+            raise HTTPError(404, str(e)) from e
+        since = str(q.get("since") or "").strip() or None
+        items = digest.plan(self.root, self.store, units, picked, scores, recs, commits,
+                            weights, since=since)  # fmt: skip
+        return items, within is not None
+
+    def _digest_view(self, items, in_set: bool) -> dict[str, Any]:
+        return {
+            "items": [it.as_dict() for it in items],
+            "missing": sum(1 for it in items if it.commits and it.digest is None),
+            "threshold": self.store.config.known_threshold,
+            "scope": "set" if in_set else "all",
+        }
+
+    def get_digest(self, q):
+        """What a digest would cover and the briefings already cached; no call."""
+        items, in_set = self._digest_items(q)
+        return self._digest_view(items, in_set)
+
+    def post_digest(self, body):
+        """Write the missing briefings (one call for all of them) and return the digest."""
+        from . import digest
+
+        with self.lock:
+            items, in_set = self._digest_items(body)
+            digest.ensure(self.root, self.store, self.llm(), items)
+        return self._digest_view(items, in_set)
+
+    def tutor_session(self, sid: str) -> tutor.Session | None:
+        """A tutor session by id: in memory, else saved under .udebt/tutor/ (a restart)."""
+        s = self.tutors.get(sid)
+        if s is None and sid:
+            s = tutor.find(self.store.dir, self.email, sid)
+            if s is not None:
+                self.tutors[s.id] = s
+        return s
+
     def get_tutor(self, q):
-        s = self.tutors.get(str(q.get("session", "")))
+        """`?session=<id>`: that conversation; `?unit=<id>`: the developer's saved
+        conversation on the unit, if any (`saved`), for the page's "resume or start over"."""
+        if q.get("unit") and not q.get("session"):
+            u = self.unit(self.store.require_map(), q.get("unit"))
+            saved = tutor.load(self.store.dir, self.email, u["id"])
+            if saved is not None and saved.id in self.tutors:
+                saved = self.tutors[saved.id]
+            return {"saved": saved.view() if saved else None}
+        s = self.tutor_session(str(q.get("session", "")))
         if s is None:
-            raise HTTPError(404, "No such tutor session (the server may have restarted).")
+            raise HTTPError(404, "No such tutor session.")
         return s.view()
 
     # -- POST ------------------------------------------------------------------------
@@ -431,10 +534,53 @@ class App:
         return {"questions": out}
 
     def post_answer(self, body):
+        """One answer, graded and recorded at once (the tutor's check works this way; the
+        quiz and review pages batch their answers through /api/answers)."""
         q = self.questions.pop(str(body.get("id", "")), None)
         if q is None:
-            raise HTTPError(404, "Unknown question (answered already, or the server restarted).")
+            raise HTTPError(404, UNKNOWN_QUESTION)
         return self.answered(q, str(body.get("answer", "")), _int(body.get("confidence"), 2, 1, 3))
+
+    def post_dontknow(self, body):
+        """ "I don't know" on a served question: no call. It is held as a blank answer for the
+        sitting's batch (it cannot be answered after its reference was shown) and, at levels
+        1-2, the reference is returned at once."""
+        qid = str(body.get("id", ""))
+        q = self.questions.get(qid)
+        if q is None:
+            raise HTTPError(404, UNKNOWN_QUESTION)
+        shown = reveals(q, "unknown") and bool(reveal_text(q))
+        q["locked"] = {"answer": "", "confidence": 1}
+        return {
+            "id": qid,
+            "revealed": shown,
+            "reference": reveal_text(q).replace("The answer: ", "").strip() if shown else None,
+        }
+
+    def post_answers(self, body):
+        """A sitting's answers, graded in one call at its end (Phase 3.4): `answers` is a list
+        of {id, answer, confidence}; a question marked "I don't know" stays blank whatever is
+        sent for it. `drop` lists questions left unanswered, which are forgotten unrecorded."""
+        for qid in body.get("drop") or []:
+            self.questions.pop(str(qid), None)
+        given = body.get("answers")
+        if not isinstance(given, list) or not given:
+            raise HTTPError(400, "No answers to grade.")
+        items = []
+        for a in given[:50]:
+            if not isinstance(a, dict):
+                raise HTTPError(400, "Each answer is an object with an id.")
+            q = self.questions.get(str(a.get("id", "")))
+            if q is None:
+                raise HTTPError(404, UNKNOWN_QUESTION)
+            lock = q.get("locked")
+            text = lock["answer"] if lock else str(a.get("answer", ""))
+            conf = lock["confidence"] if lock else _int(a.get("confidence"), 2, 1, 3)
+            items.append((q, text, conf))
+        out = self.answered_all(items)
+        for a in given[:50]:
+            self.questions.pop(str(a.get("id", "")), None)
+        return {"results": out}
 
     def post_teachback(self, body):
         m = self.store.require_map()
@@ -443,17 +589,20 @@ class App:
         if not text:
             raise HTTPError(400, "Nothing to grade; nothing recorded.")
         o = orient.cached(u)
+        recs = self.store.load_records(self.email)
+        level = teachback.level_for([x for x in recs if x.get("unit") == u["id"]])
         r = teachback.grade(self.root, self.llm(), u, text, _int(body.get("confidence"), 2, 1, 3),
-                            orient.text(o) if o else None)  # fmt: skip
-        q = {k: r[k] for k in ("unit_id", "level", "question", "reference_answer", "evidence")}
+                            orient.text(o) if o else None, level=level)  # fmt: skip
+        q = {k: r[k] for k in ("unit_id", "level", "question", "evidence")}
         with self.lock:
             prior = self.store.load_records(self.email)
-            if r["verdict"] in ("unknown", "wrong") and reveal_text(r):
+            if reveals(r, r["verdict"]) and reveal_text(r):
                 r["revealed"] = True
             record_results(self.store, self.root, self.email, [r], source="teachback",
                            kind="teachback", prior=prior)  # fmt: skip
         return {
             **q,
+            "label": ladder.label(level),
             "verdict": r["verdict"],
             "right": r["right"],
             "missing": r["missing"],
@@ -468,22 +617,33 @@ class App:
             raise HTTPError(400, "Say something to the tutor first.")
         m = self.store.require_map()
         sid = str(body.get("session") or "")
-        s = self.tutors.get(sid) if sid else None
+        s = self.tutor_session(sid) if sid else None
         if sid and s is None:
-            raise HTTPError(404, "No such tutor session (the server may have restarted).")
+            raise HTTPError(404, "No such tutor session.")
         if s is None:
             u = self.unit(m, body.get("unit"))
+            saved = tutor.load(self.store.dir, self.email, u["id"])
+            if saved is not None and not body.get("restart"):
+                raise HTTPError(
+                    409, "There is a saved conversation on this unit: resume it or start over.",
+                    {"saved": saved.view()},
+                )  # fmt: skip
+            if saved is not None:
+                tutor.discard(self.store.dir, self.email, u["id"])
+                self.tutors.pop(saved.id, None)
             recs = self.store.load_records(self.email)
             level = ladder.next_level([r for r in recs if r.get("unit") == u["id"]])
             s = tutor.Session(u["id"], level, self.email)
             self.tutors[s.id] = s
         u = self.unit(m, s.unit_id)
-        return tutor.turn(self.llm(), self.root, u, s, message)
+        view = tutor.turn(self.llm(), self.root, u, s, message)
+        tutor.save(self.store.dir, s)
+        return view
 
     def post_tutor_answer(self, body):
-        s = self.tutors.get(str(body.get("session", "")))
+        s = self.tutor_session(str(body.get("session", "")))
         if s is None:
-            raise HTTPError(404, "No such tutor session (the server may have restarted).")
+            raise HTTPError(404, "No such tutor session.")
         u = self.unit(self.store.require_map(), s.unit_id)
         q = tutor.check_question(u, s)
         if q is None:
@@ -492,6 +652,7 @@ class App:
                             _int(body.get("confidence"), 2, 1, 3))  # fmt: skip
         s.check = None
         s.turns.append({"role": "check", "text": f"{q['question']} -> {res['verdict']}"})
+        tutor.save(self.store.dir, s)
         return {**res, "session": s.view()}
 
     GET = {
@@ -502,6 +663,7 @@ class App:
         "/api/unit": get_unit,
         "/api/excerpt": get_excerpt,
         "/api/review": get_review,
+        "/api/digest": get_digest,
         "/api/tutor": get_tutor,
     }
     POST = {
@@ -509,7 +671,10 @@ class App:
         "/api/walkthrough": post_walkthrough,
         "/api/questions": post_questions,
         "/api/answer": post_answer,
+        "/api/answers": post_answers,
+        "/api/dontknow": post_dontknow,
         "/api/teachback": post_teachback,
+        "/api/digest": post_digest,
         "/api/tutor": post_tutor,
         "/api/tutor/answer": post_tutor_answer,
     }
@@ -577,7 +742,7 @@ class Handler(BaseHTTPRequestHandler):
                 q = self._body()
             self._json(200, fn(self.app, q))
         except HTTPError as e:
-            self._json(e.status, {"error": e.message})
+            self._json(e.status, {**e.data, "error": e.message})
         except LLMError as e:
             self._json(502, {"error": f"The model call failed: {e}"})
         except SystemExit as e:
@@ -594,6 +759,14 @@ class Handler(BaseHTTPRequestHandler):
         if n < 0:
             raise HTTPError(411, "Content-Length required.")
         if n > MAX_BODY:
+            if n <= 8 * MAX_BODY:  # read it away, so the client hears the 413 (no broken pipe)
+                left = n
+                while left > 0:
+                    got = self.rfile.read(min(left, 65536))
+                    if not got:
+                        break
+                    left -= len(got)
+            self.close_connection = True
             raise HTTPError(413, "Body too large.")
         try:
             data = json.loads(self.rfile.read(n) or b"{}")

@@ -247,6 +247,24 @@ class FakeLLM:
                 "misconception": "It does not send email." if verdict == "wrong" else "",
                 "reference_answer": "It returns a default, by design.",
             }
+        if "TASK: digest" in prompt:
+            out = []
+            for block in prompt.split("### unit_id: ")[1:]:
+                uid = block.split("\n", 1)[0].strip()
+                shas = re.findall(r"^    - ([0-9a-f]{7}) ", block, re.M)
+                out.append(
+                    {
+                        "unit_id": uid,
+                        "headline": f"The {uid} unit gained a fake feature in this range.",
+                        "changes": [
+                            {"what": f"It now does one more thing ({uid}).", "commits": shas[:2]}
+                        ],
+                        "decision": "extended" if len(shas) > 1 else "held",
+                        "decision_note": "The original choice stands and now covers more.",
+                        "look_at": [f"udebt/{uid}.py"],
+                    }
+                )
+            return {"digests": out}
         if "TASK: weigh" in prompt:
             shas = [ln.split()[2] for ln in prompt.splitlines() if ln.startswith("- sha:")]
             return {
@@ -274,7 +292,10 @@ class FakeLLM:
             for i in range(n):
                 ans_line = [ln for ln in prompt.splitlines() if ln.startswith("ANSWER:")][i]
                 ans = ans_line[len("ANSWER:") :].strip().lower()
-                verdict = "correct" if "default" in ans else ("unknown" if not ans else "wrong")
+                verdict = (
+                    "correct" if "default" in ans else "unknown" if not ans
+                    else "partial" if "half" in ans else "wrong"
+                )  # fmt: skip
                 verdicts.append({"index": i, "verdict": verdict, "feedback": f"fake feedback {i}"})
             return {"grades": verdicts}
         raise LLMError(f"FakeLLM has no canned answer for this prompt: {prompt[:80]}")

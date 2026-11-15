@@ -22,6 +22,7 @@
     <a href="#unit" data-tab="unit" role="tab">Unit</a>
     <a href="#quiz" data-tab="quiz" role="tab">Quiz</a>
     <a href="#review" data-tab="review" role="tab">Review</a>
+    <a href="#digest" data-tab="digest" role="tab">Digest</a>
     <a href="#tutor" data-tab="tutor" role="tab">Tutor</a>
     <a href="#teachback" data-tab="teachback" role="tab">Teach-back</a>
   </div>
@@ -82,6 +83,21 @@
     <div id="review-flow"></div>
   </section>
 
+  <section id="tab-digest" hidden>
+    <h2>Change digest</h2>
+    <p class="sub" id="digest-sub">What landed in the units you know least since you last showed what you know there, as a briefing.</p>
+    <div class="card">
+      <div class="row">
+        <label for="digest-unit">Unit</label>
+        <select id="digest-unit" class="grow"></select>
+        <label for="digest-since">Since</label>
+        <input id="digest-since" type="text" placeholder="a commit or YYYY-MM-DD" size="16">
+        <button id="digest-go" type="button">Show</button>
+      </div>
+    </div>
+    <div id="digest-body"></div>
+  </section>
+
   <section id="tab-tutor" hidden>
     <h2>Tutor</h2>
     <p class="sub">A conversation about one unit: the tutor reads the code for you and asks back. Say "check me" (or keep going a few turns) for a check question at your level; it is graded and recorded.</p>
@@ -105,7 +121,7 @@
 
   <section id="tab-teachback" hidden>
     <h2>Teach-back</h2>
-    <p class="sub">Explain a unit in your own words: what it is for, the decision behind it and what was not chosen. You hear what was right, what was missing and any misconception; it counts as level 2.</p>
+    <p class="sub">Explain a unit in your own words. You hear what was right, what was missing and any misconception; it is graded at your level on the unit's question ladder and counts like a quiz answer.</p>
     <div class="card">
       <div class="row">
         <label for="tb-unit">Unit</label>

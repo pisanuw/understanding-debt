@@ -6,7 +6,7 @@
   var TOKEN = new URLSearchParams(location.search).get("t") || "";
   var S = null; // /api/state
   var loaded = {};
-  var tutorSession = null, tutorStarted = 0, tutorTimer = null;
+  var tutorSession = null, tutorStarted = 0, tutorTimer = null, tutorRestart = false;
 
   // -- helpers ------------------------------------------------------------------------
   function $(id) { return document.getElementById(id); }
@@ -34,7 +34,7 @@
     }
     return fetch(path, opts).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {
-        if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+        if (!r.ok) { var err = new Error(data.error || ("HTTP " + r.status)); err.status = r.status; err.data = data; throw err; }
         return data;
       });
     });
@@ -86,7 +86,7 @@
       return s;
     });
   }
-  var TABS = ["dashboard", "tour", "path", "unit", "quiz", "review", "tutor", "teachback"];
+  var TABS = ["dashboard", "tour", "path", "unit", "quiz", "review", "digest", "tutor", "teachback"];
   function route() {
     var h = location.hash.replace(/^#/, "") || "path";
     var parts = h.split("/");
@@ -291,16 +291,46 @@
   $("unit-pick").addEventListener("change", function () { location.hash = "#unit/" + encodeURIComponent(this.value); });
 
   // -- the shared question flow (quiz, review) ----------------------------------------
+  // A sitting is graded in one call at its end (or at "Finish now"), as the CLI grades a run.
+  // "I don't know" needs no call: at levels 1-2 the answer is shown at once.
+  function resultCard(q, r) {
+    var card = el("div", { "class": "card" });
+    add(card, el("p", { "class": "small muted" }, (q.unit_name || unitName(r.unit_id)) + " · level " + r.level));
+    add(card, el("p", null, r.question || q.question));
+    add(card, add(el("p", { "class": "verdict" }), badge(r.verdict, r.verdict), document.createTextNode(" " + r.feedback)));
+    if (r.revealed && r.reference) add(card, add(el("div", { "class": "answer" }), el("strong", null, "The answer"), document.createTextNode(r.reference)));
+    add(card, el("p", { "class": "small muted" }, "Next on this unit: level " + r.next_level + (r.review_due ? "; back in review on " + String(r.review_due).slice(0, 10) : "") + "."));
+    return card;
+  }
   function askFlow(box, questions, done) {
-    var i = 0, results = [];
+    var i = 0, answers = {}, order = [];
+    function finish(btn) {
+      var given = order.map(function (id) { return answers[id]; });
+      var drop = questions.filter(function (q) { return !answers[q.id]; }).map(function (q) { return q.id; });
+      if (!given.length) { clear(box); add(box, el("div", { "class": "card" }, "Nothing answered, nothing recorded.")); return; }
+      var typed = given.filter(function (a) { return a.answer && !a.blank; }).length;
+      busy(btn, true, typed ? "Grading " + given.length + " answer(s) in one call" : "Recording");
+      api("/api/answers", { answers: given, drop: drop }).then(function (r) {
+        clear(box);
+        var sum = add(el("div", { "class": "card" }), el("h3", null, "Graded"));
+        var counts = {};
+        r.results.forEach(function (x) { counts[x.verdict] = (counts[x.verdict] || 0) + 1; });
+        add(sum, el("p", null, Object.keys(counts).map(function (k) { return counts[k] + " " + k; }).join(", ") + (typed ? " (one grading call)." : " (no call: every answer was blank).")));
+        add(box, sum);
+        var byId = {}; questions.forEach(function (q) { byId[q.id] = q; });
+        r.results.forEach(function (x, k) { add(box, resultCard(byId[order[k]] || {}, x)); });
+        refreshState(); loaded.path = false; loaded.unit = null; loaded.digest = false;
+        if (done) done(r.results);
+      }).catch(function (e) { busy(btn, false); toast(e.message); });
+    }
     function next() {
       clear(box);
       if (i >= questions.length) {
-        var sum = add(el("div", { "class": "card" }), el("h3", null, "Done"));
-        add(sum, el("p", null, results.map(function (r) { return unitName(r.unit_id) + ": " + r.verdict; }).join("; ") + "."));
-        add(box, sum);
-        refreshState(); loaded.path = false; loaded.unit = null;
-        if (done) done(results);
+        var end = add(el("div", { "class": "card" }), el("h3", null, "All answered"));
+        add(end, el("p", null, order.length + " answer(s) to grade together."));
+        var go = el("button", { "class": "primary", type: "button" }, "Grade my answers");
+        go.addEventListener("click", function () { finish(go); });
+        add(end, go); add(box, end); go.focus();
         return;
       }
       var q = questions[i];
@@ -318,35 +348,42 @@
       var ta = el("textarea", { "aria-label": "Your answer", placeholder: "One or two sentences, in plain language." });
       var confBox = el("span", { "class": "conf" });
       var conf = confPicker(confBox, "conf-" + q.id);
-      var send = el("button", { "class": "primary", type: "button" }, "Submit");
+      var last = i + 1 >= questions.length;
+      var send = el("button", { "class": "primary", type: "button" }, last ? "Answer and grade" : "Next");
       var dunno = el("button", { type: "button" }, "I don't know");
-      add(card, ta, add(el("div", { "class": "row gap-top" }), confBox, send, dunno));
+      var stop = el("button", { type: "button" }, "Finish now");
+      add(card, ta, add(el("div", { "class": "row gap-top" }), confBox, send, dunno, order.length ? stop : null));
       var out = el("div");
       add(card, out);
       add(box, card);
       ta.focus();
-      function submit(answer) {
-        busy(send, true, answer ? "Grading" : "Recording"); dunno.disabled = true; ta.disabled = true;
-        api("/api/answer", { id: q.id, answer: answer, confidence: conf() }).then(function (r) {
-          results.push(r);
-          busy(send, false); send.hidden = true; dunno.hidden = true;
-          add(out, add(el("p", { "class": "verdict gap-top" }), badge(r.verdict, r.verdict), document.createTextNode(" " + r.feedback)));
+      function keep(a) { if (!answers[q.id]) order.push(q.id); answers[q.id] = a; }
+      send.addEventListener("click", function () {
+        if (!ta.value.trim()) { ta.focus(); return; }
+        keep({ id: q.id, answer: ta.value, confidence: conf() });
+        i++;
+        if (last) finish(send); else next();
+      });
+      dunno.addEventListener("click", function () {
+        busy(dunno, true, "Noting it"); send.disabled = true; ta.disabled = true; stop.disabled = true;
+        api("/api/dontknow", { id: q.id }).then(function (r) {
+          keep({ id: q.id, answer: "", confidence: 1, blank: true });
+          busy(dunno, false); dunno.hidden = true; send.hidden = true; stop.hidden = true;
+          add(out, add(el("p", { "class": "verdict gap-top" }), badge("unknown", "unknown"), document.createTextNode(" A known unknown: no penalty.")));
           if (r.revealed && r.reference) add(out, add(el("div", { "class": "answer" }), el("strong", null, "The answer"), document.createTextNode(r.reference)));
-          add(out, el("p", { "class": "small muted" }, "Next on this unit: level " + r.next_level + (r.review_due ? "; back in review on " + String(r.review_due).slice(0, 10) : "") + "."));
-          var nb = el("button", { "class": "primary", type: "button" }, i + 1 < questions.length ? "Next question" : "Finish");
-          nb.addEventListener("click", function () { i++; next(); });
+          var nb = el("button", { "class": "primary", type: "button" }, last ? "Grade my answers" : "Next question");
+          nb.addEventListener("click", function () { i++; if (last) finish(nb); else next(); });
           add(out, nb); nb.focus();
-        }).catch(function (e) { busy(send, false); dunno.disabled = false; ta.disabled = false; toast(e.message); });
-      }
-      send.addEventListener("click", function () { if (ta.value.trim()) submit(ta.value); else ta.focus(); });
-      dunno.addEventListener("click", function () { submit(""); });
+        }).catch(function (e) { busy(dunno, false); send.disabled = false; ta.disabled = false; stop.disabled = false; toast(e.message); });
+      });
+      stop.addEventListener("click", function () { finish(stop); });
     }
     next();
   }
 
   // -- quiz ---------------------------------------------------------------------------
   function openQuiz() {
-    $("quiz-note").textContent = "A new question costs one model call for all of them, plus one for orientations the first time; a pooled question, or the other phrasing of one you missed, costs none. Each answer is graded on its own (one call; \"I don't know\" none).";
+    $("quiz-note").textContent = "New questions cost one model call for all of them, plus one for orientations the first time; a pooled question, or the other phrasing of one you missed, costs none. Your answers are graded together at the end, in one call (\"I don't know\" needs none, and at levels 1-2 shows the answer at once).";
   }
   $("quiz-go").addEventListener("click", function () {
     var b = this, unit = $("quiz-unit").value;
@@ -424,35 +461,81 @@
     api("/api/tutor?session=" + encodeURIComponent(id)).then(function (v) {
       $("tutor-unit").value = v.unit; $("tutor-unit").disabled = true; tutorStarted = 0;
       showTutor(v);
+      history.replaceState(null, "", location.pathname + location.search + "#tutor/" + v.session);
     }).catch(function (e) { toast(e.message); });
+  }
+  function savedChoice(v) { // a saved conversation on this unit: resume it or start over
+    var ck = clear($("tutor-check"));
+    clear($("tutor-log"));
+    var card = el("div", { "class": "card" });
+    add(card, el("h3", null, "You have a conversation on " + unitName(v.unit)));
+    add(card, el("p", { "class": "small muted" }, "Started " + String(v.created).slice(0, 10) + ", last turn " + String(v.active).replace("T", " ").slice(0, 16) + " UTC; " + v.asked + " message(s) from you" + (v.check ? ", a check question waiting" : "") + "."));
+    var last = v.turns.filter(function (t) { return t.role === "tutor"; }).slice(-1)[0];
+    if (last) add(card, el("p", { "class": "muted small" }, "The tutor last said: " + last.text.slice(0, 220) + (last.text.length > 220 ? "..." : "")));
+    var res = el("button", { "class": "primary", type: "button" }, "Resume it");
+    res.addEventListener("click", function () { clear(ck); attachTutor(v.session); });
+    var over = el("button", { type: "button" }, "Start over");
+    over.addEventListener("click", function () { tutorRestart = true; clear(ck); $("tutor-msg").focus(); toast("Your next message starts a new conversation; the old one is replaced."); });
+    add(card, add(el("div", { "class": "row" }), res, over));
+    add(ck, card);
+  }
+  function checkSaved() {
+    if (tutorSession) return;
+    tutorRestart = false;
+    var unit = $("tutor-unit").value;
+    if (!unit) return;
+    api("/api/tutor?unit=" + encodeURIComponent(unit)).then(function (r) {
+      if (r.saved && !tutorSession && $("tutor-unit").value === unit) savedChoice(r.saved);
+      else if (!tutorSession) clear($("tutor-check"));
+    }).catch(function () { /* nothing saved */ });
   }
   function sendTutor(text) {
     var b = $("tutor-send");
     if (!text.trim()) { $("tutor-msg").focus(); return; }
     busy(b, true, "Thinking"); $("tutor-checkme").disabled = true;
     var body = { message: text };
-    if (tutorSession) body.session = tutorSession; else body.unit = $("tutor-unit").value;
+    if (tutorSession) body.session = tutorSession; else { body.unit = $("tutor-unit").value; if (tutorRestart) body.restart = true; }
     api("/api/tutor", body).then(function (v) {
       busy(b, false); $("tutor-checkme").disabled = false; $("tutor-msg").value = "";
-      $("tutor-unit").disabled = true;
+      $("tutor-unit").disabled = true; tutorRestart = false;
       showTutor(v);
       history.replaceState(null, "", location.pathname + location.search + "#tutor/" + v.session);
-    }).catch(function (e) { busy(b, false); $("tutor-checkme").disabled = false; toast(e.message); });
+    }).catch(function (e) {
+      busy(b, false); $("tutor-checkme").disabled = false;
+      if (e.status === 409 && e.data && e.data.saved) savedChoice(e.data.saved); else toast(e.message);
+    });
   }
   function openTutor() {
     if (!tutorTimer) tutorTimer = setInterval(tick, 1000);
+    checkSaved();
   }
+  $("tutor-unit").addEventListener("change", checkSaved);
   $("tutor-send").addEventListener("click", function () { sendTutor($("tutor-msg").value); });
   $("tutor-checkme").addEventListener("click", function () { sendTutor(($("tutor-msg").value.trim() ? $("tutor-msg").value.trim() + " " : "") + "Check me."); });
   $("tutor-new").addEventListener("click", function () {
     tutorSession = null; tutorStarted = 0; $("tutor-unit").disabled = false;
     history.replaceState(null, "", location.pathname + location.search + "#tutor");
     clear($("tutor-log")); clear($("tutor-check")); $("tutor-stop").hidden = true; tick();
+    tutorRestart = true; // "New session" on this unit replaces its saved conversation
   });
 
   // -- teach-back ---------------------------------------------------------------------
   var tbConf = null;
-  function tbPrompt() { $("tb-prompt").textContent = "Explain " + unitName($("tb-unit").value) + " in your own words: what it is for, the decision behind it, and what was not chosen."; }
+  var TB_ASKS = {
+    1: "what it is for and where it sits in the system",
+    2: "what it is for, the decision behind it, and what was not chosen",
+    3: "the decision behind it and what else in the system would have to change if it were reversed",
+    4: "how it behaves when one of its parts fails, times out or gets bad input",
+    5: "how its code does its job: the main path through it and why it is written that way"
+  };
+  function tbLevel() {
+    var u = (S.units || []).filter(function (x) { return x.id === $("tb-unit").value; })[0];
+    return u ? u.level : 1;
+  }
+  function tbPrompt() {
+    var n = tbLevel();
+    $("tb-prompt").textContent = "Explain " + unitName($("tb-unit").value) + " in your own words: " + TB_ASKS[n] + ". Graded at your level on this unit, level " + n + " (" + S.ladder[String(n)] + ").";
+  }
   function openTeachback() { tbConf = confPicker($("tb-conf"), "conf-tb"); tbPrompt(); }
   $("tb-unit").addEventListener("change", tbPrompt);
   $("tb-go").addEventListener("click", function () {
@@ -462,24 +545,92 @@
     api("/api/teachback", { unit: $("tb-unit").value, explanation: text, confidence: tbConf ? tbConf() : 2 }).then(function (r) {
       busy(b, false);
       var out = clear($("tb-result"));
-      add(out, add(el("p", { "class": "verdict gap-top" }), badge(r.verdict, r.verdict), document.createTextNode(" level 2, decision and alternatives")));
+      add(out, add(el("p", { "class": "verdict gap-top" }), badge(r.verdict, r.verdict), document.createTextNode(" " + r.label)));
       var dl = el("dl", { "class": "kv" });
       add(dl, el("dt", null, "What was right"), el("dd", null, r.right || "-"));
       add(dl, el("dt", null, "What was missing"), el("dd", null, r.missing || "nothing important"));
       add(dl, el("dt", null, "Misconception"), el("dd", null, r.misconception || "none found"));
       add(out, dl);
       if (r.revealed && r.reference) add(out, add(el("div", { "class": "answer" }), el("strong", null, "The answer"), document.createTextNode(r.reference)));
-      refreshState(); loaded.path = false; loaded.unit = null;
+      refreshState().then(tbPrompt); loaded.path = false; loaded.unit = null; loaded.digest = false;
     }).catch(function (e) { busy(b, false); toast(e.message); });
   });
 
-  var OPEN = { dashboard: openDashboard, tour: openTour, path: openPath, quiz: openQuiz, review: openReview, tutor: openTutor, teachback: openTeachback };
+  // -- digest -------------------------------------------------------------------------
+  var DECISION = { held: "Decision held: the changes work within it.", extended: "Decision extended: it stands and now covers more.", changed: "Decision changed: the choice itself moved." };
+  function digestCard(it) {
+    var card = el("div", { "class": "card" });
+    var h = add(el("h3"), el("a", { href: "#unit/" + encodeURIComponent(it.unit) }, it.name), document.createTextNode(" "), el("code", null, it.unit));
+    add(card, h);
+    add(card, add(el("p", { "class": "small muted" }), it.basis ? badge(it.basis, it.basis) : null,
+      document.createTextNode(" und " + fmt(it.understanding) + " · " + it.range.note + " · " + it.commits.length + " commit(s), mass " + fmt(it.mass))));
+    var d = it.digest;
+    if (d) {
+      add(card, el("p", { "class": "headline" }, d.headline));
+      var ul = el("ul", { "class": "list" });
+      d.changes.forEach(function (c) { add(ul, add(el("li"), document.createTextNode(c.what + " "), c.commits.length ? el("code", null, c.commits.join(", ")) : null)); });
+      add(card, ul);
+      add(card, add(el("p", { "class": "answer" }), el("strong", null, DECISION[d.decision] || d.decision), document.createTextNode(d.decision_note)));
+      if (d.look_at.length) add(card, add(el("p", { "class": "small" }), document.createTextNode("Look at: "), el("code", null, d.look_at.join(", "))));
+    } else {
+      add(card, el("p", { "class": "muted" }, "No briefing written yet for this range."));
+    }
+    var det = el("details");
+    add(det, el("summary", null, "The commits"));
+    var cl = el("ul", { "class": "list small" });
+    it.commits.slice().sort(function (a, b) { return b.mass - a.mass; }).forEach(function (c) {
+      add(cl, add(el("li"), el("code", null, c.sha.slice(0, 8)), document.createTextNode(" " + c.date + " · " + c.who + " · " + c.klass + (c.agent ? "/" + c.agent : "") + " · weight " + fmt(c.weight) + ", mass " + fmt(c.mass) + " · " + c.subject)));
+    });
+    add(det, cl); add(card, det);
+    var acts = el("div", { "class": "acts row gap-top" });
+    var open = el("button", { type: "button" }, "Open the unit");
+    open.addEventListener("click", function () { location.hash = "#unit/" + encodeURIComponent(it.unit); });
+    var quiz = el("button", { type: "button" }, "Quiz it");
+    quiz.addEventListener("click", function () { $("quiz-unit").value = it.unit; location.hash = "#quiz"; });
+    add(card, add(acts, open, quiz));
+    return card;
+  }
+  function showDigest(r) {
+    var box = clear($("digest-body"));
+    var moved = r.items.filter(function (it) { return it.commits.length; });
+    var quiet = r.items.filter(function (it) { return !it.commits.length; });
+    var since = $("digest-since").value.trim();
+    $("digest-sub").textContent = r.items.length ? moved.length + " of " + r.items.length + " unit(s) " + (r.scope === "set" ? "in your set " : "") + (r.items.length === 1 && $("digest-unit").value ? "" : "below " + r.threshold + " ") + "have changes " + (since ? "since " + since + "." : "since your last answer there (or the last 30 days).") :
+      "Every unit in view is above " + r.threshold + ": nothing to catch up on.";
+    if (r.missing) {
+      var c = el("div", { "class": "card" });
+      add(c, el("p", null, r.missing + " briefing(s) not written yet. One model call writes them all; they are cached for anyone with the same range."));
+      var b = el("button", { "class": "primary", type: "button" }, "Write the briefings");
+      b.addEventListener("click", function () {
+        busy(b, true, "Reading what landed");
+        api("/api/digest", digestQuery(true)).then(showDigest).catch(function (e) { busy(b, false); toast(e.message); });
+      });
+      add(c, b); add(box, c);
+    }
+    moved.forEach(function (it) { add(box, digestCard(it)); });
+    if (quiet.length) add(box, el("p", { "class": "small muted" }, "Nothing landed since your start point in " + quiet.map(function (it) { return it.name; }).join(", ") + ": what you knew still holds."));
+  }
+  function digestQuery(asBody) {
+    var since = $("digest-since").value.trim(), unit = $("digest-unit").value;
+    if (asBody) { var b = {}; if (since) b.since = since; if (unit) b.unit = unit; return b; }
+    var q = []; if (since) q.push("since=" + encodeURIComponent(since)); if (unit) q.push("unit=" + encodeURIComponent(unit));
+    return q.length ? "?" + q.join("&") : "";
+  }
+  function openDigest() {
+    clear($("digest-body")); add($("digest-body"), el("p", { "class": "muted" }, "Loading..."));
+    api("/api/digest" + digestQuery(false)).then(showDigest).catch(function (e) { clear($("digest-body")); toast(e.message); });
+  }
+  $("digest-go").addEventListener("click", openDigest);
+
+  var OPEN = { dashboard: openDashboard, tour: openTour, path: openPath, quiz: openQuiz, review: openReview, digest: openDigest, tutor: openTutor, teachback: openTeachback };
 
   refreshState().then(function () {
     fillUnits($("unit-pick"), false);
     fillUnits($("quiz-unit"), true);
     fillUnits($("tutor-unit"), false);
     fillUnits($("tb-unit"), false);
+    fillUnits($("digest-unit"), true);
+    $("digest-unit").options[0].textContent = "Units below the threshold (your set)";
     route();
   }).catch(function (e) {
     add(clear($("main")), el("p", { "class": "error" }, "Could not reach udebt serve: " + e.message + ". Open the URL it printed (it carries the token)."));

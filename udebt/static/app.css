@@ -67,6 +67,7 @@ button { padding: 7px 14px; cursor: pointer; }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 button:disabled { opacity: 0.55; cursor: default; }
 select { padding: 6px 8px; max-width: 100%; min-width: 0; }
+input[type="text"], input[type="password"] { padding: 6px 8px; max-width: 100%; min-width: 0; }
 textarea { width: 100%; min-height: 96px; padding: 8px 10px; resize: vertical; display: block; }
 label { color: var(--ink-2); font-size: 14px; }
 .conf { display: inline-flex; gap: 4px; flex-wrap: wrap; align-items: center; }
@@ -135,3 +136,4 @@ details > summary { cursor: pointer; color: var(--ink-2); }
 .msg.md ul, .msg.md ol { padding-left: 20px; }
 #unit-body > h2 { margin-top: 16px; }
 #tab-dashboard { margin: -16px -16px 0; }
+.headline { font-weight: 600; margin: 6px 0; }

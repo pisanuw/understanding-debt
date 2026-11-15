@@ -910,7 +910,16 @@ def cmd_dig(args) -> int:
         print("The walkthrough named no line range in a tracked file, so it was not cached.")
     if args.no_check:
         return 0
-    q = dig.check_question(w, unit, level)
+    m = store.require_map()
+    unit_now = hier.index(m["units"])[unit["id"]]
+    on_unit = [r for r in records if r.get("unit") == unit["id"]]
+    q = dig.pick_check(w, unit_now, level, on_unit)
+    if q is not None and q.get("repeat"):
+        print("\n(Every check question at this level has been asked; writing a new one...)")
+        try:
+            q = dig.fresh_check(root, store, llm, m, unit_now, level, on_unit) or q
+        except LLMError as e:
+            raise SystemExit(str(e)) from e
     if q is None:
         print(
             f"\n(No check question at level {level} came back, so nothing was recorded. "
@@ -1100,9 +1109,13 @@ def cmd_teachback(args) -> int:
         raise SystemExit(f"Unknown unit id: {args.unit}")
     email = _email(args, root)
     records = store.load_records(email)
+    level = teachback.level_for([r for r in records if r.get("unit") == unit["id"]])
     o = orient.cached(unit)
-    print(f"Teach-back: {unit.get('name', unit['id'])} (`{unit['id']}`), graded as level 2")
-    print(teachback.question(unit))
+    print(
+        f"Teach-back: {unit.get('name', unit['id'])} (`{unit['id']}`), graded at your level "
+        f"there, {ladder.label(level)}"
+    )
+    print(teachback.question(unit, level))
     print("(Several lines if you like; an empty line ends it. Blank records nothing.)")
     explanation = read_lines(input)
     if not explanation:
@@ -1112,18 +1125,80 @@ def cmd_teachback(args) -> int:
     llm = _llm(store, args)
     print("\nChecking it against the code...")
     try:
-        r = teachback.grade(root, llm, unit, explanation, confidence, orient.text(o) if o else None)
+        r = teachback.grade(
+            root, llm, unit, explanation, confidence, orient.text(o) if o else None, level=level
+        )
     except LLMError as e:
         raise SystemExit(str(e)) from e
     if reveals(r, r["verdict"]) and reveal_text(r):
         r["revealed"] = True
     record_results(store, root, email, [r], source="teachback", kind="teachback", prior=records)
-    print(f"\n[{r['verdict'].upper()}] level 2 ({ladder.LEVELS[2].name})")
+    print(f"\n[{r['verdict'].upper()}] level {level} ({ladder.LEVELS[level].name})")
     print(f"What was right: {r['right'] or '-'}")
     print(f"What was missing: {r['missing'] or 'nothing important'}")
     print(f"Misconception: {r['misconception'] or 'none found'}")
     if r.get("revealed"):
         print(reveal_text(r))
+    return 0
+
+
+def cmd_digest(args) -> int:
+    import json as _json
+
+    from . import digest
+
+    root, store = _ctx(args)
+    store.require()
+    m = store.require_map()
+    units = m["units"]
+    cfg = store.config
+    email = _email(args, root)
+    commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
+    resp = resp_mod.load(store)
+    records = store.load_records(email)
+    scores = {
+        s_.unit_id: s_
+        for s_ in compute_scores(
+            root, store, units, email, records=records, commits=commits, weights=weights, resp=resp
+        )
+    }
+    mine = _my_set(resp, cfg.primary(email), units)
+    within = hier.at_level(mine, units, False) if mine and not args.all else None
+    picked = digest.pick(units, scores, cfg.known_threshold, only=args.unit, within=within)
+    items = digest.plan(
+        root, store, units, picked, scores, records, commits, weights, since=args.since,
+        days=args.days,
+    )  # fmt: skip
+    todo = [it for it in items if it.commits and it.digest is None]
+    if todo and args.format == "table":
+        print(f"Writing {len(todo)} briefing(s) (one call, cached in .udebt/digests/)...")
+    try:
+        digest.ensure(root, store, _llm(store, args) if todo else None, items)
+    except LLMError as e:
+        raise SystemExit(str(e)) from e
+    if args.format == "json":
+        print(_json.dumps([it.as_dict() for it in items], indent=1, ensure_ascii=False))
+        return 0
+    scope = (
+        f"`{args.unit}`"
+        if args.unit
+        else f"units {'in your set ' if within else ''}you understand below {cfg.known_threshold}"
+    )
+    print(f"\nChange digest for {email}: {scope}")
+    if not items:
+        print("Nothing below the threshold: no digest needed.")
+        return 0
+    moved = [it for it in items if it.commits]
+    quiet = [it for it in items if not it.commits]
+    for it in moved:
+        print()
+        print(digest.render(it))
+    if quiet:
+        print(
+            f"\nNothing landed since your start point in: "
+            f"{', '.join(it.unit['id'] for it in quiet)}."
+        )
     return 0
 
 
@@ -1326,6 +1401,9 @@ def cmd_risk(args) -> int:
             f"`udebt quiz --unit {muted[0].unit_id.split()[0]}`."
         )
     worst = next((r for r in risks if r.level != "OK"), None)
+    flagged = list(dict.fromkeys(r.unit_id.split()[0] for r in risks if r.level != "OK"))
+    for uid in flagged[:3]:
+        print(f"Read the digest: `udebt digest --unit {uid}` (what landed there, as a briefing)")
     if worst and worst.level == "OUTSIDE":
         assigned = resp.holders_of(worst.unit_id.split()[0], units)
         ask = ", ".join(assigned) if assigned else "a lead (nobody has it in their set)"
@@ -2337,9 +2415,19 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--unit", help="only this unit")
     s.set_defaults(fn=cmd_review)
 
-    s = sub.add_parser("teachback", help="explain a unit; graded as level 2")
+    s = sub.add_parser("teachback", help="explain a unit; graded at your ladder level there")
     s.add_argument("unit")
     s.set_defaults(fn=cmd_teachback)
+
+    s = sub.add_parser("digest", help="what landed in the units you know least, as a briefing")
+    s.add_argument("--since", help="start after this revision or date (YYYY-MM-DD)")
+    s.add_argument("--unit", help="only this unit (any understanding)")
+    s.add_argument("--all", action="store_true", help="every top-level unit, not only your set")
+    s.add_argument(
+        "--days", type=int, default=30, help="with no evidence on a unit: the last N days (30)"
+    )
+    s.add_argument("--format", choices=["table", "json"], default="table")
+    s.set_defaults(fn=cmd_digest)
 
     s = sub.add_parser("serve", help="the teaching surface in your browser, on 127.0.0.1")
     s.add_argument("--port", type=int, default=0, help="default: a free port")

@@ -54,9 +54,14 @@ INPUT_KINDS = ("eff", "add", "ren", "ver")
 # moved to a new major version is no longer a version bump; 3: nor in a TOML dependency table.
 INPUT_VERSIONS = {"ver": 3}
 GITIGNORE_HEADER = "# derived by udebt, rebuilt on demand (`udebt cache status`)\n"
-# every derived file udebt keeps under .udebt/: the parsed-commit cache, the per-blob line
-# counts (sizes.py), `udebt export`'s default output and screenshots of the dashboard
-DERIVED = (NAME, NAME + ".gz", "sizes.json", "export/", "dashboard/*.png")
+# every file udebt keeps under .udebt/ that stays out of git: the parsed-commit cache, the
+# per-blob line counts (sizes.py), `udebt export`'s default output, screenshots of the
+# dashboard, the tutor's saved conversations (tutor.py), cached change digests (digest.py),
+# and the hosted remote's settings and what `udebt pull` fetched (remote.py)
+DERIVED = (
+    NAME, NAME + ".gz", "sizes.json", "export/", "dashboard/*.png", "tutor/", "digests/",
+    "remote.json", "remote/",
+)  # fmt: skip
 
 
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess:

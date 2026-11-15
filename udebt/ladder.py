@@ -48,7 +48,7 @@ TOP = 5
 ARCHITECTURAL = (1, 2, 3)
 DEPTH = (4, 5)
 LEGACY = 5  # the level of a record written before the ladder
-REVEAL = (1, 2)  # a miss at these levels shows the reference answer at once (Phase 3.3)
+REVEAL = (1, 2)  # a miss (unknown, wrong, partial) here shows the reference (Phases 3.3, 3.4)
 
 
 @dataclass(frozen=True)

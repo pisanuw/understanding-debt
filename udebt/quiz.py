@@ -276,14 +276,11 @@ def pool_add(store: Store, map_data: dict[str, Any], questions: list[dict[str, A
         store.save_map(map_data)
 
 
-def pool_pick(
+def revealed_variant(
     unit: dict[str, Any], level: int, records_on_unit: list[dict[str, Any]]
 ) -> dict[str, Any] | None:
-    """A question for `unit` at `level` with no model call: a stored variant of the question
-    the developer last missed and saw the answer to at that level (the same fact in other
-    words), else a pooled question they have not been asked; None when there is neither."""
-    from . import orientation as orient
-
+    """A stored variant of the question the developer last missed and saw the answer to at
+    `level` (the same fact in other words) that they have not been asked; None without one."""
     asked = {str(r.get("question")) for r in records_on_unit}
     at = [r for r in ladder._ordered(records_on_unit) if ladder.level_of(r) == level]
     for r in reversed(at):
@@ -301,11 +298,33 @@ def pool_pick(
                         "evidence": list(r.get("evidence") or []),
                         "from_pool": True,
                     }
-    b = orient.basis(unit)
-    for p in (unit.get("questions") or {}).get(str(level), []):
-        if p.get("basis") == b and p["question"] not in asked:
-            return {"unit_id": unit["id"], "level": level, **p, "from_pool": True}
     return None
+
+
+def pooled(unit: dict[str, Any], level: int) -> list[dict[str, Any]]:
+    """The unit's pooled questions at `level` that are still current (written from the unit
+    as the map has it now), as quiz questions."""
+    from . import orientation as orient
+
+    b = orient.basis(unit)
+    return [
+        {"unit_id": unit["id"], "level": level, **p, "from_pool": True}
+        for p in (unit.get("questions") or {}).get(str(level), [])
+        if p.get("basis") == b
+    ]
+
+
+def pool_pick(
+    unit: dict[str, Any], level: int, records_on_unit: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """A question for `unit` at `level` with no model call: a stored variant of the question
+    the developer last missed and saw the answer to at that level (the same fact in other
+    words), else a pooled question they have not been asked; None when there is neither."""
+    got = revealed_variant(unit, level, records_on_unit)
+    if got is not None:
+        return got
+    asked = {str(r.get("question")) for r in records_on_unit}
+    return next((q for q in pooled(unit, level) if q["question"] not in asked), None)
 
 
 def generate_questions(
@@ -355,11 +374,15 @@ def generate_questions(
     return qs
 
 
+REVEALED_VERDICTS = ("unknown", "wrong", "partial")
+
+
 def reveals(q: dict[str, Any], verdict: str) -> bool:
     """A miss at levels 1-2 shows the reference answer: the purpose or the decision is what a
     developer cannot work out alone, and an "I don't know" that teaches nothing teaches
-    nothing next time either."""
-    return ladder.level_of(q) in ladder.REVEAL and verdict in ("unknown", "wrong")
+    nothing next time either. A partial answer is a miss too (Phase 3.4, owner): its
+    feedback names what was missing, the reference shows the whole of it."""
+    return ladder.level_of(q) in ladder.REVEAL and verdict in REVEALED_VERDICTS
 
 
 def reveal_text(q: dict[str, Any], width: int = 92) -> str:
@@ -374,8 +397,8 @@ def reveal_text(q: dict[str, Any], width: int = 92) -> str:
 
 
 def mark_revealed(results: list[dict[str, Any]], out=None) -> list[dict[str, Any]]:
-    """After grading: a wrong answer at levels 1-2 gets its reference shown (by `out`, when
-    given) and is marked `revealed`; a blank one was marked when it was asked."""
+    """After grading: a wrong or partial answer at levels 1-2 gets its reference shown (by
+    `out`, when given) and is marked `revealed`; a blank one was marked when it was asked."""
     for r in results:
         if r.get("revealed") or not reveals(r, r.get("verdict", "")):
             continue
