@@ -20,7 +20,8 @@ from udebt import cli, worker
 from udebt.loadsql import analysis_sql
 
 ROOT = Path(__file__).resolve().parent.parent
-PG_MIGRATION = ROOT / "supabase" / "migrations" / "20261115000000_app_udebt.sql"
+MIGRATIONS = sorted((ROOT / "supabase" / "migrations").glob("*.sql"))
+URL = "https://github.com/acme/proj"
 SQLITE_SCHEMA = ROOT / "supabase" / "sqlite" / "app_udebt.sql"
 
 
@@ -52,8 +53,8 @@ def test_sqlite_schema_loads_idempotently_and_cascades(analysis):
     c = _sqlite()
     for _ in range(2):
         c.executescript(SQLITE_SCHEMA.read_text())
-    sample = analysis_sql(analysis, dialect="sqlite", license="MIT")
-    own = analysis_sql(analysis, dialect="sqlite", user_id="u-1")
+    sample = analysis_sql(analysis, dialect="sqlite", license="MIT", url=URL)
+    own = analysis_sql(analysis, dialect="sqlite", user_id="u-1", url=URL)
     for _ in range(2):
         c.executescript(sample)
         c.executescript(own)
@@ -71,6 +72,11 @@ def test_sqlite_schema_loads_idempotently_and_cascades(analysis):
     with pytest.raises(sqlite3.IntegrityError):
         c.execute("insert into app_udebt.records (user_id, repo_id, unit_id, verdict) values "
                   "('u-1', ?, 'storage', 'great')", [rid])  # fmt: skip
+    with pytest.raises(sqlite3.IntegrityError):
+        c.execute("insert into app_udebt.repositories (url, name) values ('/local/path', 'x')")
+    c.execute("insert into app_udebt.jobs (user_id, url) values ('u-1', ?)", [URL])
+    with pytest.raises(sqlite3.IntegrityError):
+        c.execute("insert into app_udebt.jobs (user_id, url, status) values ('u-1', 'x', 'odd')")
     c.execute("delete from app_udebt.repositories")
     for t in ("analyses", "records"):
         assert c.execute(f"select count(*) from app_udebt.{t}").fetchone()[0] == 0, t
@@ -103,6 +109,8 @@ do $$ begin
 end $$;
 grant usage on schema auth to authenticated, anon;
 grant execute on function auth.uid() to authenticated, anon;
+create schema if not exists platform;
+create table if not exists platform.llm_apps (slug text primary key);
 """
 
 
@@ -134,11 +142,12 @@ def test_postgres_own_rows_shared_samples_and_nothing_for_anon(pg, analysis):
     ok = lambda r: r[0] == 0  # noqa: E731
     assert ok(psql(pg, STUB_AUTH))
     for _ in range(2):  # idempotent
-        rc, _, err = psql(pg, PG_MIGRATION.read_text())
-        assert rc == 0, err
+        for m in MIGRATIONS:
+            rc, _, err = psql(pg, m.read_text())
+            assert rc == 0, (m.name, err)
     a, b = str(uuid.uuid4()), str(uuid.uuid4())
     assert ok(psql(pg, f"insert into auth.users (id) values ('{a}'), ('{b}');"))
-    sample = analysis_sql(analysis, license="Apache-2.0")
+    sample = analysis_sql(analysis, license="Apache-2.0", url=URL)
     for _ in range(2):
         rc, _, err = psql(pg, sample)  # the admin workflow: no RLS for the table owner
         assert rc == 0, err
@@ -153,32 +162,44 @@ def test_postgres_own_rows_shared_samples_and_nothing_for_anon(pg, analysis):
         insert into app_udebt.records (repo_id, unit_id, level, verdict, confidence)
             select {rid}, 'storage', 1, 'correct', 2;
         insert into app_udebt.analyses (repo_id, sha, contract, manifest)
-            select {rid}, 'abc', 1, '{{}}'::jsonb;""",
+            select {rid}, sha, 1, '{{}}'::jsonb from app_udebt.analyses limit 1;""",
         sub=a,
     )
     assert rc == 0, err
     assert psql(pg, "select count(*) from app_udebt.records;", sub=a)[1] == ["1"]
     assert psql(pg, q, sub=a)[1] == ["2"], "the sample and their own"
-    # B sees the sample only, none of A's rows, and cannot write as A or add a sample
-    assert psql(pg, q, sub=b)[1] == ["1"]
+    # B sees both analyses (public repositories: shared, 0002), none of A's own rows, and
+    # cannot write as A, change A's analysis or add a sample
+    assert psql(pg, q, sub=b)[1] == ["2"]
     assert psql(pg, "select count(*) from app_udebt.records;", sub=b)[1] == ["0"]
     assert psql(pg, "select count(*) from app_udebt.my_repositories;", sub=b)[1] == ["0"]
     rc, _, err = psql(pg, f"insert into app_udebt.records (user_id, repo_id, unit_id, verdict) "
                       f"select '{a}', {rid}, 'storage', 'wrong';", sub=b)  # fmt: skip
     assert rc != 0 and "row-level security" in err
     rc, _, err = psql(pg, "insert into app_udebt.repositories (url, name, is_sample) values "
-                      "('https://x/y', 'y', true);", sub=b)  # fmt: skip
+                      "('https://github.com/x/y', 'y', true);", sub=b)  # fmt: skip
     assert rc != 0 and "row-level security" in err
-    rc, _, err = psql(pg, "update app_udebt.analyses set specs = '{}'::jsonb where user_id is "
-                      "null returning id;", sub=b)  # fmt: skip
-    assert rc == 0, "a shared sample is read-only: the update touches no row"
+    rc, _, err = psql(pg, "update app_udebt.analyses set specs = '{}'::jsonb returning id;",
+                      sub=b)  # fmt: skip
+    assert rc == 0, "shared analyses are read-only to others: the update touches no row"
     assert psql(pg, "select count(*) from app_udebt.analyses where specs = '{}'::jsonb;")[1] == [
         "0"
     ]
     # anon: nothing at all
     rc, _, err = psql(pg, "select count(*) from app_udebt.repositories;", role="anon")
     assert rc != 0 and "permission denied" in err
-    # deleting the account deletes their rows; the shared sample stays
+    # jobs are own rows; a repository must be a public GitHub URL
+    assert ok(psql(pg, f"insert into app_udebt.jobs (url) values ('{URL}');", sub=a))
+    assert psql(pg, "select count(*) from app_udebt.jobs;", sub=b)[1] == ["0"]
+    rc, _, err = psql(pg, "insert into app_udebt.repositories (url, name) values "
+                      "('https://evil.example/x', 'x');", sub=b)  # fmt: skip
+    assert rc != 0 and "repositories_github_url" in err
+    assert psql(pg, "select count(*) from platform.llm_apps where slug = 'udebt';")[1] == ["1"]
+    # deleting the account deletes their rows; the shared analyses stay, A's now unowned
     assert ok(psql(pg, f"delete from auth.users where id = '{a}';"))
     assert psql(pg, "select count(*) from app_udebt.records;")[1] == ["0"]
-    assert psql(pg, q)[1] == ["1"]
+    assert psql(pg, "select count(*) from app_udebt.jobs;")[1] == ["0"]
+    assert psql(pg, q)[1] == ["2"]
+    assert psql(pg, "select count(*) from app_udebt.analyses where user_id is null;")[1] == ["2"], (
+        "two unowned analyses of one commit may coexist"
+    )

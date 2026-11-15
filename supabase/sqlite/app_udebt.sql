@@ -1,13 +1,14 @@
 -- The app_udebt schema for SQLite, for tests and local runs: attach a database as `app_udebt`
 -- first (`attach database 'x.db' as app_udebt`). The same tables and constraints as
--- ../migrations/20261115000000_app_udebt.sql, in portable types: ids are integers, uuids and
--- timestamps text, JSON text, booleans integers. SQLite has no auth.users and no row-level
+-- ../migrations/0001_app_udebt.sql and 0002_hosted.sql together, in portable types: ids are
+-- integers, uuids and timestamps text, JSON text, booleans integers. SQLite has no auth.users and no row-level
 -- security: own-row access is the Postgres policies' job, and the tests check those against a
 -- real Postgres (tests/test_schema.py, UDEBT_TEST_PG).
 
 create table if not exists app_udebt.repositories (
     id integer primary key autoincrement,
-    url text not null unique,
+    url text not null unique
+        check (url glob 'https://github.com/?*/?*' and url not glob 'https://github.com/*/*/*'),
     name text not null,
     license text,
     is_sample integer not null default 0,
@@ -28,8 +29,8 @@ create table if not exists app_udebt.analyses (
     storage_path text,
     created_at text not null default CURRENT_TIMESTAMP
 );
-create unique index if not exists app_udebt.analyses_key
-    on analyses (repo_id, sha, coalesce(user_id, ''));
+drop index if exists app_udebt.analyses_key;
+create unique index if not exists app_udebt.analyses_by_owner on analyses (repo_id, sha, user_id);
 
 create table if not exists app_udebt.my_repositories (
     user_id text not null,
@@ -65,4 +66,17 @@ create table if not exists app_udebt.quiz_sessions (
     started_at text not null default CURRENT_TIMESTAMP,
     finished_at text,
     questions text not null default '[]'
+);
+
+create table if not exists app_udebt.jobs (
+    id integer primary key autoincrement,
+    user_id text not null,
+    url text not null,
+    sha text,
+    status text not null default 'running'
+        check (status in ('queued', 'running', 'done', 'failed')),
+    message text,
+    calls integer,
+    created_at text not null default CURRENT_TIMESTAMP,
+    finished_at text
 );

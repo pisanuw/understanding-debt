@@ -1,0 +1,39 @@
+{
+ "format": "udebt-analysis",
+ "version": 1,
+ "contract": 1,
+ "repo": "digitalme",
+ "url": "/home/user/digitalme",
+ "rev": null,
+ "sha": "f93102b121f1da9055c148e8eccde275ccf18236",
+ "generated_at": "2026-11-15T08:19:31+00:00",
+ "seconds": 2.2,
+ "limits": {
+  "max_commits": 20000,
+  "max_mb": 500,
+  "clone_timeout": 900
+ },
+ "clone_bytes": 2102272,
+ "map_source": "given",
+ "llm_calls": 0,
+ "code_excerpts": false,
+ "counts": {
+  "commits": 190,
+  "contributors": 3,
+  "units": 15,
+  "points": 12,
+  "devs": 1,
+  "walkthroughs": 1,
+  "tour": true
+ },
+ "files": {
+  "weights.json": 55500,
+  "structure.json": 3588,
+  "history.json": 21710,
+  "contributors.json": 951,
+  "export.json": 109900,
+  "map.json": 40464,
+  "specs.json": 54111
+ },
+ "note": null
+}
