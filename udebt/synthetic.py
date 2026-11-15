@@ -28,6 +28,16 @@ the report goes to `.udebt/experiments/`.
 
 Each snapshot is a temporary `git worktree` with its `.git` link removed, so the answerer has
 no path back to the live repository; it is deleted and pruned afterwards.
+
+**No leakage** (2026-11-15, owner): every call with read tools runs in such a clean tree, never
+in the live working tree. The question writer and the grader read a worktree of HEAD and the
+answerer one of its snapshot, and each has its `.udebt/` directory removed, so no call can read
+earlier experiment reports (their reference answers and grades), samples, records, digests or
+the map's pooled questions; the prompts carry the unit paths they need. The report says so
+(`clean_worktree: true`). (The huggingface_hub level 3 runs scored higher on each repeated
+question set; with this guard, leakage cannot explain that next time.) Reports are named
+`synthetic-<shas>-<Lisbon date>-<HHMMSS>.json`, with a counter if that exists too, and a new run
+never overwrites an existing report (two of three same-day runs on huggingface_hub were lost).
 """
 
 from __future__ import annotations
@@ -39,7 +49,7 @@ import subprocess
 import tempfile
 from collections import Counter
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -73,12 +83,15 @@ def resolve(root: Path, rev: str) -> str:
 
 @contextmanager
 def snapshot(root: Path, sha: str) -> Iterator[Path]:
-    """A temporary checkout of `sha` with no link back to the repository."""
+    """A temporary checkout of `sha` with no link back to the repository and no `.udebt/`
+    (earlier reports, records, samples, digests, pooled questions): a clean tree for any call
+    that reads files."""
     tmp = Path(tempfile.mkdtemp(prefix="udebt-synthetic-"))
     wt = tmp / root.name
     try:
         _git(root, "worktree", "add", "--detach", "--quiet", str(wt), sha)
         (wt / ".git").unlink()  # cut the link: the answerer must not reach HEAD through it
+        shutil.rmtree(wt / ".udebt", ignore_errors=True)  # nor udebt's own answers
         yield wt
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -171,13 +184,29 @@ def reading(rho: float | None, p: float | None) -> str:
 # -- the experiment ---------------------------------------------------------------------
 
 
-def lisbon_date() -> str:
+def _lisbon_now() -> datetime:
     try:
         from zoneinfo import ZoneInfo
 
-        return datetime.now(ZoneInfo("Europe/Lisbon")).date().isoformat()
+        return datetime.now(ZoneInfo("Europe/Lisbon"))
     except Exception:  # no tz database: fall back to UTC
-        return datetime.now(UTC).date().isoformat()
+        return datetime.now(UTC)
+
+
+def lisbon_date() -> str:
+    return _lisbon_now().date().isoformat()
+
+
+def report_path(directory: Path, name: str, when: datetime | None = None) -> Path:
+    """A report file that does not exist yet: `synthetic-<name>-<date>-<HHMMSS>.json`, with
+    `-2`, `-3` ... appended when even that exists. A new run never overwrites a report."""
+    when = when or _lisbon_now()
+    base = f"synthetic-{name}-{when.date().isoformat()}-{when.strftime('%H%M%S')}"
+    path, n = directory / f"{base}.json", 1
+    while path.exists():
+        n += 1
+        path = directory / f"{base}-{n}.json"
+    return path
 
 
 # 2: several snapshots, N questions per unit, one shared question set; 3: one ladder level
@@ -527,7 +556,7 @@ def run(
             raise SystemExit(f"{resume} is for another HEAD or report version; start afresh.")
     date = lisbon_date()
     name = "_".join(at[:8] for _, at in snaps)
-    path = Path(resume) if resume else store.dir / "experiments" / f"synthetic-{name}-{date}.json"
+    path = Path(resume) if resume else report_path(store.dir / "experiments", name)
     report: dict[str, Any] = {
         "experiment": "synthetic",
         "version": REPORT_VERSION,
@@ -540,6 +569,7 @@ def run(
         "level": level,
         "level_name": ladder.LEVELS[level].name,
         "unit_ids": [u["id"] for u in picked],
+        "clean_worktree": True,  # every call read a worktree without .udebt/, never the live tree
         "llm_calls": 0,
         "questions": None,
         "snapshots": [],
@@ -554,9 +584,20 @@ def run(
         header, rows = unit_rows(root, at, head, picked, m["units"], commits, weights, sizes, decay)
         report["snapshots"].append({"at": rev, **header, "graded": False, "units": rows})
 
+    fresh = [resume is None]  # the first save of a new run creates its file, never replaces one
+
     def save() -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        text = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+        if fresh[0]:
+            try:
+                with path.open("x", encoding="utf-8") as f:
+                    f.write(text)
+            except FileExistsError as e:
+                raise SystemExit(f"{path} exists; a new run never overwrites a report.") from e
+            fresh[0] = False
+        else:
+            path.write_text(text, encoding="utf-8")
 
     def call(what: str) -> None:
         """Count a model call before making it, and save, so a call that fails still counts."""
@@ -571,6 +612,27 @@ def run(
         f"{len(picked)} units x {per_unit} questions at {ladder.label(level)}, one question set "
         "for every snapshot"
     )
+    with ExitStack() as stack:
+        head_tree: list[Path] = []
+
+        def clean_head() -> Path:
+            """A worktree of HEAD without `.udebt/`, made once, for the questions and grades."""
+            if not head_tree:
+                head_tree.append(stack.enter_context(snapshot(root, head)))
+            return head_tree[0]
+
+        _run_calls(root, llm, report, prior, picked, per_unit, level, call, save, out,
+                   clean_head)  # fmt: skip
+    graded = [s for s in report["snapshots"] if s["graded"]]
+    report["pooled"] = pooled(graded)
+    report["paired"] = paired(graded)
+    save()
+    return report, path
+
+
+def _run_calls(root, llm, report, prior, picked, per_unit, level, call, save, out, clean_head):
+    """The run's model calls: the shared question set (from a clean tree of HEAD), then per
+    snapshot the answers (from a clean tree of it) and their grades (HEAD's clean tree)."""
     same_units = prior is not None and prior.get("unit_ids") == report["unit_ids"]
     same_set = prior is not None and (prior.get("per_unit"), prior.get("level")) == (
         per_unit,
@@ -582,7 +644,7 @@ def run(
     else:
         call(f"questions from HEAD, on each unit as it stands, at level {level}")
         questions = generate_questions(
-            root,
+            clean_head(),
             llm,
             picked,
             per_unit,
@@ -614,18 +676,12 @@ def run(
         save()
         if any(a["answer"] for a in answered):
             call(f"grading {at[:8]}'s answers against HEAD")
-        results = grade(root, llm, answered, MAX_TURNS["grades"])
+        results = grade(clean_head(), llm, answered, MAX_TURNS["grades"])
         fill(snap["units"], results)
         snap.pop("answers")
         snap["graded"] = True
         snap["summary"] = summarize(_rows_list(snap))
         save()
-
-    graded = [s for s in report["snapshots"] if s["graded"]]
-    report["pooled"] = pooled(graded)
-    report["paired"] = paired(graded)
-    save()
-    return report, path
 
 
 def suggest(

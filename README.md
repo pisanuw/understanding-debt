@@ -792,10 +792,14 @@ udebt experiment synthetic --snapshots ... --resume .udebt/experiments/<report>.
    is the only code it knows (one call);
 3. per snapshot, the answers are graded against HEAD, as the quiz grades them (one call).
 
-So a run costs 1 + 2 x snapshots calls, and the snapshot is the only variable. Its stale
+So a run costs 1 + 2 x snapshots calls, and the snapshot is the only variable. Every call
+reads a temporary worktree with no `.udebt/` (HEAD's for the questions and grades, the
+snapshot's for the answers), so no call can read an earlier report's answers, the samples or
+the map's pooled questions (`clean_worktree: true` in the report); every other `claude` call
+that reads files is denied `.udebt/` by a permission rule and told so in its prompt. Its stale
 knowledge should go wrong where the code moved since. The report, in
-`.udebt/experiments/synthetic-<sha>[_<sha>...]-<date>.json` (nothing goes to
-`.udebt/records/`), records the `level` and gives per snapshot and per unit:
+`.udebt/experiments/synthetic-<sha>[_<sha>...]-<date>-<HHMMSS>.json` (never overwritten; nothing
+goes to `.udebt/records/`), records the `level` and gives per snapshot and per unit:
 
 - the weighted mass landed since the snapshot (the same attribution as everywhere else),
   its share of the unit's mass, and the files at the snapshot and now;

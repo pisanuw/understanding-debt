@@ -47,6 +47,17 @@ class LLM(Protocol):
     ) -> str: ...
 
 
+# udebt's own directory holds earlier answers, grades, reference answers (pooled questions in
+# map.json, experiment reports, samples, digests, tutor transcripts): no call that writes or
+# grades questions may read it. The CLI is told so in the prompt and denied it by a permission
+# rule (a Read deny rule, which Claude Code also applies to Grep and Glob).
+UDEBT_DENY = ["Read(./.udebt/**)"]
+UDEBT_NOTE = (
+    "\n\n(Never open, list or search anything under `.udebt/`: it holds udebt's own records, "
+    "earlier answers and grades, not the code.)"
+)
+
+
 class ClaudeCLI:
     READ_TOOLS = ["Read", "Glob", "Grep"]
 
@@ -81,7 +92,8 @@ class ClaudeCLI:
         if schema is not None:
             cmd += ["--json-schema", json.dumps(schema)]
         if read_tools:
-            cmd += ["--allowedTools", *self.READ_TOOLS]
+            cmd += ["--allowedTools", *self.READ_TOOLS, "--disallowedTools", *UDEBT_DENY]
+            prompt += UDEBT_NOTE
         else:
             cmd += ["--tools", ""]
         if self.verbose:
@@ -132,6 +144,7 @@ class ClaudeCLI:
             if system:
                 cmd += ["--append-system-prompt", system]
         cmd += ["--tools", *self.READ_TOOLS, "--allowedTools", *self.READ_TOOLS]
+        cmd += ["--disallowedTools", *UDEBT_DENY]
         if self.verbose:
             how = "resume" if resume else "new"
             print(f"[udebt] claude chat turn ({how} {session_id[:8]})", file=sys.stderr)

@@ -210,7 +210,8 @@ def test_tutor_flags_for_the_claude_cli(monkeypatch, tmp_path):
     assert first[first.index("--append-system-prompt") + 1] == "SYS"
     assert later[later.index("--resume") + 1] == "u-1" and "--session-id" not in later
     for cmd in seen:
-        assert "--no-session-persistence" not in cmd and cmd[-8:] == tools
+        assert "--no-session-persistence" not in cmd and cmd[-10:-2] == tools
+        assert cmd[-2:] == ["--disallowedTools", "Read(./.udebt/**)"], "never udebt's own files"
 
 
 def test_a_stale_series_is_replayed_in_memory_and_tutor_markdown_is_escaped(server, capsys):

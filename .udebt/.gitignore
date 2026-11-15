@@ -4,3 +4,7 @@ commits-parsed.json.gz
 sizes.json
 export/
 dashboard/*.png
+tutor/
+digests/
+remote.json
+remote/

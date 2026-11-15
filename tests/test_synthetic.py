@@ -61,6 +61,9 @@ class Spy(llm_mod.FakeLLM):
     def structured(self, prompt, schema, *, cwd, read_tools=True, max_turns=40):
         task = prompt.split("\n", 1)[0]
         entry = {"task": task, "cwd": cwd, "max_turns": max_turns}
+        # the leakage guard: no call may see udebt's own directory, nor the live tree
+        entry["udebt"] = (cwd / ".udebt").exists()
+        entry["store_now"] = (cwd / "udebt" / "store.py").read_text()
         if "TASK: answer" in prompt:
             entry["store"] = (cwd / "udebt" / "store.py").read_text()
             entry["git"] = (cwd / ".git").exists()
@@ -106,7 +109,11 @@ def test_experiment_one_snapshot(fixture_repo, spy, capsys):
     (ans,) = [e for e in spy.log if e["task"] == "TASK: answer"]
     # the answerer saw the snapshot (store.py as of "store change 0"), with no way back
     assert ans["store"] == "STATE = {'v': 0}\n" and ans["git"] is False
-    assert {e["cwd"] for e in spy.log if e is not ans} == {root}  # questions and grades: HEAD
+    head_side = [e for e in spy.log if e is not ans]
+    assert len({e["cwd"] for e in head_side}) == 1, "questions and grades share HEAD's clean tree"
+    assert head_side[0]["cwd"] != root and not head_side[0]["cwd"].exists(), "gone afterwards"
+    assert all(e["store_now"] == "STATE = {'v': 2}\n" for e in head_side), "HEAD's code"
+    assert not any(e["udebt"] for e in spy.log), "no call could read .udebt/"
     assert not ans["cwd"].exists()  # the snapshot is gone
     assert all(e["max_turns"] >= 80 for e in spy.log)
     assert len(ans["questions"]) == 4  # two units, two questions each (the default)
@@ -118,6 +125,7 @@ def test_experiment_one_snapshot(fixture_repo, spy, capsys):
     (path,) = (root / ".udebt" / "experiments").glob("synthetic-*.json")
     assert path.name.startswith(f"synthetic-{at[:8]}-")
     rep = json.loads(path.read_text())
+    assert rep["clean_worktree"] is True
     assert rep["version"] == 3 and rep["llm_calls"] == 3 and rep["per_unit"] == 2
     assert rep["level"] == 3 and rep["level_name"] == "consequence across units"
     assert {q["level"] for q in rep["questions"]} == {3}
@@ -242,3 +250,54 @@ def test_experiment_level_is_explicit_and_a_resume_keeps_it(fixture_repo, spy, c
     assert [e["task"] for e in spy.log] == ["TASK: stable-questions", "TASK: answer", "TASK: grade"]
     rep = json.loads(path.read_text())
     assert rep["level"] == 2 and {q["level"] for q in rep["questions"]} == {2}
+
+
+def test_reports_never_overwrite_each_other(fixture_repo, spy, capsys, tmp_path):
+    from datetime import datetime
+
+    from udebt.synthetic import report_path
+
+    when = datetime(2026, 11, 15, 9, 30, 5)
+    first = report_path(tmp_path, "abc12345", when)
+    assert first.name == "synthetic-abc12345-2026-11-15-093005.json"
+    first.write_text("{}")
+    second = report_path(tmp_path, "abc12345", when)
+    assert second.name == "synthetic-abc12345-2026-11-15-093005-2.json"
+    root = fixture_repo
+    _run(root, capsys, "init")
+    _run(root, capsys, "map")
+    # a committed .udebt with an earlier report's answers: no call may read it
+    exp = root / ".udebt" / "experiments"
+    exp.mkdir(parents=True)
+    (exp / "old.json").write_text('{"reference": "the answer"}')
+    subprocess.run(["git", "add", "-f", ".udebt"], cwd=root, check=True)
+    subprocess.run(["git", "commit", "-qm", "commit udebt state"], cwd=root, check=True)
+    spy.log.clear()
+    for _ in range(2):  # two runs on the same snapshot, the same day
+        _run(root, capsys, "experiment", "synthetic", "--at", "HEAD~2")
+    reports = sorted(exp.glob("synthetic-*.json"))
+    assert len(reports) == 2, "the second run kept the first report"
+    assert len(spy.log) == 6 and not any(e["udebt"] for e in spy.log), "no tree has .udebt/"
+
+
+def test_every_read_tools_call_is_kept_out_of_udebt(monkeypatch, tmp_path):
+    seen = []
+
+    class Done:
+        returncode = 0
+        stdout = json.dumps({"structured_output": {"ok": 1}, "result": ""})
+        stderr = ""
+
+    def fake_run(cmd, **kw):
+        seen.append((cmd, kw.get("input", "")))
+        return Done()
+
+    monkeypatch.setattr(llm_mod.shutil, "which", lambda _: "/bin/claude")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    c = llm_mod.ClaudeCLI()
+    c.structured("TASK: questions\n...", {"type": "object"}, cwd=tmp_path)
+    c.structured("TASK: weigh\n...", {"type": "object"}, cwd=tmp_path, read_tools=False)
+    (with_tools, prompt), (without, prompt2) = seen
+    i = with_tools.index("--disallowedTools")
+    assert with_tools[i + 1] == "Read(./.udebt/**)" and ".udebt/" in prompt
+    assert "--disallowedTools" not in without and ".udebt" not in prompt2
