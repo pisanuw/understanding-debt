@@ -1242,6 +1242,31 @@ def _kind_of(data, name: str) -> str:
     raise SystemExit(f"Cannot tell what {name} is; pass --kind.")
 
 
+def cmd_worker(args) -> int:
+    from . import worker
+
+    limits = worker.Limits(args.max_commits, args.max_mb, args.timeout)
+    try:
+        m = worker.run(
+            args.url, Path(args.out), args.rev, limits=limits,
+            map_file=Path(args.map) if args.map else None, llm=args.llm,
+            walkthroughs=args.walkthroughs, excerpts=not args.no_excerpts,
+        )  # fmt: skip
+    except worker.WorkerError as e:
+        raise SystemExit(f"udebt worker: {e} (nothing written; the clone is deleted)") from e
+    c = m["counts"]
+    print(
+        f"Wrote {len(m['files']) + 1} files to {args.out} for {m['repo']} at {m['sha'][:8]}: "
+        f"{c['commits']} commits, map from {m['map_source']}"
+        + (f", {c['units']} units, {c['points']} points, {c['walkthroughs']} walkthroughs"
+           if "units" in c else "")
+        + f", {m['llm_calls']} model call(s), {m['seconds']} s. The clone is deleted."
+    )  # fmt: skip
+    if m["note"]:
+        print(f"Note: {m['note']}.")
+    return 0
+
+
 def cmd_serve(args) -> int:
     from . import serve
 
@@ -2469,6 +2494,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--format", choices=["table", "json"], default="table")
     s.set_defaults(fn=cmd_digest)
+
+    s = sub.add_parser("worker", help="analyse a repository in a transient clone (hosted)")
+    wk = s.add_subparsers(dest="action", required=True)
+    x = wk.add_parser("run", help="clone, analyse, write contract files, delete the clone")
+    x.add_argument("url", help="a git URL or a local path")
+    x.add_argument("--rev", help="the commit to analyse (default: the default branch)")
+    x.add_argument("--out", required=True, help="the directory to write into")
+    x.add_argument("--map", help="a map.json to use when the repository commits none")
+    x.add_argument("--llm", action="store_true",
+                   help="write a missing map, orientations and tour with the model")  # fmt: skip
+    x.add_argument("--walkthroughs", type=int, default=0,
+                   help="with --llm: walkthroughs for the N most important units")  # fmt: skip
+    x.add_argument("--no-excerpts", action="store_true", help="leave code lines out of specs")
+    x.add_argument("--max-commits", type=int, default=20_000)
+    x.add_argument("--max-mb", type=int, default=500)
+    x.add_argument("--timeout", type=int, default=900, help="seconds for the clone")
+    x.set_defaults(fn=cmd_worker)
 
     s = sub.add_parser("validate", help="check a JSON file against the versioned contract")
     s.add_argument("file")
