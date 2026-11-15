@@ -42,6 +42,14 @@ sentry-javascript did exactly that: it installed and built the repository inside
 run was discarded (TESTBEDS.md, "Sample prep"). huggingface_hub has no `.claude/settings.json` and
 no `.mcp.json`, so its run was not affected.
 
+## Units that name only directories
+
+These outputs predate the worker's `files` (2026-11-15), so 14 units name only directories with
+no file to quiz from: 12 on mlflow, 1 each on the others (the loader's summary of a worker output
+counts them as `tree_fallback`). The app lists those directories from GitHub's tree at the pin
+(`/api/tree`), so the scripts need no reload. A regenerated sample would carry `files` and need
+no listing.
+
 ## Regenerating
 
 The worker outputs (`analysis.json`, `map.json`, `specs.json`) are in that session's scratchpad,

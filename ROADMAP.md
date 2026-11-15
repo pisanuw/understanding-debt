@@ -673,6 +673,7 @@ queue followed the same day as v1's next feature (Phase 4b answer 5), also teste
 | 7 local end-to-end | done: Playwright with fakes (sign in, digitalme sample, unit and walkthrough, two-question level-1 quiz, debt falls, account deleted, no CSP violation); 52 screenshots (13 screens) at 1280/390 px, light/dark, in `.udebt/dashboard/hosted-*.png` |
 | digest | deferred: an analysis keeps no commits since an answer; the worker would have to precompute digests per unit |
 | 8 spaced review | done: `web/src/core/review.ts` (SM-2 per unit and level as `udebt/review.py` folds it, checked case by case against `web/test/fixtures/review-parity.json`, 20 record sets written by `tests/test_hosted_review_parity.py`); each record carries its state on `data.review` (no schema change); `/api/grade` takes `source: review` and folds the state from the person's earlier records on the sitting's units; a Review tab (due items, coming up, a sitting of up to N items through the quiz's flow, one grading call, reveal at levels 1-2, gateway or own key), the number due on the tab and the repository card; vitest 218 tests, coverage 98.2% statements, 88.4% branches; Playwright: a miss due a day later on the fake clock, reviewed, its state moved; 28 screenshots `hosted-review-*.png` |
+| 9 tree fallback | done (owner's yes of 2026-11-15): a unit that names only directories (12 of mlflow's 30 units, 1 of 18 on huggingface_hub, 1 of 15 on sentry-javascript) is quizzed from the top tracked files under them, lines 1-60; the rule in `udebt/topfiles.py` and `web/src/core/topfiles.ts` (source, then other, docs, tests and fixtures; larger first; mechanical files never; at most four, directories in turns), checked against each other on `web/test/fixtures/topfiles-parity.json`; the worker records `files` on such units (no contract change); for older analyses `/api/tree` lists the tree at the sha (one unauthenticated GitHub call per repository and sha, kept in the function's memory, refusals respected) and the page keeps each directory's answer for the session; a graded question shows the files it rests on; on a clone of mlflow at the pin each of the 12 units gets four source files; vitest 316 tests, 98.41% statements; Playwright quizzes digitalme's `frontend`-only unit; 8 screenshots `hosted-tree-*.png` |
 | tutor, teach-back | not ported in v1 (BRIEFING, Phase 4b): the tutor is next (Phase 4b answer 5) |
 
 **Remaining, in order (each production step after the owner's yes):**
@@ -1225,6 +1226,14 @@ each record's `data.review`, `/api/grade` for review sittings, the Review tab. T
 only (vitest, Playwright with the fake clock); no model call, no schema change, nothing
 deployed. Decisions and the open question in BRIEFING (Phase 4b review).
 
+**The tree fallback is built** (owner's yes of 2026-11-15; three commits after `552ebbb`): units
+that name only directories are quizzed from the top tracked files under them. The worker records
+them as `files`; for the samples already loaded in production the page lists the directories
+through the new function `/api/tree`, so nothing needs reloading. Verified on mlflow at its pin
+(all 12 file-less units get four files). Tested with fakes; no model call, nothing deployed. Open
+questions in BRIEFING (Phase 4b tree fallback): GitHub's unauthenticated limit from Netlify's
+shared addresses, evidence shown only after grading, regenerating the samples.
+
 Earlier in the day: Phase 3.4 and Phase 3.5 done, Phase 4a done as re-scoped (see their
 sections).
 
@@ -1241,7 +1250,13 @@ For the next session:
   (`python -m udebt.hosted.prompt_parts`) and `web/test/fixtures/parity.json`
   (`UDEBT_WRITE_PARITY=1 pytest tests/test_hosted_parity.py`); after changing `udebt/review.py`,
   `web/test/fixtures/review-parity.json` (`UDEBT_WRITE_PARITY=1 pytest
-  tests/test_hosted_review_parity.py`). In this container `pytest` needs `PYTHONPATH=.` (the
-  package is not installed in pytest's tool environment).
-- When the sample outputs arrive: `python -m udebt.hosted.samples <dirs> --out <sql dir>` and
-  hand the files to the Plabs session.
+  tests/test_hosted_review_parity.py`); after changing `udebt/topfiles.py`, `udebt/filekinds.py`
+  or `structure.SOURCE_EXTS`, `web/test/fixtures/topfiles-parity.json` (`UDEBT_WRITE_PARITY=1
+  pytest tests/test_hosted_topfiles_parity.py`) and the TypeScript port. In this container
+  `pytest` needs `PYTHONPATH=.` (the package is not installed in pytest's tool environment). The
+  local Postgres 16 cluster may be down: `pg_ctlcluster 16 main start`, then
+  `UDEBT_TEST_PG=postgresql://postgres:postgres@127.0.0.1:5432/postgres`.
+- The three samples are in `samples/` and loaded in production (`552ebbb`). Their outputs predate
+  `files`, so the app lists 14 units' directories from GitHub. A regenerated sample (15 calls
+  each, the owner's yes) would carry `files`: `python -m udebt.hosted.samples <dirs> --out <sql
+  dir>`, then the Plabs session's `sql`.

@@ -148,3 +148,7 @@
 2026-11-15 [decision] Owner: cheaper gateway model as the hosted default (web DEFAULT_MODEL, supabase/ops/udebt-llm-caps.sql); directory fallback for file-less units; production steps approved.
 2026-11-15 [decision] Owner: yes to the llm.py isolation fix (f294414), udebt default_model = cheaper model with default caps, Plabs loads samples/*.sql (after app_udebt migrations).
 2026-11-15 [note] Plabs loaded the 3 samples into production (migrate, expose-schema, 3 sql, check-schema passed; claude-built-apps 6ff0efc). Owner told Plabs: yes to all DEPLOY.md steps.
+2026-11-15 [code] Tree fallback: udebt/topfiles.py picks a directory-only unit's top files; the worker records them as `files` (specs, no contract change).
+2026-11-15 [code] web: /api/tree lists the tree at the sha (one GitHub call per repo and sha, refusals respected); the page keeps listings per session.
+2026-11-15 [code] web: refsForUnit uses `files`, then the tree; graded questions show their evidence files linked at the sha; the fake gateway cites its excerpts.
+2026-11-15 [note] mlflow at the pin: all 12 file-less units now get 4 source files (Python and TypeScript agree); samples need no reload.

@@ -281,3 +281,7 @@ it are in TESTBEDS.md, "Sample prep".
 5. **Units with no code for the question writer:** 1 of 18 (huggingface_hub), 1 of 15
    (sentry-javascript) and 12 of 30 (mlflow). These sub-units list only directories and have no
    walkthrough or orientation, so `refsForUnit` finds no file, and a quiz on them gets no code.
+   - **Fixed (owner's yes, 2026-11-15)** without regenerating the samples: such a unit is quizzed
+     from the top tracked files under its directories. The worker now records them (`files`);
+     for the loaded samples the page lists the directories from GitHub's tree at the pin
+     (`/api/tree`). On a clone of mlflow at the pin, each of the 12 units gets four source files.

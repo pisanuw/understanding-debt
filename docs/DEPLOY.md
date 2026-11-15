@@ -12,7 +12,7 @@ explicit yes; the UDebt session made none of them.
 | part | in this repository | runs on |
 |---|---|---|
 | the web app (Vite + TypeScript, from the platform template) | `web/` (`web/README.md`) | Netlify, built by `netlify.toml` at the root |
-| the functions `/api/questions`, `/api/grade` (also for review sittings), `/api/excerpt` | `web/netlify/functions/` | Netlify Functions in the same site |
+| the functions `/api/questions`, `/api/grade` (also for review sittings), `/api/excerpt`, `/api/tree` | `web/netlify/functions/` | Netlify Functions in the same site |
 | the analysis service | `udebt/hosted/worker_service.py` (`python -m udebt.hosted.worker_service`) | Render, `render.yaml` |
 | the migrations and the Plabs notes | `supabase/migrations/0001_app_udebt.sql`, `0002_hosted.sql`, `supabase/README.md` | the Supabase admin workflow in claude-built-apps |
 | the sample load | `python -m udebt.hosted.samples` | anywhere with Python 3.11+, then the admin workflow's `sql` |
@@ -35,6 +35,12 @@ worker, used for that job and dropped).
 - The spaced review queue (Review tab): no migration, no new function and no new variable; the
   review state rides in `records.data`, and `/api/grade` reads the person's earlier records on
   a sitting's units with their token to stamp it.
+- The tree fallback (owner's yes of 2026-11-15): a unit that names only directories is quizzed
+  from the top files under them. New analyses record them (`files` in the specs); for older ones,
+  the three loaded samples among them, the page asks the new function `/api/tree`, which lists
+  the tree at the pinned sha with one unauthenticated call to api.github.com per repository and
+  sha. No migration, no new variable, no step below changes; Netlify builds the new function
+  with the others, and the samples in production need no reload.
 - The footer: the exact `footerHtml('udebt')` (2231 bytes, sha256
   `dc713ce9950e2cb7cabc6a20f439d96e2c1e39666b483c3e9acb65f6cd4685c8`) in `web/index.html`,
   pinned by `web/test/csp.test.ts`; `FOOTER_STYLE_CSP` in the CSP; the HintWise favicon.
@@ -92,11 +98,13 @@ curl -s https://udebt.hintwise.org/ | grep -c data-site-footer            # 1
 curl -sI https://udebt.hintwise.org/ | grep -i content-security-policy    # the policy in netlify.toml
 curl -s https://udebt-api.hintwise.org/healthz                            # {"ok": true, "busy": false, "version": 1}
 curl -s -o /dev/null -w '%{http_code}\n' https://udebt.hintwise.org/api/excerpt   # 401 without a token
+curl -s -o /dev/null -w '%{http_code}\n' https://udebt.hintwise.org/api/tree      # 401 without a token
 ```
 
 Then by hand: sign in with Google and with an email link; open each sample; read a unit's
 walkthrough (the code comes from GitHub); take a two-question quiz on the HintWise key; see the
-debt fall; switch to an own key and take one more; the next day, review a question missed the
+debt fall; quiz one of mlflow's sub-units that name only directories (for example "Scorers and
+registry") and see "In the code" name files under its directory; switch to an own key and take one more; the next day, review a question missed the
 day before from the Review tab (one grading call) and see when it comes back; add a small public
 repository with an own key and watch the job; delete a test account.
 
@@ -166,7 +174,16 @@ pause waits for it to start).
   than that on one repository would get a cut list there and in the page's own read.
 - Render: the build, the start command, memory and time on the free instance, the custom domain,
   a token that expires during a long job (the worker refuses tokens with under 15 minutes left).
-- GitHub: raw.githubusercontent.com and api.github.com rate limits for many users.
+- GitHub: raw.githubusercontent.com and api.github.com rate limits for many users. `/api/tree`
+  calls api.github.com unauthenticated (60 requests an hour per IP address, and Netlify's
+  functions share outbound addresses): one call lists a whole repository at a sha and a warm
+  function keeps it, and a refusal is respected until GitHub's reset, but how often it is
+  refused live is unknown. The subtree form (`git/trees/<sha>:<dir>`, used only when GitHub
+  truncates a whole listing) was not tried against GitHub from this environment, whose proxy
+  blocks api.github.com; the mlflow check in the next item used a clone.
+- The tree fallback on the samples: checked against a clone of mlflow at the pin (2026-11-15):
+  each of the 12 units with no file now gets four source files (`udebt/topfiles.py` and the
+  TypeScript handler agree file for file).
 - The three samples: their outputs had not arrived; the loader was tested on digitalme.
 
 ## Earlier phases

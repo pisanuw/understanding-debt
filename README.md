@@ -834,6 +834,17 @@ counts on the ladder like any other. The tab and the repository card show how ma
   decisions, file and line references, the tour; no code, no commit emails), with the id of
   whoever added or analysed one.
 
+**Code for every question.** Questions are written from code excerpts at the analysis's commit:
+a unit's walkthrough steps, else the top of the files its orientation and paths name. A unit that
+names only directories (12 of mlflow's 30 units, one each on the other two samples) is written
+from the top tracked files under them: source before config, docs and tests, larger first, never
+lockfiles, generated files or media, at most four, the first 60 lines of each. An analysis made
+since 2026-11-15 records those files (`files` on the unit); for an older one, the three samples
+among them, the page lists the directories from GitHub's tree at that commit through `/api/tree`
+(once per directory per visit, kept in the page's memory only). If GitHub refuses the listing,
+the question is written without code, as before. After grading, each question shows the files
+it rests on, linked at the commit.
+
 No code is stored: a walkthrough's lines and the excerpts a grader reads are fetched from GitHub
 at the analysis's pinned commit for that one request. The HintWise gateway records the cost of
 each model call on your account and when you first and last used the app. Your own Anthropic

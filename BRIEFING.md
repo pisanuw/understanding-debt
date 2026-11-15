@@ -743,6 +743,42 @@ acceptable.
   a digest with no evidence defaults to the last 30 days; digitalme's dense co-change
   graph is left as is since the import graph carries the ordering.
 
+- **Phase 4b, the tree fallback (2026-11-15, owner's yes)**: a unit that names only directories
+  (no walkthrough, no file in its orientation or paths) is quizzed from the top tracked files
+  under them, lines 1-60 each, as a named file is read. Tested with fakes and on a clone of
+  mlflow at its pin; no model call, nothing deployed.
+  - **One rule, twice**: `udebt/topfiles.py` and `web/src/core/topfiles.ts`, checked against
+    each other on `web/test/fixtures/topfiles-parity.json` (filekinds' lock, generated, media,
+    docs and test patterns character for character, `structure.SOURCE_EXTS`). Never lockfiles,
+    generated files, media, symlinks, submodules, empty files or files over 2 MB; then source,
+    other files (config, data, styles), docs, tests and fixtures (a new `FIXTURES` pattern, not
+    added to filekinds, whose kinds weigh commits); larger first, then by path. Each directory
+    gives its top four and the unit takes them in turns, at most four, so a unit over two
+    directories shows both.
+  - **Write side**: the worker records the result as `files` on each unit with a real directory
+    among its orientation's and own paths (`git ls-tree -r -l` of the clone). specs.json is not
+    a contract kind and the field is added, so no contract change; the loaded samples are valid
+    as they are. The web prefers a walkthrough, then named files, then `files`.
+  - **Read side, for older analyses** (the three samples in production): `/api/tree?repo&sha&
+    path...` with `/api/excerpt`'s checks and `no-store`. One unauthenticated call to GitHub's
+    recursive git trees API lists the whole tree at the sha (mlflow: 10,390 files), kept in the
+    function's memory per repository and sha (four trees at most); a directory's own subtree is
+    asked only when GitHub truncates the whole listing. A 403 or 429 stops calls until GitHub's
+    reset (a minute when it names none) and answers 503 with `retry_after`. The whole tree rather
+    than one call per directory, because one call then serves every unit of a repository.
+  - **The page** keeps each directory's answer per analysis for the session (memory, never
+    storage), sends every directory a sitting needs in one request, and after a failure asks
+    again only after 10 minutes; meanwhile the question is written without code and the prompt
+    says so, as before. Both modes use it (the own-key path already fetched excerpts through the
+    functions).
+  - **Evidence after grading**: a graded question now shows the files it rests on, linked at the
+    sha, as the CLI shows the evidence beside the reference answer; never before the answer. The
+    fake gateway cites the excerpts its prompt carried, as a model would, which is what the
+    Playwright walkthrough and the screenshots show.
+  - **mlflow at `f6ff35427d7e`**: `samples/mlflow.sql` loaded twice into a scratch Postgres; each
+    of the 12 units with no file gets four source files (48 in all, each at least 60 lines), and
+    the Python rule and the TypeScript handler pick the same files in the same order.
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.
@@ -776,6 +812,18 @@ acceptable.
 
 ## Open questions
 
+- Phase 4b tree fallback: `/api/tree` calls api.github.com unauthenticated, 60 requests an hour per
+  IP address, from Netlify's shared outbound addresses. One call serves a repository at a sha
+  while the function is warm, and refusals are respected, but live refusals may be frequent.
+  If they are, list the tree from the browser instead (GitHub's API allows it; the CSP would need
+  `connect-src https://api.github.com`, and each person's own limit would apply), or give the
+  function a GitHub token (a secret, the owner's yes)? The conservative choice was the function,
+  no token, no CSP change.
+- Phase 4b tree fallback: the files a question rests on are shown only after grading. Show the
+  files the question was written from beside the question, as a "where to look" (a hint at
+  levels 4-5)? Chosen: no, nothing new before the answer.
+- Phase 4b tree fallback: regenerate the three samples (15 calls each) so they carry `files` and
+  need no GitHub listing, or keep the read-side fallback for them? Chosen: keep it (no calls).
 - Phase 4b review: a review sitting writes no `quiz_sessions` row (the table has no kind column,
   and the conservative choice was no schema change). Keep it so, or add a `kind` in a
   `0003_review.sql` so a person's sessions list their reviews too?
