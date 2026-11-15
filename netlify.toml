@@ -1,0 +1,34 @@
+# The hosted udebt app at https://udebt.hintwise.org (HintWise, option B: its own repository).
+# The owner imports this repository into Netlify with the site name udebt, Deploy Previews and
+# branch deploys off; docs-only commits carry [skip netlify] (docs/new-app-guide.md section 1).
+# Everything here is public: the Supabase URL and anon key are public by design (copied from
+# claude-built-apps platform/supabase.json); no secret belongs in this file or in Netlify.
+
+[build]
+  base = "web"
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # Read by the page at build time (web/src/lib/supabase.ts, web/src/model/worker.ts).
+  VITE_SUPABASE_URL = "https://auth.hintwise.org"
+  VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFya3R4bHJseWNlZmZ5b3pkd2hxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4ODEwMTAsImV4cCI6MjA5MjQ1NzAxMH0.Vuku-irT3kAHZYibK23q6dpyOEqV_Eg5zB78I3dyshE"
+  # The API base URL: the analysis service on Render (udebt.hosted.worker_service).
+  VITE_UDEBT_WORKER_URL = "https://udebt-api.hintwise.org"
+
+# The functions at /api (web/netlify/functions: questions, grade, excerpt) read SUPABASE_URL and
+# SUPABASE_ANON_KEY at run time. Variables set in this file reach the build only, so those two
+# are set on the site itself (Netlify UI, or the Plabs "Netlify env" workflow): docs/DEPLOY.md.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # web/dev/csp.ts builds this; web/test/csp.test.ts fails when the two differ.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'sha256-IVEm3o4yepNveaZ4xos/Qn9wn343DWKmcwFclbDzlkQ=' 'sha256-4VDViIffTKl8oDDJg58VHCVBOHSQm7GPM7eZ1fAKuzc='; style-src-attr 'unsafe-hashes' 'sha256-QIjW/+aUzfg58HcITJNHkkCTGmLovNUIQbL+Zq2TsIE=' 'sha256-2LBff+ZJlJxkM8SFdDjtw2nmc28qZvirrWOZ1lfthg8='; img-src 'self' data:; font-src 'self'; connect-src 'self' https://auth.hintwise.org https://api.anthropic.com https://udebt-api.hintwise.org; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
