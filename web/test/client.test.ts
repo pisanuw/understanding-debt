@@ -138,7 +138,11 @@ describe("the person's own key", () => {
     expect(seen).toEqual(['POST /api/allowance']);
     expect(await allowanceVia(deps({ nope: 1 }))()).toBeNull();
     await expect(allowanceVia(deps({ error: 'x' }, 502))()).rejects.toThrow('x');
-    await expect(allowanceVia({ getToken: async () => null, fetch: fetchWith({}) })()).rejects.toThrow('Sign in first.');
+    expect(await allowanceVia({ getToken: async () => null, fetch: fetchWith({}) })()).toBe('signed-out');
+    // Refused even after one refresh: the session ended elsewhere.
+    let refreshed = 0;
+    expect(await allowanceVia({ getToken: async () => 'old', fetch: fetchWith({ error: 'x', detail: 'gateway 401: no session' }, 401), refreshToken: async () => (refreshed++, 'new') })()).toBe('signed-out');
+    expect(refreshed).toBe(1);
   });
 
   it('keeps the mode and the key exactly as llm.ts does', () => {

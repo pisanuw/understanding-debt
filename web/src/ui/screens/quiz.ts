@@ -582,9 +582,11 @@ export async function quizTab(app: App, v: RepoView): Promise<HTMLElement> {
   const file = got?.questions.length ? got : null;
   const unit = app.quizUnit;
   app.quizUnit = null;
-  // The HintWise key's allowance used up: said on top, the model's quiz out of reach until it resets.
-  const usedUp = allowance !== null && !allowance.allowed;
-  const notice = usedUp ? capBanner(allowance, file !== null) : null;
+  // The HintWise key's allowance used up, or the session refused (ended elsewhere): said on top,
+  // the model's quiz out of reach until it resets or the person signs in again.
+  const signedOut = allowance === 'signed-out';
+  const usedUp = signedOut || (allowance !== null && !allowance.allowed);
+  const notice = signedOut ? sessionBanner(app, file !== null) : allowance !== null && usedUp ? capBanner(allowance as Allowance, file !== null) : null;
   const withNotice = (el: HTMLElement): HTMLElement => (notice ? h('div', null, notice, el) : el);
   if (!file) return withNotice(modelTab(app, v, unit, null, usedUp));
   if (app.mode() === 'off') return advanceTab(app, v, file, unit, null);
@@ -603,7 +605,7 @@ export async function quizTab(app: App, v: RepoView): Promise<HTMLElement> {
       draw(k, slot.querySelector<HTMLSelectElement>('#quiz-unit')?.value || null);
       choice.querySelector<HTMLInputElement>('input:checked')?.focus();
     },
-    usedUp ? 'Not available until your HintWise allowance resets (see above).' : null,
+    signedOut ? 'Not available until you sign in again (see above).' : usedUp ? 'Not available until your HintWise allowance resets (see above).' : null,
   );
   const both: Both = {
     choice,
@@ -614,6 +616,16 @@ export async function quizTab(app: App, v: RepoView): Promise<HTMLElement> {
   };
   draw(first, unit);
   return withNotice(slot);
+}
+
+/** The notice on top of the Quiz tab when the gateway refused the session even after a refresh. */
+function sessionBanner(app: App, hasAdvance: boolean): HTMLElement {
+  return h(
+    'div',
+    { class: 'warn cap-notice', role: 'status', 'data-testid': 'session-notice' },
+    h('p', null, 'Your sign-in has ended, perhaps by signing out in another HintWise app or tab, so the HintWise key cannot be used. ', hasAdvance ? 'The questions written in advance still work. ' : '', 'Sign in again to use it.'),
+    button('Sign out and sign in again', () => void app.signInAgain()),
+  );
 }
 
 /** The notice on top of the Quiz tab while the person's HintWise allowance is used up. */

@@ -36,12 +36,15 @@ const open = previewOpen(fixture as unknown as Fixture);
 const seen: string[] = [];
 /** With the fakes: the HintWise allowance used up (the check and the calls alike). */
 let capped = false;
+/** The gateway refuses the session (ended elsewhere): a 401 on the allowance check. */
+let dead = false;
 const apiFetch: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const req = new Request(new URL(String(input), 'http://site'), init);
   const path = new URL(req.url).pathname;
   seen.push(path);
   if (path === '/api/questions') return handleQuestions(req, { env: { ...env, fakeCap: capped } });
   if (path === '/api/grade') return handleGrade(req, { env: { ...env, fakeCap: capped } });
+  if (path === '/api/allowance' && dead) return Response.json({ error: 'Your sign-in has expired. Sign in again.', detail: 'gateway 401: The session token is invalid or expired; sign in again.' }, { status: 401 });
   if (path === '/api/allowance') return handleAllowance(req, { env: { ...env, fakeCap: capped } });
   if (path === '/api/excerpt') return handleExcerpt(req, { env, open });
   if (path === '/api/tree') return handleTree(req, { env, open });
@@ -123,6 +126,7 @@ const row = (name: string) => [...document.querySelectorAll<HTMLTableRowElement>
 beforeEach(() => {
   seen.length = 0;
   capped = false;
+  dead = false;
   window.location.hash = '';
   vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-15T10:00:00Z') });
 });
@@ -221,6 +225,21 @@ describe('the quiz-kind choice', () => {
     await start({ signedIn: false });
     await go('#/r/1/quiz');
     expect($('[data-testid=cap-notice]')).toBeNull();
+  });
+
+  it('says before a sitting that the sign-in has ended, keeps the questions written in advance, and offers to sign in again', async () => {
+    dead = true;
+    await start();
+    await go('#/r/1/quiz');
+    const notice = $('[data-testid=session-notice]');
+    expect(notice?.textContent).toMatch(/^Your sign-in has ended, perhaps by signing out in another HintWise app or tab, so the HintWise key cannot be used\. The questions written in advance still work\. Sign in again to use it\./);
+    expect($('[data-testid=cap-notice]')).toBeNull();
+    expect(checkedKind()).toBe('advance');
+    expect($<HTMLInputElement>('[data-testid=quiz-kind] input[value=model]')?.disabled).toBe(true);
+    expect(byText('label', /Not available until you sign in again/)).toBeTruthy();
+    await click('button', 'Sign out and sign in again');
+    expect(window.location.hash).toBe('#/signin');
+    expect(app.anonymous || !app.user).toBe(true);
   });
 
   it('says so when the allowance runs out during a sitting', async () => {

@@ -178,3 +178,4 @@
 2026-11-15 [code] HintWise key is the default for signed-in users (model quiz first); /api/allowance (gateway check mode) shows a used-up allowance clearly and falls back to advance quizzes.
 2026-11-15 [decision] Owner raised udebt's gateway caps: $1.00/person/day, app $5/day, $20/week, $40/month (Plabs sql run 43732364337); udebt-llm-caps.sql updated to match.
 2026-11-15 [code] Buttons: 'Check Answer and Grade', 'Check Answer'. A 401 from /api refreshes the session once and retries; refusals say which check (database or gateway) and its message.
+2026-11-15 [code] Quiz tab: when the allowance check is refused even after a refresh (session ended elsewhere), say so up front, keep advance quizzes, offer sign in again.

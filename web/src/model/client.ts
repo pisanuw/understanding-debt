@@ -113,10 +113,23 @@ export interface Allowance {
   calls_left?: number | null;
 }
 
+/**
+ * The allowance check's answer: the allowance, or 'signed-out' when the session was refused even
+ * after one refresh (ended elsewhere: another app's global sign-out, a deleted account), so the
+ * page can say so before anyone types an answer.
+ */
+export type AllowanceAnswer = Allowance | 'signed-out';
+
 /** POST /api/allowance, or null when the answer is not an allowance (the page then learns of a cap from the call). */
-export function allowanceVia(deps: ClientDeps): () => Promise<Allowance | null> {
+export function allowanceVia(deps: ClientDeps): () => Promise<AllowanceAnswer | null> {
   return async () => {
-    const a = await call<Partial<Allowance>>(deps, '/api/allowance', { method: 'POST', body: '{}' });
+    let a: Partial<Allowance>;
+    try {
+      a = await call<Partial<Allowance>>(deps, '/api/allowance', { method: 'POST', body: '{}' });
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) return 'signed-out';
+      throw e;
+    }
     return typeof a.allowed === 'boolean' ? { allowed: a.allowed, scope: a.scope ?? null, resets_at: a.resets_at ?? null, app_open: a.app_open, calls_left: a.calls_left ?? null } : null;
   };
 }
