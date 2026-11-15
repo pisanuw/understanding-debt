@@ -723,24 +723,16 @@ acceptable.
 - Blocking merges. Every signal is advisory unless a team opts in (ROADMAP).
 - Storing source code in the hosted service. Metadata only (ROADMAP Phase 4).
 
-## Open questions
+- **Phase 4b answers (2026-11-15, 15-minute rule; the owner can reverse any of them):**
+  (1) a signed-in person's shared analysis stays visible, labelled as theirs, HintWise's own
+  preferred (revisit with real users; the alternative is a worker signature or samples only);
+  (2) the platform's default $0.25 per person per day stays until measured on the gateway,
+  `default_model` unchanged; (3) own-row records stay: the hosted debt is a self-assessment,
+  README says so; (4) the free instance keeps 6,000 commits and 200 MB, large repositories are
+  precomputed samples or `udebt worker run` locally then `udebt push`; (5) the spaced review
+  queue is ported next, the tutor (needs streaming and the `claude` CLI) after.
 
-- Phase 4b: a signed-in person can write an analysis of a public repository with their own
-  token, and others see it. The page labels whose analysis it shows and prefers HintWise's. Is
-  that enough, or should only analyses the worker wrote be shared (a signature the functions
-  check, which needs a worker secret on Netlify), or only samples?
-- Phase 4b: a quiz sitting is about $0.07 (two questions) to $0.16 (five) on the gateway's
-  default model, estimated, so the default $0.25 per person per day is about three short
-  sittings. Which caps, and should udebt's `default_model` be a cheaper one? (Measure on the
-  gateway first.)
-- Phase 4b: own-row records mean a person can edit their own evidence. Fine for a learning tool;
-  if the debt ever means something to someone else (a lead, a team), grading has to record
-  through a function with a key the person does not hold.
-- Phase 4b: the free Render instance (512 MB, 0.1 CPU) analyses repositories up to 6,000 commits
-  and 200 MB; sentry-javascript and mlflow would not fit. Raise the limits on a paid instance,
-  or keep large repositories to precomputed samples?
-- Phase 4b: port the spaced review queue next (records would keep `review` state in `data`), or
-  the tutor (a gateway conversation with read tools over a short-lived clone on the worker)?
+## Open questions
 
 - Phase 3.5: k_low (0.2) comes from huggingface_hub alone, a library whose architecture has
   been stable for years; digitalme decayed fastest on pre-ladder questions (k 2.72) and its

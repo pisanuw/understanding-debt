@@ -134,3 +134,5 @@
 2026-11-15 [code] udebt worker sql --dialect json, --public, --url; udebt worker run --no-export; python -m udebt.hosted.samples checks the three outputs and writes their public SQL.
 2026-11-15 [note] Local end-to-end with fakes: sign in, digitalme sample, two-question level-1 quiz, debt index falls from 100.0; 52 screenshots at 1280/390 px, light/dark; no CSP violation.
 2026-11-15 [doc] docs/DEPLOY.md rewritten for HintWise (owner and Plabs steps, env vars, caps estimate, untested parts), supabase/README.md, README hosted section, BRIEFING and ROADMAP Phase 4b.
+
+2026-11-15 [decision] Phase 4b answers (15-minute rule): shared analyses stay labelled, $0.25/day default cap, self-assessment records, large repos as samples or local run + push, review queue ported next.
