@@ -344,6 +344,9 @@ it are in TESTBEDS.md, "Sample prep".
      $0.25 per person and $2 for the app per day and `max_tokens` at 4096, until the gateway's
      `usage` shows real sittings. The Plabs session runs `supabase/ops/udebt-llm-caps.sql`; the
      web app's `DEFAULT_MODEL` names the same model.
+   - **Raised by the owner the same day ("1 yes, 2 yes", through Plabs):** $1.00 per person per
+     day (about 28 two-question sittings), and $5 a day, $20 a week and $40 a month for the
+     app. `supabase/ops/udebt-llm-caps.sql` states the new numbers.
    - The cheaper model made these samples, as every logged call shows. The synthetic experiments
      in TESTBEDS.md also ran on the CLI's default with no model set, though their reports do not
      record the model.

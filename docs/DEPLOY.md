@@ -126,9 +126,11 @@ worker, used for that job and dropped).
    were made; each applied twice to a scratch Postgres 16 after the migrations). Copy them
    into claude-built-apps (for example `udebt/supabase/ops/`), run the admin workflow's
    `sql <file>` for each, then `check-schema app_udebt` again.
-8. Gateway settings (prepared by Plabs, waiting on the owner's yes there):
-   `supabase/ops/udebt-llm-caps.sql` (the cheaper model as `default_model`,
-   $2 a day for the app, $0.25 a day per person; owner's yes of 15 Nov 2026), run with `sql`.
+8. Gateway settings: `supabase/ops/udebt-llm-caps.sql` (the cheaper model as `default_model`;
+   $5 a day, $20 a week and $40 a month for the app; $1.00 a day per person), run with `sql`.
+   Run 43707126814 set the first numbers ($2 a day, $0.25 a person). The owner raised them the
+   same day, in claude-built-apps `udebt-llm-caps-2.sql` (sql run 43732364337), and the file
+   here now states the raised ones.
 
 ### Checks after the deploy
 
@@ -187,7 +189,8 @@ output tokens. At the gateway's default model price ($4 in, $20 out per million)
 $0.07 for a two-question sitting and $0.16 for five, so $0.25 per person per day would be three
 short sittings. udebt uses the cheaper model ($2 in, $10 out; `DEFAULT_MODEL` in the web app and
 `default_model` in `supabase/ops/udebt-llm-caps.sql`, owner's yes of 15 Nov 2026), so a sitting
-is about $0.035 or $0.08 and the day's $0.25 about seven short sittings. A review sitting is one
+is about $0.035 or $0.08. The first $0.25 a day was about seven short sittings; the owner's
+$1.00 a day (15 Nov 2026) is about 28, or 12 of five questions. A review sitting is one
 call, the grading (its questions are stored phrasings), about the size of a quiz's grading call.
 Call caps per person (photo2pgn's pattern) are the other lever. Measure on the live gateway
 before settling (`usage` in the admin workflow).
