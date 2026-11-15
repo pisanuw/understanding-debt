@@ -394,7 +394,9 @@ def _hosted_questions(prompt: str, n: int) -> list[dict[str, Any]]:
         dirs = [p.rstrip("/") + "/" for p in paths]
         under = [f for f in shown if f in paths or any(f.startswith(d) for d in dirs)]
         summary = fields.get("summary", "").strip()
-        ref = f"It {summary[:1].lower()}{summary[1:]}" if summary else f"{name} does one job."
+        # Lower-case the first letter only when the second is lower too ("POST ..." stays).
+        head = summary[:1].lower() if summary[1:2].islower() else summary[:1]
+        ref = f"It {head}{summary[1:]}" if summary else f"{name} does one job."
         asks = [a.format(n=name) for a in _HOSTED_ASK.get(level, _HOSTED_ASK[1])]
         for k in range(n):
             q = asks[k % 3]

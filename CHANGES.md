@@ -165,3 +165,5 @@
 2026-11-15 [code] udebt worker quizzes: advance questions per unit, levels 1-3, with the hosted prompt (Python port, parity fixture); contract kind quizzes added, CONTRACT stays 1.
 2026-11-15 [code] web: no login needed for samples; answers in localStorage, self-checked advance quizzes and reviews, excerpt/tree open at sample pins, copy offer at sign-in.
 2026-11-15 [decision] No-login choices (15-minute rule): functions not browser for excerpts, self-checked at full weight, off-mode users get advance quizzes too; BRIEFING open questions.
+
+2026-11-15 [decision] Owner on use without signing in: advance quizzes for everybody (model quiz one choice away); self-checked at full weight; copies keep browser answers and their review states; no excerpt caching yet; 51 calls stand.

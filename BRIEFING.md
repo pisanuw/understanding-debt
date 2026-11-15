@@ -869,24 +869,16 @@ acceptable.
   Netlify site and creates the Render blueprint, the Plabs session runs the migrations, labels,
   the three sample loads and the caps file.
 
-## Open questions
+- **Use without signing in, the owner's answers (2026-11-15, "2 everybody gets advance
+  quizzes 1,3,4,5,6 yes"):** (1) self-checked answers count at full weight, labelled; (2) the
+  advance quizzes are offered to everybody, signed in or not, with or without a model in use,
+  the model-written and model-graded quiz staying one choice away; (3) a copy leaves the browser's
+  answers in place; (4) copied rows keep the review states folded from the browser's answers; (5)
+  visitors' excerpt calls stay `no-store` until Netlify usage is known; (6) the advance questions
+  are written for every unit at levels 1-3, three per unit and level, about 51 calls for the
+  four samples.
 
-- Use without signing in: self-checked answers count at full weight, labelled. Discount them (for
-  example half the evidence), or leave them out of the index and show them beside it? Chosen: full
-  weight, as the owner's wording ("progress on quizzes") implies.
-- Use without signing in: a signed-in person with model features off also gets the questions
-  written in advance and self-checked reviews. Keep that, or offer them to visitors without an
-  account only? Chosen: offered to anyone with no model in use.
-- Use without signing in: after a copy the answers stay in the browser too (the person sees them
-  when signed out). Clear them on copy instead? Chosen: keep (it is a copy; "Discard" deletes).
-- Use without signing in: copied rows keep the review states folded from the browser's answers
-  only; what is due is always folded from all records, so the stamps are informational. Re-stamp
-  them against the account's earlier records at copy time?
-- Use without signing in: `/api/excerpt` keeps `no-store` for visitors' requests, so every
-  walkthrough step a visitor opens is a function invocation. Allow shared caching for requests
-  without a token at a pinned sha (immutable content), or rate-limit them, once usage is known?
-- Use without signing in: the advance questions cover every architectural unit, about 51 calls
-  for the four samples. Fewer per unit (`--per 2`), top-level units only, or levels 1-2 first?
+## Open questions
 
 - Phase 4b tree fallback: `/api/tree` calls api.github.com unauthenticated, 60 requests an hour per
   IP address, from Netlify's shared outbound addresses. One call serves a repository at a sha

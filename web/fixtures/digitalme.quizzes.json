@@ -4,7 +4,7 @@
  "repo": "https://github.com/pisanuw/digitalme",
  "name": "digitalme",
  "sha": "f93102b121f1da9055c148e8eccde275ccf18236",
- "generated_at": "2026-11-15T12:08:50+00:00",
+ "generated_at": "2026-11-15T12:35:43+00:00",
  "levels": [
   1,
   2,
@@ -21,7 +21,7 @@
     "Why does the rest of the system need Chat request lifecycle (SSE)?",
     "What would a user notice first if Chat request lifecycle (SSE) stopped working?"
    ],
-   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "reference_answer": "It POST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
    "evidence": [
     "frontend/src/App.jsx",
     "backend/main.py"
@@ -54,7 +54,7 @@
     "What job does Chat request lifecycle (SSE) do for the rest of the system?",
     "What would a user notice first if Chat request lifecycle (SSE) stopped working?"
    ],
-   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "reference_answer": "It POST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
    "evidence": [
     "frontend/src/App.jsx",
     "backend/main.py"
@@ -87,7 +87,7 @@
     "What job does Chat request lifecycle (SSE) do for the rest of the system?",
     "Why does the rest of the system need Chat request lifecycle (SSE)?"
    ],
-   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "reference_answer": "It POST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
    "evidence": [
     "frontend/src/App.jsx",
     "backend/main.py"
@@ -120,7 +120,7 @@
     "Which alternative did Chat request lifecycle (SSE) turn down?",
     "What constraint shaped Chat request lifecycle (SSE)?"
    ],
-   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "reference_answer": "It POST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
    "evidence": [
     "frontend/src/App.jsx",
     "backend/main.py"
@@ -134,7 +134,7 @@
     "What was chosen for Chat request lifecycle (SSE)?",
     "What constraint shaped Chat request lifecycle (SSE)?"
    ],
-   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "reference_answer": "It POST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
    "evidence": [
     "frontend/src/App.jsx",
     "backend/main.py"
@@ -148,7 +148,7 @@
     "What was chosen for Chat request lifecycle (SSE)?",
     "Which alternative did Chat request lifecycle (SSE) turn down?"
    ],
-   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "reference_answer": "It POST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
    "evidence": [
     "frontend/src/App.jsx",
     "backend/main.py"
@@ -162,7 +162,7 @@
     "What breaks elsewhere if Chat request lifecycle (SSE) changed its approach?",
     "Which part depends most on the choice in Chat request lifecycle (SSE)?"
    ],
-   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "reference_answer": "It POST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
    "evidence": [
     "frontend/src/App.jsx",
     "backend/main.py"
@@ -176,7 +176,7 @@
     "If the decision behind Chat request lifecycle (SSE) were reversed, what else would have to change first?",
     "Which part depends most on the choice in Chat request lifecycle (SSE)?"
    ],
-   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "reference_answer": "It POST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
    "evidence": [
     "frontend/src/App.jsx",
     "backend/main.py"
@@ -190,7 +190,7 @@
     "If the decision behind Chat request lifecycle (SSE) were reversed, what else would have to change first?",
     "What breaks elsewhere if Chat request lifecycle (SSE) changed its approach?"
    ],
-   "reference_answer": "It pOST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
+   "reference_answer": "It POST /api/chat streams a persona-driven Claude reply through pre-checks, retrieval, sentence capping, post-checks and persistence.",
    "evidence": [
     "frontend/src/App.jsx",
     "backend/main.py"
