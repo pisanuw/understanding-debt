@@ -822,6 +822,8 @@ acceptable.
     with an explanation.
   - **Who gets advance quizzes:** whoever has no model in use: a visitor without their own key,
     and a signed-in person with model features off (their records go to the server, labelled).
+    (Widened the same day to everybody, the owner's answer 2: "Phase 4b, advance quizzes for
+    everybody" below.)
     Review with no model in use self-checks the items that kept a reference; others wait for a
     model. A visitor with their own key gets model-written questions and grading; never the
     gateway without an account (`App.quiz()`, and `GatewayClient` refuses to send without a token).
@@ -837,6 +839,52 @@ acceptable.
     offered twice. A sample the server does not know keeps its answers in the browser and says so;
     a failed copy keeps the offer.
   - **Cost:** the main bundle 343 KB (312 KB before).
+
+- **Phase 4b, advance quizzes for everybody (2026-11-15, the owner's answer 2 below, "everybody
+  gets advance quizzes", the model's quiz one choice away; details by the UDebt session under the
+  15-minute rule, the owner can reverse any of them).** Tested with fakes; no model call, nothing
+  deployed.
+  - **Who gets which:** a repository with an advance file at its analysis's commit (a sample at
+    its pin) and a model in use (the HintWise key or an own key signed in, an own key not signed
+    in): both kinds, chosen on the Quiz tab. No model in use: the advance quiz only, as before. No
+    advance file (a repository someone added, or an analysis at another commit; a file with no
+    question counts as none): the model's only, as before. No choice is shown with one kind.
+  - **Default:** the advance quiz, `DEFAULT_QUIZ_KIND = 'advance'` in `web/src/model/prefs.ts`
+    (free, the same for everyone); set it to `'model'` to flip. The choice is kept per browser
+    (localStorage `udebt.quizKind`, every access wrapped, memory when blocked), never on a server
+    row; nothing is stored until a person chooses, so a flipped constant reaches everyone who has
+    not chosen.
+  - **The tab:** the choice ("Written in advance, self-checked (no model call)", "Written and
+    graded by the model (one call each way)", each with its cost in the person's mode) at the top
+    of the start card; below it the chosen kind's explanation and cost ("no model call"; "counts
+    against your daily allowance" or "your own Anthropic key"). The choice is locked while a
+    sitting runs (a click would discard typed answers) and freed once it is recorded or fails to
+    start; a unit chosen stays chosen across kinds where listed; past level 3 the advance kind
+    points to the model's. Start now reads the current view: before, a second sitting started from
+    the same tab without a redraw used the records from before the first.
+  - **Records, unchanged in meaning:** signed in, an advance sitting writes its rows through the
+    person's store (`type` self-checked, `source` advance, review state stamped; no function
+    called). The label shows on the results, the header, the debt table and tiles, and now also on
+    a unit page's list of answers (for visitors too).
+  - **One history:** the ladder, the scoring and the review fold read every record on a unit and
+    level whatever its type, so a level passed in one kind is passed for the other and a miss in
+    either feeds the one review item (asked in the latest miss's phrasings). The model's quiz asks
+    a self-checked miss's stored variant with no writing call, and the advance quiz asks a model
+    miss's variant, self-checked (`revealedVariant`, as before).
+  - **Review's rule:** an item is checked the way its latest miss was (the record its question and
+    reference come from): self-checked when the person marked that answer (`type` self-checked),
+    otherwise graded by the model in use. With no model in use, as before: every item with a
+    reference self-checked, the rest waiting. A sitting is of one kind; with both kinds due the
+    tab has two buttons ("Review the self-checked ones", "Review the model-graded ones") and marks
+    the self-checked items in the due list. Chosen over "self-checked when the question came from
+    the advance file" by matching its text: the record says how the miss was checked, with no file
+    to load or text to match, and the preview's fake gateway writes the same template questions as
+    the fixture's advance file, so matching would misfire there. The two rules differ only when a
+    person crosses kinds on one unit and level: an advance question missed in the model's quiz is
+    graded by the model in review; a model-written question missed in a self-checked review (model
+    features off) stays self-checked.
+  - **Not changed:** Settings, the functions, the schema, the copy offer. The main bundle 346 KB
+    (343 KB before).
 
 ## Non-goals (for now)
 
@@ -880,6 +928,17 @@ acceptable.
 
 ## Open questions
 
+- Phase 4b advance quizzes for everybody: Review checks an item the way its latest miss was, so a
+  model-written question missed in a self-checked review (model features off) stays self-checked
+  after the person chooses a key. Should a model in use take such items back? Chosen: no, the
+  latest miss decides.
+- Phase 4b advance quizzes for everybody: a review sitting is of one kind, with two buttons when
+  both are due. Mix them in one sitting (self-check some, grade the rest in one call), or let the
+  Quiz tab's choice decide for Review too (to spare the allowance)? Chosen: neither; both flows
+  are unchanged and the item's own history decides.
+- Phase 4b advance quizzes for everybody: with the advance kind chosen, a unit past level 3 only
+  says the model's quiz is one choice away. Switch to the model's quiz for such a unit by itself?
+  Chosen: no, the person chooses.
 - Phase 4b tree fallback: `/api/tree` calls api.github.com unauthenticated, 60 requests an hour per
   IP address, from Netlify's shared outbound addresses. One call serves a repository at a sha
   while the function is warm, and refusals are respected, but live refusals may be frequent.

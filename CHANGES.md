@@ -170,3 +170,6 @@
 2026-11-15 [note] Advance quizzes (levels 1-3) for all four samples: 719 of 738 planned questions, 51 calls on the subscription ($5.82 CLI-reported); index.json lists them.
 
 2026-11-15 [doc] README: use a plain or depth-1 clone for `udebt worker quizzes`, never a treeless one; DEPLOY.md: the fourth sample is loaded in production (4 repositories, 4 analyses).
+
+2026-11-15 [code] web: advance quizzes for everybody: a quiz-kind choice when a model is in use (default advance, DEFAULT_QUIZ_KIND; kept per browser); signed-in self-checked rows labelled.
+2026-11-15 [decision] Review checks each item the way its latest miss was (self-checked, or by the model in use); one kind per sitting, a button each; BRIEFING open questions.

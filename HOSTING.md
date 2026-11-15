@@ -266,8 +266,18 @@ and the owner can reverse any of them (BRIEFING, "Phase 4b, use without signing 
 - **Self-checked answers.** A visitor answers, reads the reference and marks the answer (correct,
   partly right, wrong, didn't know; confidence fixed before the reference shows). The record's
   `type` is `self-checked`, which the scoring counts like any other answer and the page labels
-  wherever the debt rests on it. A visitor with their own key gets model-written questions and
-  grading as before; the HintWise key needs an account.
+  wherever the debt rests on it. The HintWise key needs an account.
+- **Advance quizzes for everybody (owner, 2026-11-15: "everybody gets advance quizzes", the
+  model-written and model-graded quiz one choice away).** The questions written in advance are
+  offered to everyone on a sample, signed in or not, with or without a model in use. Whoever has a
+  model in use (a visitor with their own key, a signed-in person with the HintWise key or their
+  own) chooses on the Quiz tab between "Written in advance, self-checked (no model call)" and
+  "Written and graded by the model (one call each way)"; the advance quiz is the default (one
+  constant, `DEFAULT_QUIZ_KIND`, for the owner to flip) and the choice is kept per browser, never
+  on the server. A signed-in person's self-checked answers go to their server rows, labelled as
+  for visitors. Both kinds are one history (ladder, debt, review); Review checks an item the way
+  its latest miss was checked: self-checked if the person marked it, by the model in use otherwise
+  (BRIEFING, "Phase 4b, advance quizzes for everybody").
 - **Progress in the browser.** One localStorage entry per sample holds the visitor's records in
   the same shape as the server's, read through the same store interface, so debt, review and the
   ladder behave the same; with storage blocked the visit works in memory.

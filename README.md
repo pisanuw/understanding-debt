@@ -803,8 +803,10 @@ tour, walkthroughs that trace one request through the code), and climb the quiz 
 your understanding debt falls. Four public repositories are ready to start with
 (huggingface_hub, sentry-javascript, mlflow and udebt itself, analysed in advance), and they need
 no account (below); any other public GitHub repository can be added once signed in, at once if
-someone already analysed it, otherwise analysed with your own Anthropic key. Quizzes run on the
-HintWise key within a daily allowance, or on your own key.
+someone already analysed it, otherwise analysed with your own Anthropic key. On the samples,
+everybody gets questions written in advance and checked by yourself, with no model call (below);
+the model's quizzes, written and graded for you at any level, run on the HintWise key within a
+daily allowance, or on your own key.
 Not deployed yet: `docs/DEPLOY.md` has the steps, `web/README.md` the code.
 
 The scoring is the CLI's, ported to TypeScript and checked against it case by case: the
@@ -821,6 +823,11 @@ TypeScript and checked against `udebt/review.py` case by case. An item is asked 
 stored phrasings that you were not asked last time, with the reference answer kept from the
 miss, so a review sitting costs one grading call and none to write questions; a review answer
 counts on the ladder like any other. The tab and the repository card show how many are due.
+An item is checked the way its latest miss was: one you marked yourself (a question written in
+advance, or a review with no model in use) is self-checked again, with no call; one a model
+graded is graded by the model when one is in use. A sitting is of one kind; when both kinds are
+due, the tab has a button for each ("Review the self-checked ones", "Review the model-graded
+ones"). With no model in use, every item with a reference answer is self-checked.
 
 **Without signing in.** The samples work with no account (owner, 2026-11-15). The site serves
 them as static JSON (`web/public/samples/`, derived from the load scripts in `samples/`), reads
@@ -833,17 +840,29 @@ and your answer text is never sent or stored. Those answers are recorded as **se
 the debt says so wherever it rests on them (the label beside the debt index, on the units in
 the debt table and on each result); they count as you marked them. Levels 4-5 are not written in
 advance, because they need code reading and a real grader. With your own Anthropic key (Settings)
-the model writes and grades questions as for a signed-in person; the HintWise key needs an
-account. A missed answer comes back in Review the next day and, with no model in use, is
+you can also take the quizzes the model writes and grades, as a signed-in person can (below); the
+HintWise key needs an account. A missed answer comes back in Review the next day and is
 self-checked there too. When you sign in, udebt asks once what to do with the answers this
 browser keeps: copy them into your account (each keeps its provenance, so a self-checked answer
 stays self-checked), keep them separate (they stay in the browser for when you are signed out),
 or discard them; nothing happens without your choice, and the same answers are never offered
-again. Settings has "Delete the answers kept in this browser". Signed in with model features
-off, you get the same questions written in advance, self-checked.
+again. Settings has "Delete the answers kept in this browser".
 
-**Questions written in advance: `udebt worker quizzes`.** The questions for visitors without an
-account are written once per sample with the hosted quiz's own prompt (`udebt/hosted/advance.py`
+**Advance quizzes for everybody** (owner, 2026-11-15). The questions written in advance are
+offered to everyone on a sample, signed in or not, with or without a model in use: they are free
+and the same for everyone. With the HintWise key or your own key, the Quiz tab asks which quiz
+you want: "Written in advance, self-checked (no model call)" or "Written and graded by the model
+(one call each way)", which counts against your daily allowance on the HintWise key, or runs on
+your own key. The advance quiz is the default (one constant, `DEFAULT_QUIZ_KIND` in
+`web/src/model/prefs.ts`, so the owner can flip it); your choice is kept in this browser, never in
+your account. With model features off, or on a repository with nothing written in advance, there
+is only one kind and no choice. Signed in, a self-checked answer goes to your account like any
+other, still `self-checked` and labelled wherever it shows. Both kinds are one history on a unit:
+the ladder, the debt and Review read them together, so a level passed in one is passed for the
+other, and a miss in either comes back in the same review item.
+
+**Questions written in advance: `udebt worker quizzes`.** The advance questions are written once
+per sample with the hosted quiz's own prompt (`udebt/hosted/advance.py`
 ports `web/src/core/prompts.ts`, and a parity test keeps the two identical), from code excerpts at
 the pinned commit, through the configured model (the `claude` CLI on a subscription, no tools):
 one call per level and batch of five units, three questions per unit and level, each with two
