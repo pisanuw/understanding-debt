@@ -95,6 +95,7 @@
 2026-11-14 [note] Tutor smoke test on digitalme auth-rbac, 3 calls: --session-id then --resume worked, the tutor read the code and asked back; its check graded and recorded.
 2026-11-14 [code] serve fixes from 52 screenshots: tutor Markdown rendered (escaped), a stale series replayed in memory, full-bleed dashboard tab; tutor reattaches by URL.
 2026-11-14 [doc] README `udebt serve`, BRIEFING serve decisions and open questions, ROADMAP Phase 3.3 done and what Phase 4 reuses from serve; Handoff statuses final.
+2026-11-15 [note] Level-3 synthetic, 3 question sets on hf bb3d3b55: 0.81/0.88/0.96, no decay signal (pooled rho 0.29 p 0.18); same-day reports overwrite.
 2026-11-15 [decision] Phase 3.4: partial answers at levels 1-2 reveal the reference; teach-back is graded at the developer's next ladder level (1 with no evidence).
 2026-11-15 [code] dig rotates its check: missed-question variant, own check, unasked pooled, least recent; walkthrough checks join the pool; an exhausted pool gets one new question.
 2026-11-15 [code] Tutor sessions persist in gitignored .udebt/tutor/<dev>/<unit>.json; a restart reattaches; a saved conversation offers resume or start over.
@@ -113,3 +114,6 @@
 2026-11-15 [code] checks.py and webhooks.py: advisory check runs, opt-in soft block cleared by a lead's label or /udebt ack, a pure webhook router; udebt risk --check-run.
 2026-11-15 [note] Contract holds for digitalme, dsa-instructor, huggingface_hub exports; worker 2 s on digitalme, 38 s on dsa-instructor; RLS verified on Postgres 16.
 2026-11-15 [doc] README Hosted section, docs/DEPLOY.md (deployment follows HOSTING.md), BRIEFING Phase 4a, ROADMAP Phase 4a done and 4b pending, Handoff.
+2026-11-15 [plan] HOSTING.md: hosted udebt on the HintWise platform (Google/email via Supabase, gateway or BYOK, option B footer), 3 cached samples, 7 owner decisions.
+2026-11-15 [note] Level-5 synthetic on hf bb3d3b55, 3 isolated sets: pooled share vs wrongness rho 0.74 p 0.005 (level 3: 0.29); the L3-L5 gap tracks share (rho 0.80): decay per level.
+2026-11-15 [doc] HOSTING.md checked with Plabs: udebt footer sha256, SHARED_TABLES for shared rows, worker at udebt-api.hintwise.org, no stored code (references + fetch at sha).

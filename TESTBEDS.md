@@ -344,6 +344,86 @@ Correlations are Spearman rho with a one-sided permutation p, over 12 units.
   names and general knowledge. These runs support the ranking (share changed orders the
   units), not an absolute calibration.
 
+## Question-set variance at a fixed ladder level (bb0c580, 2026-11-15)
+
+Three owner-approved runs of `experiment synthetic --at bb3d3b55 --level 3` on
+huggingface_hub, each writing its own question set (9 `claude` calls, 6 minutes). The map is
+the repaired e2485d4 map, rescored on bb0c580 with no LLM call. This tests ROADMAP Phase 3.2's
+prediction that question sets at one level should spread less than the unlevelled pair
+(0.75 and 0.58).
+
+| question set | mean score | share vs wrongness | mass vs wrongness | verdicts |
+|---|--:|---|---|---|
+| 1 | 0.81 | 0.25, p 0.21 | 0.20, p 0.26 | 15 correct, 9 partial |
+| 2 | 0.88 | 0.31, p 0.16 | -0.23, p 0.78 | 18 correct, 6 partial |
+| 3 | 0.96 | -0.13, p 0.70 | 0.00, p 0.54 | 22 correct, 2 partial |
+| pooled per unit (6 questions) | 0.88 | 0.29, p 0.18 | | |
+
+The refit curve (k = 1.0) predicts 0.62 for this snapshot.
+
+- **Level 3 shows no decay at this snapshot.** Scores sit near the ceiling (0.88 against the
+  pre-ladder 0.75 and 0.58), and share changed does not predict wrongness even with the
+  three sets pooled. Level-3 questions (consequence across units, no identifiers) can be
+  answered from a nine-month-old snapshot because cross-unit relationships move slowly. This
+  is ROADMAP's "level 3 should fade less steeply", taken to the point of being undetectable
+  here. There were no `unknown` and no confidently wrong answers.
+- **The spread did not drop.** The set means are 0.81 / 0.88 / 0.96 (sd 0.07, range 0.15)
+  against the unlevelled pair's range of 0.17. The mean within-unit sd across sets is 0.11.
+- **The decay rate likely needs to depend on the level.** k = 1.0 was fit on pre-ladder
+  questions, which behave like level 4–5. The ladder score weights levels 1–3 most
+  ((v1+v2+v3)/3 + 0.1(v4+v5)), so one k applies a steep decay to the part that, here, barely
+  decays. The next measurement is the same snapshot at `--level 5` (and 4) on a few question
+  sets.
+- **Bug: same-day reports overwrite each other.** The path is
+  `synthetic-{snapshot}-{date}.json`, so runs 1 and 2 were overwritten by run 3. Their
+  per-unit tables survive in the run logs. A time or counter suffix, or refusing to
+  overwrite, would fix it.
+- **Unverified contamination risk.** The question writer and the grader have read tools on
+  HEAD, and nothing keeps them out of `.udebt/experiments/`, which holds earlier reports with
+  questions, reference answers and grades. The rising scores (0.81, 0.88, 0.96) could be
+  chance or could be leakage; the logs cannot tell. The answerer sees only the snapshot
+  worktree, where `.udebt/` is absent. A guard: run the HEAD-side calls in a clean worktree
+  too, or keep reports outside the repository the model reads.
+
+### The same snapshot at level 5 (bb0c580, 2026-11-15)
+
+Three more owner-approved runs, `--at bb3d3b55 --level 5` (9 calls, 9 minutes), on the same
+map and code as the level-3 runs. Both bugs were worked around in the scratchpad clone:
+before each run every earlier report was moved out of `.udebt/experiments/` (it held 0 files
+when each run started), and each new report was moved aside under its own name.
+
+| question set | mean score | share vs wrongness | mass vs wrongness |
+|---|--:|---|---|
+| 1 | 0.58 | **0.64, p 0.014** | 0.10, p 0.37 |
+| 2 | 0.83 | **0.56, p 0.030** | 0.09, p 0.40 |
+| 3 | 0.65 | **0.81, p 0.001** | 0.41, p 0.09 |
+
+Pooled per unit over the three sets (6 questions per unit, 12 units):
+
+| level | set means (sd) | share vs wrongness | within-unit sd |
+|---|---|---|--:|
+| 3 | 0.81 / 0.88 / 0.96 (0.07) | 0.29, p 0.18 | 0.11 |
+| 5 | 0.58 / 0.83 / 0.65 (0.13) | **0.74, p 0.005** | 0.16 |
+
+The refit curve (k = 1.0) predicts 0.62 at both levels.
+
+- **Decay depends on the level.** Level 5 (implementation) fades with the share changed;
+  level 3 (consequence across units) barely does at this snapshot. Per unit, the level-3
+  minus level-5 gap grows with the share changed (rho 0.80, p 0.001). `cli` (share 1.34)
+  scores 0.92 at level 3 and 0.25 at level 5, while `inference-client` (0.25) scores 1.00 at
+  both. One k fits level 5 roughly (0.62 predicted against 0.69 observed) and over-decays
+  level 3 (0.88 observed). Since the ladder score weights levels 1–3 most, the decay should
+  be per level: steep for levels 4–5, shallow or none for levels 1–3, with the level-3 rate
+  still to be measured on older snapshots.
+- **A fixed level does not remove question-set variance.** Level 5's set means spread more
+  (sd 0.13) than level 3's (0.07). Each snapshot and level needs several question sets, or
+  more questions per unit, before a curve's level can be fitted.
+- **No rising sequence with isolation.** The isolated level-5 sets scored 0.58, 0.83, 0.65.
+  This does not settle whether the level-3 rise was leakage, since those runs were not
+  isolated, but the guard costs nothing.
+- Question set 2 graded 22 of its 24 answers (15 correct, 6 partial, 1 wrong). The report
+  `synthetic-bb3d3b55-2026-11-15_L5_qs2.json` in the scratchpad archive has the details.
+
 ## Caveats
 
 - **Disclosure-only.** Every AI share is a lower bound. Zed (2%), Ruff (2%) and openai/codex
