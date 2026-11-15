@@ -37,7 +37,10 @@ human commits, AI-assisted commits and AI-authored commits, and uses the `claude
    all of it in the browser (`udebt serve`);
 9. **replay** all of it over the history: debt per developer and unit at every week (or N
    units of mass), the risk events of the past, an export for the hosted version and a
-   static dashboard.
+   static dashboard;
+10. **prepare the hosted twin** (Phase 4a): a versioned JSON contract, an analysis worker
+    over a transient clone, a Supabase schema with own-row security, `udebt push` and
+    `udebt pull`, and the pull-request check run with its webhook router.
 
 ## Install
 
@@ -92,6 +95,12 @@ udebt timeline [--dev X] [--unit U] [--format table|csv|json]   # the series and
 udebt risk --history [--since DATE] [--all]   # every past change a developer landed, against their understanding then
 udebt export [--format csv|json] [--out PATH] [--with-answers]   # full history for the hosted import
 udebt dashboard [--out .udebt/dashboard/index.html] [--open]    # one static, self-contained HTML page
+udebt validate <file> [--kind K]   # check a JSON file against the versioned contract
+udebt worker run <url> [--rev SHA] --out DIR [--map F|--llm]   # analyse a transient clone
+udebt worker sql DIR [--dialect postgres|sqlite] [--user-id U]   # an idempotent load of it
+udebt remote set <url>; udebt remote token   # the hosted store; the token is read from stdin
+udebt push [--dry-run]; udebt pull           # the export out, hosted evidence back
+udebt risk <range> --check-run [--soft-block] [--ack LOGIN]   # the pull-request check body
 ```
 
 Commit everything under `.udebt/` except the parsed-commit cache, the line counts
@@ -764,6 +773,65 @@ developers with a footprint) every 25 units of mass gives 53 points and 1,383 ev
 94 s; the series is 8.3 MB and the dashboard 9 MB, and the page renders without errors in
 Chromium. This repository's own dashboard, `.udebt/dashboard/index.html`, is committed as
 the example (every 2 units of mass, since its history spans two days).
+
+## Hosted: the platform-agnostic core (Phase 4a)
+
+The hosted app will live on the HintWise platform (HOSTING.md on the
+`claude/jolly-hamilton-pvos83` branch; Phase 4b, waiting on the owner's decisions; deployment
+notes in `docs/DEPLOY.md`). Phase 4a built what any host needs, stdlib only, with no web
+framework:
+
+- **The contract** (`udebt/contract.py`, version 1): schemas for `map.json` (versions 1-3), a
+  record, `snapshots.json`, `commits.json`, `responsibility.json`, the export and the import
+  payload (the export plus a sanitized map), checked by a small validator that names the
+  failing path (`$.units[3]: missing 'name'`) and by cross-field rules (every developer and
+  unit a row names exists). Fields may be added without a new version; removing or retyping
+  one bumps it. The export carries `contract` and the series' `fingerprint`, and `udebt
+  export` refuses to write one that breaks the contract; `udebt validate <file>` checks any of
+  these files. The sanitized map keeps the specs (descriptions, decisions, paths, history,
+  orientations, the tour) and drops walkthroughs and pooled questions with their reference
+  answers. The exports of digitalme, dsa-instructor and huggingface_hub validate
+  (`UDEBT_TESTBEDS=1 pytest tests/test_contract.py`).
+- **The worker** (`udebt/worker.py`, `udebt worker run <url> --rev <sha> --out <dir>`): clones
+  into a temporary directory within limits (a clone timeout, 500 MB of objects, 20,000
+  commits by default), takes the repository's committed map, else `--map` (with its config
+  and responsibility sets), else with `--llm` writes one (plus orientations, the tour and
+  `--walkthroughs N`) with the configured model; writes the offline core (`weights.json`,
+  `structure.json`, `history.json`, `contributors.json`) and, with a map, `export.json`
+  (contract `import`), `map.json` (sanitized) and `specs.json` (units, orientations,
+  connections, the tour as Markdown, walkthroughs with the lines of each step, which let a
+  public repository's quizzes be graded without a clone; `--no-excerpts` leaves them out), and
+  the manifest `analysis.json`; then deletes the clone, always. Over a limit it writes nothing.
+  digitalme takes 2 s, dsa-instructor (2,510 commits) 38 s and 1.3 MB.
+- **The schema** (`supabase/migrations/20261115000000_app_udebt.sql`, schema `app_udebt`,
+  idempotent): shared `repositories` and `analyses` keyed by (repository, sha, owner), where a
+  sample's analysis has no owner, is readable by every signed-in person and written by no app
+  code; a person's `my_repositories`, `records` and `quiz_sessions`, each with `user_id ...
+  default auth.uid() references auth.users on delete cascade` and own-row policies; grants to
+  `authenticated` only. The team roles (owner, lead, member, viewer) are designed in its
+  comments, not built. `supabase/sqlite/app_udebt.sql` is the same for SQLite, and `udebt worker
+  sql <dir>` turns a worker output into an idempotent load for either (the platform's admin
+  workflow loads the samples with it). `UDEBT_TEST_PG=<url> pytest tests/test_schema.py`
+  checks the policies against a real Postgres with Supabase's `auth.uid()`.
+- **Push and pull** (`udebt/remote.py`): `udebt remote set <url>`, then `udebt push` POSTs the
+  import payload to `<url>/import` and `udebt pull` GETs `<url>/pull`, adding the evidence the
+  host recorded (a quiz taken in the browser) to the records once (`origin: remote`); both
+  directions are idempotent because every row has a natural key (an evidence record's
+  developer, time, unit, level and question). The URL is in `.udebt/remote.json`, the token
+  in `UDEBT_TOKEN` or `~/.config/udebt/credentials.json` (mode 0600, read from stdin by `udebt
+  remote token`), both outside git.
+- **The pull-request check** (`udebt/checks.py`, `udebt/webhooks.py`): `udebt risk` as a
+  GitHub check-run body, advisory by default (it always passes, with the verdict, a table of
+  units and how to raise each); a repository that opts into soft blocking fails a HIGH or
+  OUTSIDE change until a lead acknowledges it (the label `udebt-acknowledged` or the comment
+  `/udebt ack`), and the check then passes naming them. `udebt risk <range> --check-run` prints
+  it. The webhook router verifies the signature and says what a delivery asks for (analyse a
+  push to the default branch, check a pull request, record an acknowledgement); whoever
+  receives it does the work.
+
+A first draft of a full hosted API (Starlette, GitHub OAuth, organisations and roles in row
+level security) was written before the hosting target changed; it is parked, untested, under
+`drafts/hosted-api/`.
 
 ## Experiments
 

@@ -523,6 +523,48 @@ acceptable.
     changes included. The deny rule's form is Claude Code's documented one; no call was spent
     to see the CLI accept it (the tests check the command line).
 
+- **Phase 4a, the platform-agnostic hosted core (2026-11-15)**: the hosting target moved to the
+  HintWise platform mid-phase (HOSTING.md on `claude/jolly-hamilton-pvos83`: Supabase Auth
+  with Google and email sign-in, Netlify Functions, a Python worker on Render, the HintWise
+  LLM gateway or the user's own key, schema `app_udebt` with own-row RLS). 4a built only what
+  any host needs; the hosted API server, the SPA's login and data-layer refactor, Render and
+  Netlify configs and the local end-to-end through a hosted API were dropped.
+  - **Contract version 1** (`contract.py`): a stdlib validator over a JSON-Schema subset; open
+    objects everywhere, so fields are added without a version and only removing or retyping
+    one bumps it; a newer `contract` in a payload is refused. The export is the import format
+    (plus an optional sanitized map) and carries the series fingerprint, so a host can tell a
+    rebuild from an append. The sanitized map keeps descriptions, paths, history,
+    orientations and the tour; it drops walkthroughs, pooled questions (reference answers),
+    provenance and churn.
+  - **The worker** writes contract files to a directory, not to a database: the same output
+    serves an admin load (`udebt worker sql`), a platform function, or a person. Limits are
+    the brief's recommendation (20,000 commits, 500 MB), checked after the clone (git cannot
+    tell a remote's size first), with a clone timeout. A map comes from the repository, a file
+    or, with `--llm`, the configured model; the model steps on the gateway are 4b.
+    Walkthrough excerpts (code lines) go into `specs.json` by default because v1 is public
+    repositories only and grading needs them; `--no-excerpts` for anything else.
+  - **Schema**: shared `repositories`/`analyses` (a sample's analysis has `user_id` null:
+    readable by all, written by no app code, which matches "apps never get the service-role
+    key"), a person's rows own-row only, `unique nulls not distinct (repo_id, sha, user_id)`;
+    roles designed in comments only. No answer text is stored. The SQL loader replaces an
+    analysis by delete and insert in one transaction rather than an upsert, so the same script
+    is idempotent in SQLite, whose unique constraints treat nulls as distinct.
+  - **Tests on Postgres use psql**, not a driver, so the core keeps no runtime or test
+    dependency beyond pytest; a stub `auth` schema (`auth.users`, `auth.uid()` reading the JWT
+    claims as Supabase does) stands in for Supabase's.
+  - **Push and pull**: a two-endpoint protocol (`POST <url>/import`, `GET <url>/pull`) with a
+    bearer token and an `X-Udebt-Contract` header; the token lives in `UDEBT_TOKEN` or a
+    0600 credentials file keyed by URL, read from stdin so it never sits in shell history, and
+    the URL in gitignored `.udebt/remote.json`. Evidence is keyed by developer, time, unit,
+    level and question (level added because one sitting's records may share time, unit and
+    question text in synthetic data).
+  - **Check runs** stay advisory unless the repository opts into soft blocking; an
+    acknowledgement applies to the head commit the last check ran on (`*` when none ran yet),
+    so a new push asks again. The webhook router is pure: the caller says who is a lead.
+  - **The first hosted-API draft** (Starlette, GitHub OAuth, orgs, the four roles in RLS) is
+    kept, untested, outside the package in `drafts/hosted-api/`, as the coordinator asked for
+    already-built skipped work.
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.
@@ -531,6 +573,14 @@ acceptable.
 - Storing source code in the hosted service. Metadata only (ROADMAP Phase 4).
 
 ## Open questions
+
+- Phase 4a: v1 of the hosted app has no own-commit prior (HOSTING.md: the person is a learner,
+  not an author). Keep the prior out of the hosted score entirely, or show it as `estimated`
+  once a person verifies a commit email?
+- Phase 4a: an acknowledgement of a soft block applies to one head commit. Should it carry
+  over to later pushes on the same pull request unless they touch another flagged unit?
+- Phase 4a: `specs.json` stores walkthrough code lines for public repositories. Confirm, or
+  store only file and line ranges and fetch the lines from GitHub at view time?
 
 - Threshold for "architectural decision worth an acknowledgement" when we add
   capture-at-generation-time.

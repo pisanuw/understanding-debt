@@ -540,6 +540,12 @@ answer" when a date was given.
 
 ## Phase 4: hosted (Netlify, Render, Supabase) with the CLI as the local twin
 
+**Status 2026-11-15: split.** 4a, the platform-agnostic core, is done (below the original
+plan); 4b, the hosted app on the HintWise platform per HOSTING.md, waits on the owner. HOSTING.md
+supersedes parts of the plan below: sign-in is HintWise's Google and email sign-in through
+Supabase rather than GitHub OAuth, and model calls go through the HintWise gateway or the
+user's own key rather than an organisation key stored in Supabase.
+
 **Adds**
 
 - The Python package becomes the shared core with a versioned JSON contract (`map.json`,
@@ -603,6 +609,33 @@ for the hosted model calls.
 
 **Exit** when one team uses the hosted dashboard for a month and the CLI and server agree
 on every number.
+
+### Phase 4a: the platform-agnostic core
+
+**Status 2026-11-15: done.** Scope changed mid-phase: the hosted app moves to the HintWise
+platform (HOSTING.md, branch `claude/jolly-hamilton-pvos83`), so 4a built only what any host
+needs and dropped the rest. No model call.
+
+| item | status |
+|---|---|
+| 1 versioned contract | done: `udebt/contract.py` (version 1; map, record, snapshots, commits, responsibility, export, import), `udebt validate`, the export carries `contract` and `fingerprint` and is checked before it is written; digitalme, dsa-instructor and huggingface_hub exports validate (go-git and prefect have no map) |
+| 2 analysis worker | done: `udebt/worker.py`, `udebt worker run <url> --rev <sha> --out <dir>` (limits, committed or given map or `--llm`, offline core, export, sanitized map, specs with walkthrough excerpts, manifest, clone deleted); digitalme 2 s, dsa-instructor 38 s |
+| 3 schema | done: `supabase/migrations/20261115000000_app_udebt.sql` (shared repositories and analyses by repo and sha; own-row records, my_repositories, quiz_sessions; authenticated only; idempotent; roles designed in comments), `supabase/sqlite/app_udebt.sql`, `udebt worker sql`; RLS tested on Postgres 16 with a stub auth schema |
+| 4 push / pull | done: `udebt/remote.py`, `udebt remote set|token`, `udebt push [--dry-run]`, `udebt pull`; idempotent both ways against a stdlib stub host |
+| 5 check run and webhooks | done: `udebt/checks.py` (advisory, soft block, acknowledgement), `udebt/webhooks.py` (signature, router), `udebt risk --check-run`; payload fixtures |
+| docs | done: README "Hosted", `docs/DEPLOY.md` (deployment follows HOSTING.md), BRIEFING, CHANGES |
+| skipped by the scope change | the hosted API server (`udebt[hosted]`, Starlette or FastAPI, GitHub OAuth, an organisation key), the SPA login and data-layer refactor, `render.yaml` and `netlify.toml`, the local end-to-end through a hosted API. A draft of the API written before the change is parked, untested, in `drafts/hosted-api/` (its own commit, `ca899c3`) |
+
+### Phase 4b: the HintWise app (pending the owner)
+
+Per HOSTING.md, after the owner's decisions there (who builds it, slug and domain, model use,
+the Render worker, public repositories only, shared analyses, the three samples): the Vite +
+TypeScript app from the platform template with the `udebt serve` teaching layer as its start,
+Supabase Auth through HintWise, the worker on Render with the model steps as a tool loop over
+the gateway (or the person's own key), the `app_udebt` migration applied by the Plabs session,
+the sample analyses loaded with `udebt worker sql`, and push and pull served by a platform
+function. Real-service validation (Supabase, Netlify, Render, the gateway, any GitHub App)
+happens there.
 
 ## Phase 5: validity and calibration
 
@@ -1059,7 +1092,15 @@ udebt defaults to advisory and lets a repo owner opt in to soft blocking per rep
 
 ## Handoff 2026-11-15
 
-**Phase 3.3's handoff is closed**: every item was done (statuses in Phase 3.3 above and in the
-git history up to `a96b141`). **Phase 3.4 is done** (section above; two `claude` calls of
-three). **Phase 4a** (the hosted foundation that needs no cloud account) starts next; this
-section is rewritten when it lands or stops.
+**Phase 3.3's handoff is closed** (every item done, up to `a96b141`). **Phase 3.4 is done**,
+with the owner's two additions (synthetic report names that never collide, the leakage
+guard); two `claude` calls of three. **Phase 4a is done** as re-scoped (the platform-agnostic
+core: contract, worker, `app_udebt` schema, push and pull, check runs and webhooks); no call.
+**Phase 4b waits on the owner's decisions in HOSTING.md**; nothing of it was started.
+
+For the next session: read HOSTING.md on `claude/jolly-hamilton-pvos83` and `docs/DEPLOY.md`
+here. The Postgres schema tests need `UDEBT_TEST_PG` (a server where databases can be created;
+`initdb`/`pg_ctl` from `/usr/lib/postgresql/16/bin` as the `postgres` user worked here, with
+the data directory under `/tmp`); the testbed contract test needs `UDEBT_TESTBEDS=1`
+(huggingface_hub's replay takes about six minutes in memory). Open questions are at the top of
+BRIEFING's list.
