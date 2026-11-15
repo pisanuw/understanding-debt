@@ -16,7 +16,9 @@ export and no commit emails.
 
 ## Loaded (2026-11-15)
 
-`understanding-debt.sql` is not loaded yet; loading it needs the owner's yes.
+`understanding-debt.sql` was loaded later the same day, with the owner's yes: claude-built-apps
+bdfeb9c, `sql` run 43715703125, then `check-schema app_udebt` run 43715769274, which passed
+with 4 repositories and 4 analyses.
 
 The Plabs session loaded the first three into production with the owner's yes, from
 claude-built-apps 6ff0efc (copied byte for byte; the hashes match):
