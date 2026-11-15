@@ -2,8 +2,9 @@
 /**
  * Everybody gets advance quizzes (owner, 2026-11-15): a person with a model in use (the HintWise
  * key or their own) on a repository with questions written in advance chooses between those,
- * self-checked with no model call, and the questions the model writes and grades; the advance
- * quiz first (DEFAULT_QUIZ_KIND), the choice kept per browser. In jsdom over the preview wiring:
+ * self-checked with no model call, and the questions the model writes and grades; on the HintWise
+ * key the model's quiz first (owner, later on 2026-11-15), with the own key the advance quiz first
+ * (DEFAULT_QUIZ_KIND), the choice kept per browser. In jsdom over the preview wiring:
  * the fixture with its advance quizzes, the fake sign-in, and the functions' real handlers behind
  * /api, every request watched. Self-checked and model-graded answers on one unit are one history
  * (the ladder, the debt, the review queue), and Review checks each item the way its latest miss
@@ -13,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fixture from '../fixtures/digitalme.json';
 import quizzes from '../fixtures/digitalme.quizzes.json';
 import { previewOpen } from '../dev/api-plugin';
-import { handleExcerpt, handleGrade, handleQuestions, handleTree } from '../netlify/functions/lib/handlers';
+import { handleAllowance, handleExcerpt, handleGrade, handleQuestions, handleTree } from '../netlify/functions/lib/handlers';
 import type { FnEnv } from '../netlify/functions/lib/env';
 import { nextLevel } from '../src/core/ladder';
 import { SELF_CHECKED, type EvidenceRow } from '../src/core/quiz';
@@ -33,17 +34,22 @@ import { checkedBy } from '../src/ui/screens/review';
 const env: FnEnv = { supabaseUrl: null, anonKey: null, fakes: true, fakeRepos: {} };
 const open = previewOpen(fixture as unknown as Fixture);
 const seen: string[] = [];
+/** With the fakes: the HintWise allowance used up (the check and the calls alike). */
+let capped = false;
 const apiFetch: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const req = new Request(new URL(String(input), 'http://site'), init);
   const path = new URL(req.url).pathname;
   seen.push(path);
-  if (path === '/api/questions') return handleQuestions(req, { env });
-  if (path === '/api/grade') return handleGrade(req, { env });
+  if (path === '/api/questions') return handleQuestions(req, { env: { ...env, fakeCap: capped } });
+  if (path === '/api/grade') return handleGrade(req, { env: { ...env, fakeCap: capped } });
+  if (path === '/api/allowance') return handleAllowance(req, { env: { ...env, fakeCap: capped } });
   if (path === '/api/excerpt') return handleExcerpt(req, { env, open });
   if (path === '/api/tree') return handleTree(req, { env, open });
   return new Response('{}', { status: 404 });
 }) as typeof fetch;
 const calls = () => seen.filter((p) => p === '/api/questions' || p === '/api/grade');
+/** Requests other than the code reads and the allowance check, none of which calls a model. */
+const modelish = () => seen.filter((p) => p !== '/api/excerpt' && p !== '/api/tree' && p !== '/api/allowance');
 
 const tick = async (n = 10) => {
   for (let i = 0; i < n; i += 1) await new Promise((r) => setTimeout(r, 0));
@@ -116,6 +122,7 @@ const row = (name: string) => [...document.querySelectorAll<HTMLTableRowElement>
 
 beforeEach(() => {
   seen.length = 0;
+  capped = false;
   window.location.hash = '';
   vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-15T10:00:00Z') });
 });
@@ -125,17 +132,21 @@ afterEach(() => {
 });
 
 describe('the quiz-kind choice', () => {
-  it('offers a signed-in person with the HintWise key both kinds, the advance quiz first, and keeps the choice per browser', async () => {
-    expect(DEFAULT_QUIZ_KIND).toBe('advance');
+  it('offers a signed-in person with the HintWise key both kinds, the model\'s quiz first, and keeps the choice per browser', async () => {
+    expect(DEFAULT_QUIZ_KIND).toBe('advance'); // with the own key
     await start({ mode: 'gateway' });
     await go('#/r/1/quiz');
     expect(kind()).toBeTruthy();
-    expect(checkedKind()).toBe('advance');
+    expect(checkedKind()).toBe('model');
+    expect(byText('p', /^Questions written and graded by the model/)).toBeTruthy();
+    expect($('[data-testid=cap-notice]')).toBeNull();
+    expect(local.getItem(QUIZ_KIND_KEY)).toBeNull(); // nothing stored until a choice is made
+    await pick('advance');
+    expect(local.getItem(QUIZ_KIND_KEY)).toBe('advance');
     expect([...(kind() as HTMLElement).querySelectorAll('label strong')].map((s) => s.textContent)).toEqual(['Written in advance, self-checked (no model call)', 'Written and graded by the model (one call each way)']);
     expect(byText('label', /graded by the model, through the HintWise key: each sitting counts against your daily allowance/)).toBeTruthy();
     expect(byText('p', /^Questions written in advance for this repository/)?.textContent).toMatch(/no model call/);
     expect(byText('p', /^Recorded as/)?.textContent).toBe('Recorded as self-checked in your account, with no model call.');
-    expect(local.getItem(QUIZ_KIND_KEY)).toBeNull(); // nothing stored until a choice is made
 
     await pick('model');
     expect(local.getItem(QUIZ_KIND_KEY)).toBe('model');
@@ -169,12 +180,61 @@ describe('the quiz-kind choice', () => {
     expect(kept.records.map((r) => [r.type, r.source, r.unit_id])).toEqual([[SELF_CHECKED, 'advance', 'chat-flow']]);
     await pick('model');
     expect(byText('p', /with your own Anthropic key, straight from this browser: two calls per sitting/)).toBeTruthy();
-    expect(seen.filter((p) => p !== '/api/excerpt' && p !== '/api/tree')).toEqual([]);
+    expect(modelish()).toEqual([]);
+  });
+
+  it('says plainly when the HintWise allowance is used up, and uses the questions written in advance until it resets', async () => {
+    capped = true;
+    await start(); // signed in, nothing chosen: the HintWise key
+    await go('#/r/1/quiz');
+    const notice = $('[data-testid=cap-notice]');
+    expect(notice?.textContent).toMatch(/^Your daily allowance in this app is used up until .+\. Until then the quiz uses the questions written in advance \(no model call\), or you can use your own Anthropic key in Settings\.$/);
+    expect(notice?.getAttribute('role')).toBe('status');
+    expect(checkedKind()).toBe('advance');
+    expect($<HTMLInputElement>('[data-testid=quiz-kind] input[value=model]')?.disabled).toBe(true);
+    expect(byText('label', /Not available until your HintWise allowance resets/)).toBeTruthy();
+    expect(local.getItem(QUIZ_KIND_KEY)).toBeNull(); // the person's choice is untouched
+    await advanceSitting('chat-flow', 'Correct');
+    expect(byText('p', /^1 correct, self-checked \(no model call\)\./)).toBeTruthy();
+    expect(calls()).toEqual([]);
+    // Reset: the model's quiz again, no notice.
+    capped = false;
+    await go('#/r/1/specs');
+    await go('#/r/1/quiz');
+    expect($('[data-testid=cap-notice]')).toBeNull();
+    expect(checkedKind()).toBe('model');
+    // Nothing written in advance: the notice, and no Start on the HintWise key.
+    app.stop();
+    capped = true;
+    await start({ quizzes: [] });
+    await go('#/r/1/quiz');
+    expect($('[data-testid=cap-notice]')?.textContent).toMatch(/Until then you can use your own Anthropic key in Settings; no allowance applies to it\.$/);
+    expect(($<HTMLButtonElement>('button.primary') as HTMLButtonElement).disabled).toBe(true);
+    // Not signed in, or on their own key: no allowance check at all.
+    app.stop();
+    seen.length = 0;
+    await start({ mode: 'byok' });
+    setByokKey('sk-test', local);
+    await go('#/r/1/quiz');
+    expect($('[data-testid=cap-notice]')).toBeNull();
+    app.stop();
+    await start({ signedIn: false });
+    await go('#/r/1/quiz');
+    expect($('[data-testid=cap-notice]')).toBeNull();
+  });
+
+  it('says so when the allowance runs out during a sitting', async () => {
+    await start();
+    await go('#/r/1/quiz');
+    expect(checkedKind()).toBe('model');
+    capped = true; // used up between the page and the call
+    await click('button', 'Start', 30);
+    expect($('#quiz-flow .error')?.textContent).toMatch(/^Your daily allowance in this app is used up until .+\. You can use your own Anthropic key in Settings/);
   });
 
   it('shows no choice where only one kind exists', async () => {
-    // Signed in with model features off: the questions written in advance only, as before.
-    await start();
+    // Signed in with model features turned off: the questions written in advance only.
+    await start({ mode: 'off' });
     await go('#/r/1/quiz');
     expect(kind()).toBeNull();
     expect(byText('p', /^Recorded as/)?.textContent).toMatch(/choose the HintWise key or your own key in Settings\.$/);
@@ -261,6 +321,7 @@ describe('one history for both kinds', () => {
   it('records a signed-in self-checked sitting on the server with its label, then a model-graded one, both in the debt table', async () => {
     await start({ mode: 'gateway' });
     await go('#/r/1/quiz');
+    await pick('advance');
     await advanceSitting('chat-flow', 'Correct');
     expect(byText('h3', 'Recorded')).toBeTruthy();
     expect(byText('p', /^1 correct, self-checked \(no model call\)\./)).toBeTruthy();
@@ -337,6 +398,7 @@ describe('review with both kinds', () => {
   it('self-checks a signed-in person\'s advance miss and has the model grade their model-graded miss, one button each', async () => {
     await start({ mode: 'gateway' });
     await go('#/r/1/quiz');
+    await pick('advance');
     await advanceSitting('chat-flow', 'Wrong', 'It renders the slides.');
     await pick('model');
     await modelSitting('cost-control', 'It is wrong on purpose: it renders the slides.');
@@ -397,7 +459,7 @@ describe('review with both kinds', () => {
     await click('button', "I don't know");
     await click('button', 'Record my answers');
     expect(byText('p', /^1 unknown, self-checked/)).toBeTruthy();
-    expect(seen.filter((p) => p !== '/api/excerpt' && p !== '/api/tree')).toEqual([]);
+    expect(modelish()).toEqual([]);
   });
 });
 

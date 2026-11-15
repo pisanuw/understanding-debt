@@ -25,6 +25,7 @@ export async function callGateway(req: ModelRequest, token: string, env: FnEnv, 
   const body = gatewayBody(req);
   const text = JSON.stringify(body);
   if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) throw new HttpError(413, 'Too large for the gateway.', { error: 'The request is larger than the gateway accepts.' });
+  if (env.fakes && env.fakeCap) throw new HttpError(429, 'cap', fakeCapAnswer());
   if (env.fakes) return fakeGateway(req);
   if (!env.supabaseUrl) throw new HttpError(503, 'No gateway URL.', { error: 'The server is not configured yet.' });
   let res: Response;
@@ -45,4 +46,40 @@ export async function callGateway(req: ModelRequest, token: string, env: FnEnv, 
     throw new HttpError(502, 'Gateway error.', { error: typeof m === 'string' && m ? m : `The HintWise gateway answered ${res.status}.` });
   }
   return data as ModelMessage;
+}
+
+/** The fakes' cap answer: the person's daily allowance in this app, until the next UTC midnight. */
+function fakeCapAnswer(now: Date = new Date()): Record<string, unknown> {
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  return { error: 'cap', scope: 'app-user-day', resets_at: next.toISOString() };
+}
+
+/**
+ * The gateway's check mode (docs/platform.md section 3): `{ app, check: true }` makes no model
+ * call and answers the person's allowance (allowed, scope, resets_at, app_open, limits,
+ * calls_left), so the page can say a cap is reached before anyone starts a sitting.
+ */
+export async function checkAllowance(token: string, env: FnEnv, doFetch: typeof fetch = fetch): Promise<Record<string, unknown>> {
+  if (env.fakes) {
+    if (!env.fakeCap) return { allowed: true, uses_credit: false, scope: null, resets_at: null, app_open: true, limits: [], calls_left: null };
+    const cap = fakeCapAnswer();
+    return { allowed: false, uses_credit: false, scope: cap.scope, resets_at: cap.resets_at, app_open: true, limits: [], calls_left: null };
+  }
+  if (!env.supabaseUrl) throw new HttpError(503, 'No gateway URL.', { error: 'The server is not configured yet.' });
+  let res: Response;
+  try {
+    res = await doFetch(`${env.supabaseUrl}/functions/v1/llm-gateway`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ app: APP, check: true }),
+    });
+  } catch {
+    throw new HttpError(502, 'Gateway unreachable.', { error: 'Could not reach the HintWise gateway. Try again in a moment.' });
+  }
+  const data: unknown = await res.json().catch(() => ({}));
+  if (res.status === 401) throw new HttpError(401, 'Sign in again.', { error: 'Your sign-in has expired. Sign in again.' });
+  if (!res.ok || !data || typeof data !== 'object' || typeof (data as { allowed?: unknown }).allowed !== 'boolean') {
+    throw new HttpError(502, 'Gateway error.', { error: `The HintWise gateway answered ${res.status} to the allowance check.` });
+  }
+  return data as Record<string, unknown>;
 }

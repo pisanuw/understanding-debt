@@ -15,7 +15,7 @@ import { MemoryStore } from '../data/memory';
 import type { Fixture } from '../data/store';
 import { SupabaseStore, type TableClient } from '../data/supabase-store';
 import { FakeAuth } from '../fake/auth';
-import { GatewayClient, quizClient, treeVia, type ClientDeps } from '../model/client';
+import { allowanceVia, GatewayClient, quizClient, treeVia, type ClientDeps } from '../model/client';
 import { HttpWorkerClient, workerUrl } from '../model/worker';
 import { App, type AppDeps } from './app';
 
@@ -59,6 +59,7 @@ export function previewDeps(fixture: Fixture, opts: { doFetch?: typeof fetch; se
     signIn,
     getToken: () => fake.token(),
     quiz: (mode?: LlmMode) => quizClient(clientDeps, mode ?? getMode(opts.local)),
+    allowance: allowanceVia(clientDeps),
     excerpt: (repo, sha, ref) => gateway.excerpt(repo, sha, ref),
     tree: treeVia(clientDeps),
     worker: null,
@@ -80,6 +81,7 @@ export function liveDeps(): AppDeps {
     signIn: { client },
     getToken,
     quiz: (mode?: LlmMode) => quizClient(clientDeps, mode ?? getMode()),
+    allowance: allowanceVia(clientDeps),
     excerpt: (repo, sha, ref) => gateway.excerpt(repo, sha, ref),
     tree: treeVia(clientDeps),
     worker: base ? new HttpWorkerClient(base) : null,

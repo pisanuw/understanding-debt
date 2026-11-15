@@ -175,3 +175,4 @@
 2026-11-15 [decision] Review checks each item the way its latest miss was (self-checked, or by the model in use); one kind per sitting, a button each; BRIEFING open questions.
 
 2026-11-15 [note] Hosted app live at udebt.hintwise.org (main dc75449), worker at udebt-api.hintwise.org; post-deploy checks pass. Build session archived; the "UDebt: Nov 12" session continues.
+2026-11-15 [code] HintWise key is the default for signed-in users (model quiz first); /api/allowance (gateway check mode) shows a used-up allowance clearly and falls back to advance quizzes.

@@ -241,6 +241,15 @@ the walkthroughs add one per unit.
     - signed-in users keep server records, and the app offers to copy browser progress into
       the account at sign-in;
     - adding a repository still needs sign-in.
+11. **The HintWise key by default (owner, 2026-11-15):** "The HintWise key should be the default for
+    new users until they hit a daily cap and then it should be clearly indicated".
+    - A signed-in person who has not chosen a mode runs on the HintWise key, and their quiz
+      defaults to the model's. A choice once made in Settings, Off included, is kept.
+    - Before the Quiz tab draws, `/api/allowance` asks the gateway in check mode, with no model
+      call. When an allowance is used up, the tab says which one and until when, switches to the
+      questions written in advance, and disables the model's quiz until it resets. A cap reached
+      during a sitting shows the same message.
+    - Visitors who are not signed in are unchanged: the gateway serves signed-in users only.
 
 ## Use without signing in, as built (2026-11-15)
 

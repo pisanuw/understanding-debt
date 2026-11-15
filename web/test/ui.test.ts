@@ -205,8 +205,14 @@ describe('the quiz', () => {
     expect(byText('p', /1 wrong/)).toBeTruthy();
   });
 
-  it('quizzes the unit asked for from its page, and says when model features are off', async () => {
+  it('quizzes the unit asked for from its page, on the HintWise key by default, and says when model features are off', async () => {
     await start();
+    await go('#/r/1/quiz');
+    // Signed in and nothing chosen: the HintWise key (owner, 2026-11-15).
+    expect(($<HTMLButtonElement>('button.primary') as HTMLButtonElement).disabled).toBe(false);
+    expect(byText('p', /through the HintWise key/)).toBeTruthy();
+    setMode('off', local);
+    await go('#/r/1/specs');
     await go('#/r/1/quiz');
     expect(($<HTMLButtonElement>('button.primary') as HTMLButtonElement).disabled).toBe(true);
     expect(byText('p', /Model features are off/)).toBeTruthy();

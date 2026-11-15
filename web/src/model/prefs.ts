@@ -50,9 +50,15 @@ function write(storage: Store, key: string, value: string | null): void {
   }
 }
 
-export function getMode(storage: Store = defaultStorage()): LlmMode {
+/**
+ * The mode the person chose, else `fallback`: 'off' for a visitor who is not signed in (the
+ * gateway is for signed-in people), 'gateway' for a signed-in person who has not chosen
+ * (owner, 2026-11-15: "The HintWise key should be the default for new users until they hit a
+ * daily cap"). A choice once made, 'off' included, is kept.
+ */
+export function getMode(storage: Store = defaultStorage(), fallback: LlmMode = 'off'): LlmMode {
   const v = read(storage, MODE_KEY);
-  return v === 'byok' || v === 'gateway' ? v : 'off';
+  return v === 'byok' || v === 'gateway' || v === 'off' ? v : fallback;
 }
 
 export function setMode(mode: LlmMode, storage: Store = defaultStorage()): void {
@@ -78,15 +84,17 @@ export type QuizKind = 'advance' | 'model';
 export const QUIZ_KIND_KEY = 'udebt.quizKind';
 
 /**
- * The kind a person with both gets until they choose: the questions written in advance, free and
- * the same for everyone (owner, 2026-11-15: "everybody gets advance quizzes", the model quiz one
- * choice away). The owner can flip this to 'model'; a choice once made is kept per browser.
+ * The kind a person with both gets until they choose, with their own key: the questions written in
+ * advance, free and the same for everyone (owner, 2026-11-15: "everybody gets advance quizzes").
+ * On the HintWise key the default is the model's quiz (`getQuizKind(storage, 'model')`, owner,
+ * later that day: the HintWise key is the default until the daily cap). A choice once made is
+ * kept per browser.
  */
 export const DEFAULT_QUIZ_KIND: QuizKind = 'advance';
 
-export function getQuizKind(storage: Store = defaultStorage()): QuizKind {
+export function getQuizKind(storage: Store = defaultStorage(), fallback: QuizKind = DEFAULT_QUIZ_KIND): QuizKind {
   const v = read(storage, QUIZ_KIND_KEY);
-  return v === 'advance' || v === 'model' ? v : DEFAULT_QUIZ_KIND;
+  return v === 'advance' || v === 'model' ? v : fallback;
 }
 
 export function setQuizKind(kind: QuizKind, storage: Store = defaultStorage()): void {

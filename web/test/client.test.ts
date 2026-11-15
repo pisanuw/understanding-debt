@@ -3,7 +3,7 @@ import { handleExcerpt, handleGrade, handleQuestions } from '../netlify/function
 import { FAKE_TOKEN, type FnEnv } from '../netlify/functions/lib/env';
 import { fakeGateway } from '../netlify/functions/lib/fake';
 import * as llm from '../src/lib/llm';
-import { ApiError, CapError, GatewayClient, LazyByokClient, capMessage, quizClient, type ClientDeps } from '../src/model/client';
+import { ApiError, CapError, GatewayClient, LazyByokClient, allowanceVia, capMessage, capNotice, quizClient, type ClientDeps } from '../src/model/client';
 import * as prefs from '../src/model/prefs';
 import { HttpWorkerClient, workerUrl } from '../src/model/worker';
 
@@ -80,6 +80,42 @@ describe("the person's own key", () => {
     expect(quizClient(deps, 'gateway')?.mode).toBe('gateway');
     expect(quizClient(deps, 'byok')?.mode).toBe('byok');
     expect(quizClient(deps, 'off')).toBeNull();
+  });
+
+  it('gives a person who has not chosen the fallback, and keeps a choice, off included', () => {
+    const s = llm.memoryStorage();
+    expect(prefs.getMode(s)).toBe('off');
+    expect(prefs.getMode(s, 'gateway')).toBe('gateway');
+    prefs.setMode('off', s);
+    expect(prefs.getMode(s, 'gateway')).toBe('off');
+    prefs.setMode('byok', s);
+    expect(prefs.getMode(s, 'gateway')).toBe('byok');
+    expect(prefs.getQuizKind(llm.memoryStorage(), 'model')).toBe('model');
+    expect(prefs.getQuizKind(llm.memoryStorage())).toBe(prefs.DEFAULT_QUIZ_KIND);
+  });
+
+  it('says an allowance is used up, until when, and what still works', () => {
+    const now = new Date('2026-11-15T10:00:00Z');
+    const a = { scope: 'app-user-day', resets_at: '2026-11-16T00:00:00Z' };
+    expect(capNotice(a, true, now)).toMatch(/^Your daily allowance in this app is used up until .+\. Until then the quiz uses the questions written in advance \(no model call\), or you can use your own Anthropic key in Settings\.$/);
+    expect(capNotice(a, false, now)).toMatch(/Until then you can use your own Anthropic key in Settings; no allowance applies to it\.$/);
+    expect(capNotice({ scope: 'user-day', resets_at: null }, false, now)).toMatch(/^Your daily HintWise allowance is used up\. /);
+    expect(capNotice({ scope: 'app-day', resets_at: 'not a date' }, true, now)).toMatch(/^This app's shared allowance is used up\. /);
+  });
+
+  it('reads the allowance through /api/allowance, and nothing that is not one', async () => {
+    const seen: string[] = [];
+    const fetchWith = (body: unknown, status = 200) =>
+      (async (u: RequestInfo | URL, init?: RequestInit) => {
+        seen.push(`${init?.method} ${String(u)}`);
+        return Response.json(body, { status });
+      }) as typeof fetch;
+    const deps = (body: unknown, status?: number) => ({ getToken: async () => 'tok', fetch: fetchWith(body, status) });
+    expect(await allowanceVia(deps({ allowed: false, scope: 'app-user-day', resets_at: 'x' }))()).toEqual({ allowed: false, scope: 'app-user-day', resets_at: 'x', app_open: undefined, calls_left: null });
+    expect(seen).toEqual(['POST /api/allowance']);
+    expect(await allowanceVia(deps({ nope: 1 }))()).toBeNull();
+    await expect(allowanceVia(deps({ error: 'x' }, 502))()).rejects.toThrow('x');
+    await expect(allowanceVia({ getToken: async () => null, fetch: fetchWith({}) })()).rejects.toThrow('Sign in first.');
   });
 
   it('keeps the mode and the key exactly as llm.ts does', () => {

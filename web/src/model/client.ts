@@ -91,6 +91,26 @@ async function call<T>(deps: ClientDeps, path: string, init: RequestInit = {}, a
   return data as T;
 }
 
+/**
+ * The person's HintWise allowance, as the gateway's check mode answers ({ app, check: true }: no
+ * model call; docs/platform.md section 3). `allowed` false: a cap is reached until `resets_at`.
+ */
+export interface Allowance {
+  allowed: boolean;
+  scope: string | null;
+  resets_at: string | null;
+  app_open?: boolean;
+  calls_left?: number | null;
+}
+
+/** POST /api/allowance, or null when the answer is not an allowance (the page then learns of a cap from the call). */
+export function allowanceVia(deps: ClientDeps): () => Promise<Allowance | null> {
+  return async () => {
+    const a = await call<Partial<Allowance>>(deps, '/api/allowance', { method: 'POST', body: '{}' });
+    return typeof a.allowed === 'boolean' ? { allowed: a.allowed, scope: a.scope ?? null, resets_at: a.resets_at ?? null, app_open: a.app_open, calls_left: a.calls_left ?? null } : null;
+  };
+}
+
 /** GET /api/tree for the directories of a sitting's units (model/tree.ts keeps the answers). */
 export function treeVia(deps: ClientDeps): TreeFetch {
   return (repoUrl, sha, dirs) => call<TreeAnswer>(deps, `/api/tree?${new URLSearchParams([['repo', repoUrl], ['sha', sha], ...dirs.map((d) => ['path', d])])}`, {}, true);
@@ -153,8 +173,8 @@ export function quizClient(deps: ClientDeps, mode: LlmMode = getMode()): QuizCli
   return null;
 }
 
-/** A cap answer in plain words (docs/new-app-guide.md section 7), with when it resets in local time. */
-export function capMessage(e: { scope: string; resetsAt: string }, now: Date = new Date()): string {
+/** Which allowance a cap scope is, and when it resets in local time (" until 1:00 AM", or ""). */
+function capParts(e: { scope: string; resetsAt: string }, now: Date): { what: string; when: string } {
   const s = e.scope;
   const what = s.startsWith('app-user-week')
     ? 'Your weekly allowance in this app is used up'
@@ -167,5 +187,23 @@ export function capMessage(e: { scope: string; resetsAt: string }, now: Date = n
   const when = Number.isNaN(d.getTime())
     ? ''
     : ` until ${d.toDateString() === now.toDateString() ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : d.toLocaleString([], { weekday: 'long', hour: 'numeric', minute: '2-digit' })}`;
+  return { what, when };
+}
+
+/** A cap answer in plain words (docs/new-app-guide.md section 7), with when it resets in local time. */
+export function capMessage(e: { scope: string; resetsAt: string }, now: Date = new Date()): string {
+  const { what, when } = capParts(e, now);
   return `${what}${when}. You can use your own Anthropic key in Settings; no allowance applies to it.`;
+}
+
+/**
+ * The quiz page's notice once the HintWise allowance is used up: which one, until when, and what
+ * still works (the questions written in advance, when the repository has them; the person's own key).
+ */
+export function capNotice(a: { scope: string | null; resets_at: string | null }, hasAdvance: boolean, now: Date = new Date()): string {
+  const { what, when } = capParts({ scope: a.scope ?? '', resetsAt: a.resets_at ?? '' }, now);
+  const meanwhile = hasAdvance
+    ? 'Until then the quiz uses the questions written in advance (no model call), or you can use your own Anthropic key in Settings.'
+    : 'Until then you can use your own Anthropic key in Settings; no allowance applies to it.';
+  return `${what}${when}. ${meanwhile}`;
 }

@@ -20,7 +20,7 @@ import type { LocalStore } from '../data/local';
 import type { UdebtStore } from '../data/store';
 import { onAuth, type AuthClient, type SignInOptions } from '../lib/auth';
 import { getByokKey, getMode, type LlmMode } from '../model/prefs';
-import type { QuizClient } from '../model/client';
+import type { Allowance, QuizClient } from '../model/client';
 import { TreeCache, type TreeFetch } from '../model/tree';
 import type { WorkerClient } from '../model/worker';
 import { clear, h } from './dom';
@@ -44,6 +44,8 @@ export interface AppDeps {
   getToken: () => Promise<string | null>;
   /** The quiz client for the person's current mode, or null when model features are off. */
   quiz: (mode?: LlmMode) => QuizClient | null;
+  /** The signed-in person's HintWise allowance, through /api/allowance (no model call). */
+  allowance?: () => Promise<Allowance | null>;
   /** A line range of a file at a commit, through /api/excerpt (no model call). */
   excerpt: (repoUrl: string, sha: string, ref: ExcerptRef) => Promise<Excerpt>;
   /** The top files under directories at a commit, through /api/tree (the tree fallback; none: no fallback). */
@@ -165,15 +167,26 @@ export class App {
    * the gateway without signing in.
    */
   quiz(): QuizClient | null {
-    if (this.user || !this.deps.anon) return this.deps.quiz();
+    if (this.user || !this.deps.anon) return this.deps.quiz(this.mode());
     const storage = this.deps.storage;
     return getMode(storage) === 'byok' && getByokKey(storage) ? this.deps.quiz('byok') : null;
   }
 
   /** The mode quizzes run in now ('off': no model, the questions written in advance). */
   mode(): LlmMode {
-    if (this.user || !this.deps.anon) return getMode(this.deps.storage);
+    if (this.user) return getMode(this.deps.storage, 'gateway');
+    if (!this.deps.anon) return getMode(this.deps.storage);
     return this.quiz() ? 'byok' : 'off';
+  }
+
+  /**
+   * The signed-in person's HintWise allowance (the gateway's check mode, no model call), or null
+   * when it does not apply (not signed in, not on the HintWise key) or could not be read: the cap
+   * still shows on the call itself then.
+   */
+  allowance(): Promise<Allowance | null> {
+    if (!this.user || this.mode() !== 'gateway' || !this.deps.allowance) return Promise.resolve(null);
+    return this.deps.allowance().catch(() => null);
   }
 
   /** The questions written in advance for this repository's analysis, or null. */

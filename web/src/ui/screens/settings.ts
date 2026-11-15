@@ -11,10 +11,11 @@ import { button, h, toast } from '../dom';
 
 export function settingsScreen(app: App): HTMLElement {
   const storage = app.deps.storage;
-  const current = getMode(storage);
+  // Signed in and not chosen yet: the HintWise key (App.mode); not signed in: the stored choice.
+  const current = app.anonymous ? getMode(storage) : app.mode();
   const anonymous = app.anonymous;
   const modes: [LlmMode, string, string][] = [
-    ['gateway', 'The HintWise key', anonymous ? 'Sign in to use it: questions are written and graded through HintWise, within a daily allowance per person.' : 'Questions are written and graded through HintWise, within a daily allowance per person. Nothing to set up.'],
+    ['gateway', 'The HintWise key', anonymous ? 'Sign in to use it: questions are written and graded through HintWise, within a daily allowance per person.' : 'The default: questions are written and graded through HintWise, within a daily allowance per person. Nothing to set up.'],
     ['byok', 'My own Anthropic key', 'Your key stays in this browser and goes only to api.anthropic.com, except when you ask udebt to analyse a new repository: then it is sent once to udebt’s analysis service, used for that job only and never stored. No allowance applies. No account needed.'],
     ['off', 'Off', 'No model call: read the specs and walkthroughs, and answer the questions written in advance for the samples, checking yourself against the reference answer.'],
   ];

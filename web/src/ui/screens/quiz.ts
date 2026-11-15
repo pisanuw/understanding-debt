@@ -20,7 +20,7 @@ import { parseRef, refsForUnit, type ExcerptRef } from '../../core/excerpts';
 import { SELF_CHECKED, SELF_FEEDBACK, UNKNOWN_FEEDBACK, markRevealed, mergeGrades, orientationWanted, pickUnits, revealText, revealedOn, revealedVariant, reveals, levelsFor, sittingTs, type Answered, type Graded, type Question } from '../../core/quiz';
 import { sittingRows, stateAt } from '../../core/review';
 import { githubLink, orientationOf, orientationText, unitById, type Orientation, type SpecUnit } from '../../core/specs';
-import { CapError, capMessage } from '../../model/client';
+import { CapError, capMessage, capNotice, type Allowance } from '../../model/client';
 import { getQuizKind, setQuizKind, type QuizKind } from '../../model/prefs';
 import { repoHref, unitHref, type App, type RepoTab, type RepoView } from '../app';
 import { badge, busy, button, clear, day, extLink, fmt, h } from '../dom';
@@ -447,16 +447,17 @@ function modelCost(app: App): string {
 }
 
 /** The quiz-kind choice for a person who has both kinds; `pick` runs on a change. */
-function kindChoice(app: App, current: QuizKind, pick: (k: QuizKind) => void): HTMLFieldSetElement {
+function kindChoice(app: App, current: QuizKind, pick: (k: QuizKind) => void, modelBlocked: string | null = null): HTMLFieldSetElement {
   const kinds: [QuizKind, string, string][] = [
     ['advance', 'Written in advance, self-checked (no model call)', 'The same for everyone, at levels 1-3: you read the reference answer and mark your own answer.'],
     ['model', 'Written and graded by the model (one call each way)', `Written for you at any level and graded by the model, ${modelCost(app)}.`],
   ];
   const fs = h('fieldset', { class: 'modes kinds', 'data-testid': 'quiz-kind' }, h('legend', null, 'Which quiz'));
   for (const [k, title, text] of kinds) {
-    const inp = h('input', { type: 'radio', name: 'quiz-kind', value: k, checked: k === current });
+    const blocked = k === 'model' && modelBlocked !== null;
+    const inp = h('input', { type: 'radio', name: 'quiz-kind', value: k, checked: k === current, disabled: blocked });
     inp.addEventListener('change', () => pick(k));
-    fs.append(h('label', { class: 'mode' }, inp, h('span', null, h('strong', null, title), h('span', { class: 'small muted' }, text))));
+    fs.append(h('label', { class: 'mode' }, inp, h('span', null, h('strong', null, title), h('span', { class: blocked ? 'small warn' : 'small muted' }, blocked ? modelBlocked : text))));
   }
   return fs;
 }
@@ -519,7 +520,7 @@ function advanceTab(app: App, v: RepoView, file: AdvanceFile, unit: string | nul
 }
 
 /** The quiz the model writes and grades (or, with no model in use and nothing written in advance, how to get one). */
-function modelTab(app: App, v: RepoView, unit: string | null, both: Both | null): HTMLElement {
+function modelTab(app: App, v: RepoView, unit: string | null, both: Both | null, blocked = false): HTMLElement {
   const a = v.analysis as NonNullable<RepoView['analysis']>;
   const mode = app.mode();
   const flow = h('div', { id: 'quiz-flow' });
@@ -549,7 +550,7 @@ function modelTab(app: App, v: RepoView, unit: string | null, both: Both | null)
         clear(flow).append(h('p', { class: 'error' }, errorText(e)));
       });
   }, 'primary');
-  go.disabled = mode === 'off';
+  go.disabled = mode === 'off' || blocked;
   return h(
     'div',
     null,
@@ -576,21 +577,33 @@ function modelTab(app: App, v: RepoView, unit: string | null, both: Both | null)
  */
 export async function quizTab(app: App, v: RepoView): Promise<HTMLElement> {
   if (!v.analysis) return h('p', null, 'This repository has no analysis yet.');
-  const got = await app.advanceFor(v);
+  const [got, allowance] = await Promise.all([app.advanceFor(v), app.allowance()]);
   const file = got?.questions.length ? got : null;
   const unit = app.quizUnit;
   app.quizUnit = null;
-  if (!file) return modelTab(app, v, unit, null);
+  // The HintWise key's allowance used up: said on top, the model's quiz out of reach until it resets.
+  const usedUp = allowance !== null && !allowance.allowed;
+  const notice = usedUp ? capBanner(allowance, file !== null) : null;
+  const withNotice = (el: HTMLElement): HTMLElement => (notice ? h('div', null, notice, el) : el);
+  if (!file) return withNotice(modelTab(app, v, unit, null, usedUp));
   if (app.mode() === 'off') return advanceTab(app, v, file, unit, null);
   const storage = app.deps.storage;
   const slot = h('div', { class: 'quiz-kind-slot' });
   const draw = (k: QuizKind, u: string | null) => slot.replaceChildren(k === 'advance' ? advanceTab(app, v, file, u, both) : modelTab(app, v, u, both));
-  const choice = kindChoice(app, getQuizKind(storage), (k) => {
-    setQuizKind(k, storage);
-    // The unit chosen stays chosen where the other kind lists it.
-    draw(k, slot.querySelector<HTMLSelectElement>('#quiz-unit')?.value || null);
-    choice.querySelector<HTMLInputElement>('input:checked')?.focus();
-  });
+  // On the HintWise key the model's quiz is the default (owner, 2026-11-15), the advance one while it is used up.
+  const kept = getQuizKind(storage, app.mode() === 'gateway' ? 'model' : undefined);
+  const first: QuizKind = usedUp ? 'advance' : kept;
+  const choice = kindChoice(
+    app,
+    first,
+    (k) => {
+      setQuizKind(k, storage);
+      // The unit chosen stays chosen where the other kind lists it.
+      draw(k, slot.querySelector<HTMLSelectElement>('#quiz-unit')?.value || null);
+      choice.querySelector<HTMLInputElement>('input:checked')?.focus();
+    },
+    usedUp ? 'Not available until your HintWise allowance resets (see above).' : null,
+  );
   const both: Both = {
     choice,
     lock: (on) => {
@@ -598,6 +611,11 @@ export async function quizTab(app: App, v: RepoView): Promise<HTMLElement> {
       choice.title = on ? 'Finish this sitting to change the kind of quiz.' : '';
     },
   };
-  draw(getQuizKind(storage), unit);
-  return slot;
+  draw(first, unit);
+  return withNotice(slot);
+}
+
+/** The notice on top of the Quiz tab while the person's HintWise allowance is used up. */
+function capBanner(a: Allowance, hasAdvance: boolean): HTMLElement {
+  return h('p', { class: 'warn cap-notice', role: 'status', 'data-testid': 'cap-notice' }, capNotice(a, hasAdvance));
 }

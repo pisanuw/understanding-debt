@@ -12,7 +12,7 @@ import { sittingRows } from '../../../src/core/review';
 import { parseGitHubUrl } from '../../../src/core/specs';
 import { authorize } from './auth';
 import { readEnv, type FnEnv } from './env';
-import { callGateway } from './gateway';
+import { callGateway, checkAllowance } from './gateway';
 import { GitHubRefused, dirFiles, excerpt } from './github';
 import { HttpError, bearer, bearerOrNull, errorResponse, json, readJson } from './http';
 import { insertRecords, priorRecords } from './records';
@@ -167,6 +167,18 @@ export async function handleTree(req: Request, opts: HandlerDeps & { now?: () =>
       const wait = String(Math.max(1, Math.ceil((e.until - now()) / 1000)));
       return json(503, { error: 'GitHub is refusing tree requests from this server for now; questions on this unit are written without code until then.', retry_after: Number(wait) }, { 'retry-after': wait });
     }
+    return errorResponse(e);
+  }
+}
+
+/** POST /api/allowance -> the signed-in person's HintWise allowance (the gateway's check mode: no model call). */
+export async function handleAllowance(req: Request, opts: HandlerDeps = {}): Promise<Response> {
+  const env = opts.env ?? readEnv();
+  const doFetch = opts.fetch ?? fetch;
+  try {
+    if (req.method !== 'POST') throw new HttpError(405, 'POST only.', { error: 'Use POST.' });
+    return json(200, await checkAllowance(bearer(req), env, doFetch));
+  } catch (e) {
     return errorResponse(e);
   }
 }

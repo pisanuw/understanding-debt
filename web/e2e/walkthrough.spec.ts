@@ -40,12 +40,13 @@ test('sign in, read the specs, take a level-1 quiz, see the debt fall', async ({
   await expect(page.locator('.walkthrough .excerpt').first()).not.toContainText('Loading', { timeout: 15_000 });
 
   await page.getByRole('link', { name: 'Settings' }).click();
-  await page.getByLabel(/The HintWise key/).check();
+  await expect(page.getByLabel(/The HintWise key/)).toBeChecked(); // the default when signed in
   await page.getByRole('link', { name: 'Repositories' }).click();
   await page.locator('a.repo-card', { hasText: 'digitalme' }).click();
   await page.getByRole('link', { name: 'Quiz' }).click();
 
-  // Both kinds on offer; the questions written in advance first, self-checked with no call.
+  // Both kinds on offer; on the HintWise key the model's quiz first, the questions written in
+  // advance (self-checked, no call) one choice away.
   const asked = async () => ((await page.locator('.question p.small').first().textContent()) ?? '').replace(/^\[\d\/\d\] /, '').split(' · ')[0];
   const apiCalls: string[] = [];
   page.on('request', (r) => {
@@ -53,7 +54,9 @@ test('sign in, read the specs, take a level-1 quiz, see the debt fall', async ({
     if (path === '/api/questions' || path === '/api/grade') apiCalls.push(path);
   });
   await expect(page.getByTestId('quiz-kind')).toBeVisible();
-  await expect(page.getByLabel(/Written in advance, self-checked/)).toBeChecked();
+  await expect(page.getByLabel(/Written and graded by the model/)).toBeChecked();
+  await expect(page.getByTestId('cap-notice')).toHaveCount(0);
+  await page.getByLabel(/Written in advance, self-checked/).check();
   await expect(page.getByText(/Questions written in advance for this repository/)).toContainText('no model call');
   await page.getByLabel('Questions').selectOption('2');
   await page.getByRole('button', { name: 'Start' }).click();

@@ -14,6 +14,8 @@ export interface FnEnv {
   fakes: boolean;
   /** "owner/repo" (or "*") -> a local clone the fake GitHub reads with `git show`. */
   fakeRepos: Record<string, string>;
+  /** With the fakes: the person's daily allowance is used up (UDEBT_FAKE_CAP=1), for the walkthrough of the cap notice. */
+  fakeCap?: boolean;
 }
 
 export { PREVIEW_TOKEN as FAKE_TOKEN } from '../../../src/core/preview';
@@ -38,5 +40,6 @@ export function readEnv(env: Record<string, string | undefined> = process.env): 
     anonKey: key,
     fakes: env.UDEBT_FAKES === '1' && !onNetlify,
     fakeRepos: parseRepos(env.UDEBT_FAKE_REPOS),
+    fakeCap: env.UDEBT_FAKES === '1' && !onNetlify && env.UDEBT_FAKE_CAP === '1',
   };
 }

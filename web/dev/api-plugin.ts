@@ -11,7 +11,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import type { Connect, Plugin } from 'vite';
-import { handleExcerpt, handleGrade, handleQuestions, handleTree } from '../netlify/functions/lib/handlers';
+import { handleAllowance, handleExcerpt, handleGrade, handleQuestions, handleTree } from '../netlify/functions/lib/handlers';
 import { openToAnyone } from '../netlify/functions/lib/samples';
 import type { Fixture } from '../src/data/store';
 
@@ -28,6 +28,7 @@ function routes(fixtureDir: string): Record<string, (req: Request) => Promise<Re
   return {
     '/api/questions': (r) => handleQuestions(r),
     '/api/grade': (r) => handleGrade(r),
+    '/api/allowance': (r) => handleAllowance(r),
     '/api/excerpt': (r) => handleExcerpt(r, { open }),
     '/api/tree': (r) => handleTree(r, { open }),
   };

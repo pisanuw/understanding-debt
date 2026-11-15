@@ -10,12 +10,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import excerptFn, { config as excerptConfig } from '../netlify/functions/excerpt';
 import gradeFn, { config as gradeConfig } from '../netlify/functions/grade';
 import questionsFn, { config as questionsConfig } from '../netlify/functions/questions';
+import allowanceFn, { config as allowanceConfig } from '../netlify/functions/allowance';
 import { authorize, resetAuthCache } from '../netlify/functions/lib/auth';
 import { FAKE_TOKEN, readEnv, type FnEnv } from '../netlify/functions/lib/env';
 import { fakeGateway, fakeUnits } from '../netlify/functions/lib/fake';
 import { callGateway, gatewayBody } from '../netlify/functions/lib/gateway';
 import { excerpt, fetchFile } from '../netlify/functions/lib/github';
-import { handleExcerpt, handleGrade, handleQuestions } from '../netlify/functions/lib/handlers';
+import { handleAllowance, handleExcerpt, handleGrade, handleQuestions } from '../netlify/functions/lib/handlers';
 import { HttpError, bearer, errorResponse, readJson } from '../netlify/functions/lib/http';
 import { inList, insertRecords, priorRecords, tableRow } from '../netlify/functions/lib/records';
 
@@ -158,6 +159,27 @@ describe('the functions in live mode', () => {
     expect(down.status).toBe(502);
   });
 
+  it('asks the gateway for the person\'s allowance in check mode, with their token and no model call', async () => {
+    const calls: Call[] = [];
+    const used = { allowed: false, uses_credit: false, scope: 'app-user-day', resets_at: '2026-11-16T00:00:00Z', app_open: true, limits: [], calls_left: null };
+    const res = await handleAllowance(post('/api/allowance', {}), { env: LIVE, fetch: liveFetch({ gateway: () => Response.json(used) }, calls) });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(used);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe('https://auth.example/functions/v1/llm-gateway');
+    expect(JSON.parse(String(calls[0].init?.body))).toEqual({ app: 'udebt', check: true });
+    expect((calls[0].init?.headers as Record<string, string>).authorization).toBe('Bearer user-token');
+    expect((await handleAllowance(post('/api/allowance', {}, null), { env: LIVE, fetch: liveFetch() })).status).toBe(401);
+    expect((await handleAllowance(new Request('http://x/api/allowance', { headers: { authorization: 'Bearer user-token' } }), { env: LIVE })).status).toBe(405);
+    expect((await handleAllowance(post('/api/allowance', {}), { env: LIVE, fetch: liveFetch({ gateway: () => new Response('{}', { status: 401 }) }) })).status).toBe(401);
+    expect((await handleAllowance(post('/api/allowance', {}), { env: LIVE, fetch: liveFetch({ gateway: () => Response.json({ content: [] }) }) })).status).toBe(502);
+    expect((await handleAllowance(post('/api/allowance', {}), { env: { ...LIVE, supabaseUrl: null }, fetch: liveFetch() })).status).toBe(503);
+    const down = (async () => {
+      throw new Error('down');
+    }) as typeof fetch;
+    expect((await handleAllowance(post('/api/allowance', {}), { env: LIVE, fetch: down })).status).toBe(502);
+  });
+
   it('refuses a missing or expired token, an unknown repository and a bad request', async () => {
     expect((await handleQuestions(post('/api/questions', {}, null), { env: LIVE, fetch: liveFetch() })).status).toBe(401);
     expect((await handleQuestions(post('/api/questions', { repo: REPO, sha: SHA, units: [unit] }), { env: LIVE, fetch: liveFetch({ repo: () => new Response('{}', { status: 401 }) }) })).status).toBe(401);
@@ -216,6 +238,21 @@ describe('the functions with the fakes', () => {
     expect(((await g.json()) as { grades: { verdict: string }[] }).grades.map((x) => x.verdict)).toEqual(['wrong', 'partial']);
   });
 
+  it('fake an open allowance, or with UDEBT_FAKE_CAP one used up until the next UTC midnight, on the check and the calls alike', async () => {
+    const open = (await (await handleAllowance(post('/api/allowance', {}, FAKE_TOKEN), { env })).json()) as { allowed: boolean };
+    expect(open.allowed).toBe(true);
+    const capEnv = { ...env, fakeCap: true };
+    const used = (await (await handleAllowance(post('/api/allowance', {}, FAKE_TOKEN), { env: capEnv })).json()) as { allowed: boolean; scope: string; resets_at: string };
+    expect([used.allowed, used.scope]).toEqual([false, 'app-user-day']);
+    expect(new Date(used.resets_at).getUTCHours()).toBe(0);
+    const q = await handleQuestions(post('/api/questions', { repo: REPO, sha: SHA, units: [unit] }, FAKE_TOKEN), { env: capEnv });
+    expect(q.status).toBe(429);
+    expect(((await q.json()) as { error: string }).error).toBe('cap');
+    expect(readEnv({ UDEBT_FAKES: '1', UDEBT_FAKE_CAP: '1' }).fakeCap).toBe(true);
+    expect(readEnv({ UDEBT_FAKE_CAP: '1' }).fakeCap).toBe(false);
+    expect(readEnv({ UDEBT_FAKES: '1', UDEBT_FAKE_CAP: '1', NETLIFY: 'true' }).fakeCap).toBe(false);
+  });
+
   it('read excerpts from a local clone with git show', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'udebt-fake-'));
     const git = (...a: string[]) => execFileSync('git', ['-C', dir, ...a], { encoding: 'utf8' });
@@ -244,7 +281,7 @@ describe('the functions with the fakes', () => {
 
 describe('the small parts', () => {
   it('reads its settings and never fakes on Netlify', () => {
-    expect(readEnv({ SUPABASE_URL: 'https://a/', SUPABASE_ANON_KEY: 'k' })).toEqual({ supabaseUrl: 'https://a', anonKey: 'k', fakes: false, fakeRepos: {} });
+    expect(readEnv({ SUPABASE_URL: 'https://a/', SUPABASE_ANON_KEY: 'k' })).toEqual({ supabaseUrl: 'https://a', anonKey: 'k', fakes: false, fakeRepos: {}, fakeCap: false });
     expect(readEnv({ VITE_SUPABASE_URL: 'https://b', UDEBT_FAKES: '1', UDEBT_FAKE_REPOS: '{"a/b":"/x","c":3}' })).toMatchObject({ supabaseUrl: 'https://b', fakes: true, fakeRepos: { 'a/b': '/x' } });
     expect(readEnv({ UDEBT_FAKES: '1', NETLIFY: 'true' }).fakes).toBe(false);
     expect(readEnv({ UDEBT_FAKES: '1', AWS_LAMBDA_FUNCTION_NAME: 'f' }).fakes).toBe(false);
@@ -277,7 +314,7 @@ describe('the small parts', () => {
   });
 
   it('routes each entry point at its /api path', async () => {
-    expect([questionsConfig.path, gradeConfig.path, excerptConfig.path]).toEqual(['/api/questions', '/api/grade', '/api/excerpt']);
-    for (const fn of [questionsFn, gradeFn, excerptFn]) expect((await fn(new Request('http://x/api', { method: 'PUT' }))).status).toBeGreaterThanOrEqual(400);
+    expect([questionsConfig.path, gradeConfig.path, excerptConfig.path, allowanceConfig.path]).toEqual(['/api/questions', '/api/grade', '/api/excerpt', '/api/allowance']);
+    for (const fn of [questionsFn, gradeFn, excerptFn, allowanceFn]) expect((await fn(new Request('http://x/api', { method: 'PUT' }))).status).toBeGreaterThanOrEqual(400);
   });
 });
