@@ -40,6 +40,17 @@
    "sha": "09a75770c47ec3838f6f65446ecf9a82da28edc0",
    "weight": 0.05
   },
+  "12ee384140028713f160cc9e023cc2fa6401a8e2": {
+   "effective_lines": 663,
+   "reasons": [
+    "663 effective lines",
+    "1 new code files",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "12ee384140028713f160cc9e023cc2fa6401a8e2",
+   "weight": 0.85
+  },
   "17987333402b9e9eb9ac8fbab96b5b71cf823aca": {
    "effective_lines": 1461,
    "reasons": [
@@ -60,6 +71,26 @@
    "refined": null,
    "sha": "1ef0e84e2a5d66b06222ecff9f7ad8aef4f8410f",
    "weight": 0.781
+  },
+  "1ef5e80a3005ccd0ed9b43e7e9b344e448e28dc2": {
+   "effective_lines": 0,
+   "reasons": [
+    "no diff (merge or empty)"
+   ],
+   "refined": null,
+   "sha": "1ef5e80a3005ccd0ed9b43e7e9b344e448e28dc2",
+   "weight": 0.0
+  },
+  "22770de4882927472ff520d03d0070e560d7ce56": {
+   "effective_lines": 410,
+   "reasons": [
+    "410 effective lines",
+    "1 new code files",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "22770de4882927472ff520d03d0070e560d7ce56",
+   "weight": 0.831
   },
   "2394341bbda5e124694cebc4bb9b2d5c67577a6d": {
    "effective_lines": 975,
@@ -146,6 +177,52 @@
    "sha": "3570a681d65fbfef8e9a674ec983d10287ec4412",
    "weight": 1.0
   },
+  "36478a0afbba3799a2a2b1f9390f84d19ac0078b": {
+   "effective_lines": 507,
+   "reasons": [
+    "507 effective lines",
+    "3 new code files",
+    "new top-level dir supabase",
+    "spans 3 top-level dirs",
+    "decision keyword in subject"
+   ],
+   "refined": null,
+   "sha": "36478a0afbba3799a2a2b1f9390f84d19ac0078b",
+   "weight": 1.0
+  },
+  "37426bd8b39e8a9ea5de2631111c9b035308c08f": {
+   "effective_lines": 71,
+   "group": "380e72d3c0840b894d5b6ecb7694ac36da7aef3f",
+   "reasons": [
+    "branch of 380e72d: 4 commits weighed as one (0.05)",
+    "21% of its lines",
+    "documentation only"
+   ],
+   "refined": null,
+   "sha": "37426bd8b39e8a9ea5de2631111c9b035308c08f",
+   "standalone": 0.05,
+   "weight": 0.011
+  },
+  "376379e2c326ed47859d2ce313b1abec05aa0bb5": {
+   "effective_lines": 417,
+   "reasons": [
+    "417 effective lines",
+    "2 new code files",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "376379e2c326ed47859d2ce313b1abec05aa0bb5",
+   "weight": 0.883
+  },
+  "380e72d3c0840b894d5b6ecb7694ac36da7aef3f": {
+   "effective_lines": 0,
+   "reasons": [
+    "no diff (merge or empty)"
+   ],
+   "refined": null,
+   "sha": "380e72d3c0840b894d5b6ecb7694ac36da7aef3f",
+   "weight": 0.0
+  },
   "3b3f9a13ba989ab9a1be130bb374d3f39ae61182": {
    "effective_lines": 203,
    "reasons": [
@@ -213,6 +290,16 @@
    "sha": "4adc2d1047720ed49655ed7e58f24a12a7b7b60f",
    "weight": 0.476
   },
+  "4b37b206b48248e9973fc0e8b03b5ebaf65d6b06": {
+   "effective_lines": 615,
+   "reasons": [
+    "615 effective lines",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "4b37b206b48248e9973fc0e8b03b5ebaf65d6b06",
+   "weight": 0.8
+  },
   "4bd7550973fc0141a2112846b8ff1c53a37eb727": {
    "effective_lines": 37,
    "reasons": [
@@ -231,6 +318,19 @@
    "refined": null,
    "sha": "4ff6ad09e4bd95b167760ba738aa3dd3a2e50494",
    "weight": 0.8
+  },
+  "525f6a59ea29fadacfd3586bd18bf9c4e7fb6d13": {
+   "effective_lines": 181,
+   "group": "380e72d3c0840b894d5b6ecb7694ac36da7aef3f",
+   "reasons": [
+    "branch of 380e72d: 4 commits weighed as one (0.05)",
+    "54% of its lines",
+    "documentation only"
+   ],
+   "refined": null,
+   "sha": "525f6a59ea29fadacfd3586bd18bf9c4e7fb6d13",
+   "standalone": 0.05,
+   "weight": 0.027
   },
   "5351e7e9911960232e72a8ecc6dc3c7ff8d121ce": {
    "effective_lines": 200,
@@ -292,6 +392,19 @@
    "refined": null,
    "sha": "63a74b1571024d63e9c880d4a3e6dec106056879",
    "weight": 0.0
+  },
+  "65f509920a4d4c4489a29af1648b67119167c2b3": {
+   "effective_lines": 42,
+   "group": "380e72d3c0840b894d5b6ecb7694ac36da7aef3f",
+   "reasons": [
+    "branch of 380e72d: 4 commits weighed as one (0.05)",
+    "13% of its lines",
+    "documentation only"
+   ],
+   "refined": null,
+   "sha": "65f509920a4d4c4489a29af1648b67119167c2b3",
+   "standalone": 0.05,
+   "weight": 0.006
   },
   "6cf99753bfaf58c88e051916bac06249a4e1b0e1": {
    "effective_lines": 30,
@@ -362,6 +475,17 @@
    "refined": null,
    "sha": "9111b03ad5d63405e2c27b364b9c09540d31be84",
    "weight": 0.741
+  },
+  "94945389bbd0f449c632b7d57aec93bcebe86cad": {
+   "effective_lines": 445,
+   "reasons": [
+    "445 effective lines",
+    "1 new code files",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "94945389bbd0f449c632b7d57aec93bcebe86cad",
+   "weight": 0.839
   },
   "9b7d0e25f69586a2ab49bc75b6399f2288b14afd": {
    "effective_lines": 579,
@@ -453,6 +577,15 @@
    "sha": "bb0c58014fc1a9b414529d9420f4429cf0444a76",
    "weight": 0.05
   },
+  "bcfb42c973286528951d7b5b24f322c31e71f771": {
+   "effective_lines": 0,
+   "reasons": [
+    "no diff (merge or empty)"
+   ],
+   "refined": null,
+   "sha": "bcfb42c973286528951d7b5b24f322c31e71f771",
+   "weight": 0.0
+  },
   "be8f9273b3811ddaa007036d77436fb5a9394598": {
    "effective_lines": 395,
    "reasons": [
@@ -481,6 +614,17 @@
    "sha": "ca70615bfd529b1655d60914632bc73c93e39aea",
    "weight": 0.626
   },
+  "ca899c38d555439574af9c17851705d9a7042868": {
+   "effective_lines": 2588,
+   "reasons": [
+    "2588 effective lines",
+    "14 new code files",
+    "new top-level dir drafts"
+   ],
+   "refined": null,
+   "sha": "ca899c38d555439574af9c17851705d9a7042868",
+   "weight": 1.0
+  },
   "cf5ce6d80c776c114577bbaacc6ad91fed0831a3": {
    "effective_lines": 232,
    "reasons": [
@@ -499,6 +643,19 @@
    "sha": "d682805f48eb5edb8ba249e7fada3b9e28442618",
    "weight": 0.0
   },
+  "da6740b6abd09320de0ebfec686734c8eb53e9fc": {
+   "effective_lines": 40,
+   "group": "380e72d3c0840b894d5b6ecb7694ac36da7aef3f",
+   "reasons": [
+    "branch of 380e72d: 4 commits weighed as one (0.05)",
+    "12% of its lines",
+    "documentation only"
+   ],
+   "refined": null,
+   "sha": "da6740b6abd09320de0ebfec686734c8eb53e9fc",
+   "standalone": 0.05,
+   "weight": 0.006
+  },
   "dd26ff46c6f168dcb85ce48c8349d09149fd63ca": {
    "effective_lines": 521,
    "reasons": [
@@ -508,6 +665,15 @@
    "refined": null,
    "sha": "dd26ff46c6f168dcb85ce48c8349d09149fd63ca",
    "weight": 0.8
+  },
+  "e239f56085f51c7be514d8211adf535584c02c94": {
+   "effective_lines": 221,
+   "reasons": [
+    "documentation only"
+   ],
+   "refined": null,
+   "sha": "e239f56085f51c7be514d8211adf535584c02c94",
+   "weight": 0.05
   },
   "e2485d4f3ecc3e7a63fa46ce0321521422424d2e": {
    "effective_lines": 234,
@@ -617,6 +783,16 @@
    "refined": null,
    "sha": "f51a092567edd2a74ed4c2fa99b484e194610ecd",
    "weight": 0.85
+  },
+  "f7c75a281a53d469c59d39039a203e2798f45045": {
+   "effective_lines": 217,
+   "reasons": [
+    "217 effective lines",
+    "spans 2 top-level dirs"
+   ],
+   "refined": null,
+   "sha": "f7c75a281a53d469c59d39039a203e2798f45045",
+   "weight": 0.72
   },
   "f885892f6227201e7820fa26425d1d6f9cf5bbec": {
    "effective_lines": 196,
