@@ -264,9 +264,10 @@ it are in TESTBEDS.md, "Sample prep".
      over to the samples.
 3. **Per-person caps.** $0.25 a day is about three two-question sittings on the default model and
    about seven on the cheaper one.
-   - **Decided by the owner (2026-11-15):** udebt's `default_model` becomes the cheaper model;
-     the caps stay at $0.25 per person and $2 for the app per day, and `max_tokens` stays at
-     4096, until the gateway's `usage` shows real sittings. The Plabs session sets it.
+   - **Decided by the owner (2026-11-15):** udebt's `default_model` is the cheaper model, with
+     $0.25 per person and $2 for the app per day and `max_tokens` at 4096, until the gateway's
+     `usage` shows real sittings. The Plabs session runs `supabase/ops/udebt-llm-caps.sql`; the
+     web app's `DEFAULT_MODEL` names the same model.
    - The cheaper model made these samples, as every logged call shows. The synthetic experiments
      in TESTBEDS.md also ran on the CLI's default with no model set, though their reports do not
      record the model.

@@ -144,4 +144,6 @@
 2026-11-15 [note] Review tested with fakes: vitest 218 tests (98.2% statements, 88.4% branches), Playwright 11 with a miss due next day on the fake clock; 28 hosted-review screenshots.
 
 2026-11-15 [code] ClaudeCLI isolation (15-minute rule): every claude call adds --setting-sources user --strict-mcp-config, read calls --tools Read Glob Grep; a clone's hooks and MCP config no longer run.
+
+2026-11-15 [decision] Owner: cheaper gateway model as the hosted default (web DEFAULT_MODEL, supabase/ops/udebt-llm-caps.sql); directory fallback for file-less units; production steps approved.
 2026-11-15 [decision] Owner: yes to the llm.py isolation fix (f294414), udebt default_model = cheaper model with default caps, Plabs loads samples/*.sql (after app_udebt migrations).
