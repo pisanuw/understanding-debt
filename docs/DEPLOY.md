@@ -119,7 +119,8 @@ worker, used for that job and dropped).
    explicitly; do not derive it from the repository name).
 5. "Set CNAME" / "Render domain": `udebt-api.hintwise.org` -> the Render service `udebt-api`.
 6. "Netlify env" on site `udebt`: `SUPABASE_URL` and `SUPABASE_ANON_KEY`, if the owner did not.
-7. **Done 2026-11-15** (3 repositories, 3 analyses, `check-schema` passed). The samples:
+7. **Done 2026-11-15** (4 repositories, 4 analyses after `samples/understanding-debt.sql`,
+   `check-schema` passed). The samples:
    `samples/{huggingface_hub,sentry-javascript,mlflow}.sql` in this repository
    (made by the "UDebt: Nov 12" session; `samples/README.md` has their sha256s and how they
    were made; each applied twice to a scratch Postgres 16 after the migrations). Copy them

@@ -168,3 +168,5 @@
 
 2026-11-15 [decision] Owner on use without signing in: advance quizzes for everybody (model quiz one choice away); self-checked at full weight; copies keep browser answers and their review states; no excerpt caching yet; 51 calls stand.
 2026-11-15 [note] Advance quizzes (levels 1-3) for all four samples: 719 of 738 planned questions, 51 calls on the subscription ($5.82 CLI-reported); index.json lists them.
+
+2026-11-15 [doc] README: use a plain or depth-1 clone for `udebt worker quizzes`, never a treeless one; DEPLOY.md: the fourth sample is loaded in production (4 repositories, 4 analyses).

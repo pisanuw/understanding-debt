@@ -864,7 +864,10 @@ read from raw.githubusercontent.com and the tree from GitHub's API (unauthentica
 checks it, and the site lists a file only at the sample's pin. At the defaults the four samples
 take 12, 9, 18 and 12 calls (huggingface_hub, sentry-javascript, mlflow, udebt) for 162, 135, 270
 and 171 questions. `python -m udebt.hosted.static_samples --check` fails while
-`web/public/samples/` is stale.
+`web/public/samples/` is stale. Make the clone an ordinary or depth-1 one
+(`git fetch --depth 1 origin <sha>`), not a treeless partial clone (`--filter=tree:0`): the
+command lists the tree with `git ls-tree -r -l`, which on a treeless clone fetches objects one by
+one and takes hours (the testbeds session, 2026-11-15).
 
 **What is stored, and where.** Without an account: only in your browser, as above. Signed in: in
 HintWise's database (Supabase, US East), schema `app_udebt`:
