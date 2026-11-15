@@ -122,3 +122,5 @@
 2026-11-15 [note] Level 3 on hf bd209e71 (share 1.00), b60bdd6c (1.50), 2 sets each, 10 calls: 0.69/0.63, 0.88/0.90; oldest scored highest (no code there: reasoned from the question).
 2026-11-15 [decision] Fits: k_low 0.20 (RMSE 0.212, 95% 0.13-0.28; free-ceiling slope not distinct from 0), k_high 0.97 (RMSE 0.232). Defaults 0.2 and 1.0; digitalme prior-only status unchanged.
 2026-11-15 [doc] README model table and decay text, BRIEFING Phase 3.5, ROADMAP Phase 3.5 and Phase 5 fits, TESTBEDS Phase 3.5 re-check; dogfood series and dashboard rebuilt.
+2026-11-15 [decision] Hosted: UDebt session builds; udebt.hintwise.org, repo not renamed; gateway quizzes, user key for new repos; Render free; public only; shared analyses.
+2026-11-15 [decision] Phase 4a answers (15-min rule): no own-commit prior in the hosted app v1; soft-block ack carries over a PR until its touched units change; specs store line ranges not code; digest default 30 days; co-change density left as is.

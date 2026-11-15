@@ -74,6 +74,17 @@ acceptable.
   seeded then lead-curated; refine the heaviest 40 commits; metadata-only AI heuristics;
   languages Python, JS/TS, C++, Rust, Java; live dashboard with sync and export.
 
+- **Owner answers 2026-11-15 (hosting, HOSTING.md)**: these supersede the org API key above.
+  - The UDebt session builds the hosted app on the HintWise platform at
+    `udebt.hintwise.org`, without renaming the repository.
+  - Google and email sign-in go through HintWise Supabase Auth.
+  - Samples are precomputed on the subscription; quizzes go through the HintWise LLM
+    gateway; a new repository needs the person's own key.
+  - The worker runs on a Render free instance, with gateway limits set after measuring the
+    samples.
+  - Only public repositories are accepted, and analyses of them are shared.
+  - The samples are huggingface_hub, sentry-javascript and mlflow, with no stored code.
+
 - **Commit weight (Phase 1)**: heuristic weight in [0, 1] per commit, LLM-refined for the
   heaviest, cached in `.udebt/commits.json`; split across units by line share. Every former
   commit count (churn, decay, provenance, prior) is now weighted mass.
@@ -609,6 +620,12 @@ acceptable.
   - **digitalme** for pisan@uw.edu is prior-only, so its status is unchanged but for the decay
     line (the prior fades at level 5's rate, still 1.0). Hypothetically, levels 1-3 passed on
     every unit at `f557893` would read 6.5 instead of 27.6.
+
+- **Phase 4a answers (2026-11-15, 15-minute rule)**: the hosted app v1 has no own-commit
+  prior (learner, not author); a soft-block acknowledgement carries over later pushes on the
+  same PR until its touched units change; specs store file and line ranges, never code;
+  a digest with no evidence defaults to the last 30 days; digitalme's dense co-change
+  graph is left as is since the import graph carries the ordering.
 
 ## Non-goals (for now)
 
