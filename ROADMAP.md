@@ -514,6 +514,8 @@ it stale.
 | 7 hub files out of the unit graph | done: files listed by more than two units connect nothing (`MAX_OWNERS`); digitalme uses edges >= 0.5 30 -> 20, all uses 47 -> 30, co-change pairs 64 -> 59; tour rewritten (1 call) |
 | 8 change digests | done: `udebt digest [--since] [--unit] [--days] [--all] [--format json]`, Digest tab, one call per run, cached per (unit, start, end) in `.udebt/digests/`; `risk` links to it |
 | 9 docs | done: README (digest section, serve, teaching, reference answers), BRIEFING, CHANGES, this section |
+| 10 synthetic report names (added by the owner) | done: `-<HHMMSS>` and a counter, an exclusive first write; never overwritten (Phase 5) |
+| 11 leakage guard (added by the owner) | done: the experiment's calls read worktrees without `.udebt/` (`clean_worktree: true`); every other read-tools call is denied `.udebt/` and told so (Phase 5) |
 
 **Digest validation on digitalme** (as pisan@uw.edu, `--since 2026-07-01`, start 6f9cafc0,
 end f93102b1; `.udebt/samples/digitalme-digest.md`): 11 of 12 units in his set below 0.6 had
@@ -959,6 +961,26 @@ team that wants it. Reading it honestly:
   mostly through "unknown" answers; 1 of 144 answers was confidently wrong; 0.9^mass
   predicted 0.02-0.51 against 0.56-0.71 observed. Raw mass correlated with wrongness
   significantly once (mlflow, rho 0.53, p 0.039); the share did in all six.
+
+**Two guards for the next runs, 2026-11-15** (owner-approved, folded into Phase 3.4; no model
+call):
+
+- **Report names never collide.** Reports were `synthetic-<shas>-<date>.json`, so two runs on
+  one snapshot on one day overwrote each other: two of the three huggingface_hub level 3 runs
+  were lost from disk (only their summaries survive). Now
+  `synthetic-<shas>-<Lisbon date>-<HHMMSS>.json`, a counter if that exists too, and a new
+  run's first write fails rather than replace a file.
+- **No leakage.** The question writer and the grader read the live working tree with tools,
+  where `.udebt/` held earlier reports (reference answers and grades), samples, records,
+  digests and the map's pooled questions; the answerer's snapshot held whatever `.udebt/` was
+  committed then. Every call now reads a temporary worktree (HEAD for questions and grades,
+  the snapshot for answers) with its `.git` link cut and its `.udebt/` removed; the report
+  records `clean_worktree: true`. The huggingface_hub level 3 runs scored higher on each
+  repeated question set; the next repeat cannot owe that to the model reading earlier
+  answers. Every other read-tools call (map, quiz questions and grades, orientations,
+  walkthroughs, teach-back, digests, the tutor) runs in the live tree, so the `claude` CLI is
+  denied `.udebt/` by a permission rule (`--disallowedTools "Read(./.udebt/**)"`, which Claude
+  Code also applies to Grep and Glob) and told so in the prompt.
 
 ## Decisions assumed in this roadmap
 

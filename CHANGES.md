@@ -103,3 +103,5 @@
 2026-11-15 [code] udebt digest and a Digest tab: per unit below threshold, commits since last evidence (or --since, else 30 days), one cached call; risk links to it.
 2026-11-15 [note] digitalme digest --since 2026-07-01: 11 units, 66 commits, 1 call of 32 s, 6 decisions held, 5 extended. Sample in .udebt/samples/digitalme-digest.md.
 2026-11-15 [doc] README digest section, serve batch grading and tutor persistence, why reference answers stay in map.json; BRIEFING and ROADMAP Phase 3.4.
+2026-11-15 [code] Synthetic reports are named <shas>-<date>-<HHMMSS>.json, with a counter after that, and a new run never overwrites one (two hf runs were lost).
+2026-11-15 [code] Leakage guard: synthetic questions, answers and grades read temporary worktrees without .udebt/ (clean_worktree: true); every claude call is denied .udebt/.

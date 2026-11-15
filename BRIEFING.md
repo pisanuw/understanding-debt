@@ -156,7 +156,8 @@ acceptable.
   importance unless `--units N`, one question each. The snapshot worktree loses its `.git`
   file so the answerer cannot follow it back to HEAD, and the prompt does not hint that the
   code moved on. Mass since is over `rev..HEAD` (ancestry, not dates). Nothing goes to
-  `records/`; the report is `experiments/synthetic-<sha8>-<Lisbon date>.json` and names
+  `records/`; the report is `experiments/synthetic-<sha8>-<Lisbon date>-<HHMMSS>.json` (the
+  time since Phase 3.4) and names
   the resolved sha, since `<rev>` may contain `~`. First result on digitalme: rho -0.27, no
   support for decay; recorded as is (ROADMAP Phase 5).
 - **Synthetic experiment, second design** (Phase 1.2): several snapshots in one run share
@@ -513,6 +514,14 @@ acceptable.
     changes (its basis). `risk` prints "Read the digest: `udebt digest --unit X`" for up to
     three flagged units. digitalme, `--since 2026-07-01`: 11 units, 66 commits, one call of
     32 s (94K characters), 6 held, 5 extended.
+  - **Synthetic reports never overwrite** (owner): `-<HHMMSS>` in the name, a counter after
+    that, the first write exclusive. **No leakage** (owner): the experiment's question,
+    answer and grading calls each read a temporary worktree without `.udebt/` (HEAD for
+    questions and grades), recorded as `clean_worktree: true`; every other read-tools call is
+    denied `.udebt/` (`--disallowedTools "Read(./.udebt/**)"`) and told so in the prompt, not
+    moved to a worktree, because the quiz asks about the working tree as it is, uncommitted
+    changes included. The deny rule's form is Claude Code's documented one; no call was spent
+    to see the CLI accept it (the tests check the command line).
 
 ## Non-goals (for now)
 
