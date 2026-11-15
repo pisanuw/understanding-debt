@@ -2,9 +2,12 @@
  * Advance quizzes (HOSTING.md decision 10): questions written ahead of time by `udebt worker
  * quizzes` (udebt/hosted/advance.py, with the hosted quiz's own prompt) for each unit at ladder
  * levels 1-3, each with its reference answer and, at level 1, the orientation shown before it.
- * Whoever has no model to hand (a visitor who is not signed in and has no key of their own, or
- * a signed-in person with model features off) answers one, reads the reference and marks their
- * own answer: a `self-checked` record (quiz.ts SELF_CHECKED), with no model call.
+ * Everybody gets them (owner, 2026-11-15): whoever has no model to hand (a visitor without a key
+ * of their own, or model features off) has only these, and a person with a model in use chooses
+ * them or the model's quiz on the Quiz tab (model/prefs.ts DEFAULT_QUIZ_KIND). The learner answers
+ * one, reads the reference and marks their own answer: a `self-checked` record (quiz.ts
+ * SELF_CHECKED), with no model call; in review such an answer's item is self-checked again
+ * (ui/screens/review.ts checkedBy).
  *
  * Which question: a missed one comes back in other words first (quiz.revealedVariant, as in a
  * model-written quiz: every self-checked answer saw its reference), else the first one at that

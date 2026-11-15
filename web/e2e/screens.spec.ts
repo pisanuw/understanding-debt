@@ -6,7 +6,9 @@
  * only directories (hosted-tree-*.png: the question, and the grade with the files it rests on),
  * and udebt without signing in (hosted-anon-*.png: the front page, a sample, an advance-quiz
  * question, the self-check step, the recorded sitting with its label, the debt, and the copy
- * offer at sign-in). Also checks that no page scrolls sideways.
+ * offer at sign-in), and the quiz-kind choice signed in with the HintWise key (hosted-choice-*.png:
+ * the advance kind first, a recorded self-checked sitting, the model kind, and a review the next
+ * day with an item of each kind). Also checks that no page scrolls sideways.
  */
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
@@ -47,6 +49,7 @@ for (const width of [1280, 390]) {
       await page.getByLabel(/The HintWise key/).check();
       await shot(page, 'settings', width, scheme);
       await page.goto('/#/r/1/quiz');
+      await page.getByLabel(/Written and graded by the model/).check();
       await page.getByLabel('Questions').selectOption('2');
       await shot(page, 'quiz-start', width, scheme);
       await page.getByRole('button', { name: 'Start' }).click();
@@ -87,6 +90,7 @@ for (const width of [1280, 390]) {
       await page.goto('/#/settings');
       await page.getByLabel(/The HintWise key/).check();
       await page.goto('/#/r/1/quiz');
+      await page.getByLabel(/Written and graded by the model/).check();
       await page.getByLabel('Questions').selectOption('2');
       await page.getByRole('button', { name: 'Start' }).click();
       await page.getByLabel('Your answer').fill('It is wrong on purpose: it renders the slides.');
@@ -134,6 +138,7 @@ for (const width of [1280, 390]) {
       await page.goto('/#/settings');
       await page.getByLabel(/The HintWise key/).check();
       await page.goto('/#/r/1/quiz');
+      await page.getByLabel(/Written and graded by the model/).check();
       await page.getByLabel('Questions').selectOption('1');
       await page.getByLabel('Unit').selectOption('frontend-spa');
       await page.getByRole('button', { name: 'Start' }).click();
@@ -184,6 +189,55 @@ for (const width of [1280, 390]) {
       await page.getByRole('button', { name: 'Continue with Google' }).click();
       await expect(page.getByTestId('offer')).toBeVisible();
       await shot(page, 'anon-offer', width, scheme);
+      await page.evaluate(() => {
+        sessionStorage.clear();
+        localStorage.clear();
+      });
+    });
+  }
+}
+
+for (const width of [1280, 390]) {
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`the quiz-kind choice signed in at ${width}px, ${scheme}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.clock.setFixedTime(new Date('2026-11-15T10:00:00Z'));
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Continue with Google' }).click();
+      await page.goto('/#/settings');
+      await page.getByLabel(/The HintWise key/).check();
+      await page.goto('/#/r/1/quiz');
+      await expect(page.getByLabel(/Written in advance, self-checked/)).toBeChecked();
+      await shot(page, 'choice-advance', width, scheme);
+      await page.getByRole('button', { name: 'Start' }).click();
+      await page.getByLabel('Your answer').fill('It streams the reply to the browser as it is written and saves the exchange.');
+      await page.getByRole('button', { name: 'Show the answer' }).click();
+      await expect(page.getByTestId('reference')).toBeVisible();
+      await shot(page, 'choice-check', width, scheme);
+      await page.getByRole('button', { name: 'Correct' }).click();
+      await page.getByLabel('Your answer').fill('It renders the slides.');
+      await page.getByRole('button', { name: 'Show the answer' }).click();
+      await page.getByRole('button', { name: 'Wrong' }).click();
+      await expect(page.getByRole('heading', { name: 'Recorded' })).toBeVisible();
+      await shot(page, 'choice-recorded', width, scheme);
+      await page.getByLabel(/Written and graded by the model/).check();
+      await expect(page.getByText(/^Questions written and graded by the model/)).toBeVisible();
+      await shot(page, 'choice-model', width, scheme);
+      await page.getByLabel('Questions').selectOption('1');
+      await page.getByLabel('Unit').selectOption('persona-retrieval');
+      await page.getByRole('button', { name: 'Start' }).click();
+      await page.getByLabel('Your answer').fill('It is wrong on purpose: it renders the slides.');
+      await page.getByRole('button', { name: 'Answer and grade' }).click();
+      await expect(page.getByRole('heading', { name: 'Graded' })).toBeVisible();
+      await shot(page, 'choice-graded', width, scheme);
+      await page.clock.setFixedTime(new Date('2026-11-16T11:00:00Z'));
+      await page.getByRole('link', { name: 'Your debt', exact: true }).click();
+      await expect(page.getByTestId('debt-self-note')).toBeVisible();
+      await shot(page, 'choice-debt', width, scheme);
+      await page.getByRole('link', { name: /^Review/ }).click();
+      await expect(page.getByRole('button', { name: 'Review the self-checked ones' })).toBeVisible();
+      await shot(page, 'choice-review', width, scheme);
       await page.evaluate(() => {
         sessionStorage.clear();
         localStorage.clear();

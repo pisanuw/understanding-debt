@@ -1,7 +1,9 @@
 /**
  * The main flow with fakes: sign in, open the sample, read the specs and a unit's walkthrough
- * (code fetched through /api/excerpt from the fake GitHub), take a two-question level-1 quiz
- * through the fake gateway, see the debt fall, then delete the account; and the spaced review:
+ * (code fetched through /api/excerpt from the fake GitHub), with the HintWise key take the
+ * questions written in advance (the default kind: self-checked, no call), then a two-question
+ * level-1 quiz the fake gateway writes and grades on the same account, see the debt fall and both
+ * kinds labelled in the debt table, then delete the account; and the spaced review:
  * a missed question comes back in Review the next day (the browser's clock moved by
  * Playwright's fake clock, not by waiting) and a correct answer moves its state on; and a quiz
  * on a unit that names only directories, written from the top files under them (the tree
@@ -42,27 +44,80 @@ test('sign in, read the specs, take a level-1 quiz, see the debt fall', async ({
   await page.getByRole('link', { name: 'Repositories' }).click();
   await page.locator('a.repo-card', { hasText: 'digitalme' }).click();
   await page.getByRole('link', { name: 'Quiz' }).click();
+
+  // Both kinds on offer; the questions written in advance first, self-checked with no call.
+  const asked = async () => ((await page.locator('.question p.small').first().textContent()) ?? '').replace(/^\[\d\/\d\] /, '').split(' · ')[0];
+  const apiCalls: string[] = [];
+  page.on('request', (r) => {
+    const path = new URL(r.url()).pathname;
+    if (path === '/api/questions' || path === '/api/grade') apiCalls.push(path);
+  });
+  await expect(page.getByTestId('quiz-kind')).toBeVisible();
+  await expect(page.getByLabel(/Written in advance, self-checked/)).toBeChecked();
+  await expect(page.getByText(/Questions written in advance for this repository/)).toContainText('no model call');
+  await page.getByLabel('Questions').selectOption('2');
+  await page.getByRole('button', { name: 'Start' }).click();
+  await expect(page.getByText(/^\[1\/2\]/)).toContainText('level 1 of 5: purpose and placement · self-checked');
+  await expect(page.getByLabel(/Written and graded by the model/)).toBeDisabled(); // locked while the sitting runs
+  const selfUnits = [await asked()];
+  await page.getByLabel('Your answer').fill('It streams the reply to the browser as it is written and saves the exchange.');
+  await page.getByRole('button', { name: 'Show the answer' }).click();
+  await page.getByRole('button', { name: 'Correct' }).click();
+  await expect(page.getByText(/^\[2\/2\]/)).toBeVisible();
+  selfUnits.push(await asked());
+  await page.getByLabel('Your answer').fill('It keeps the cost of each visitor within the daily budget.');
+  await page.getByRole('button', { name: 'Show the answer' }).click();
+  await page.getByRole('button', { name: 'Correct' }).click();
+  await expect(page.getByRole('heading', { name: 'Recorded' })).toBeVisible();
+  await expect(page.getByText('2 correct, self-checked (no model call).')).toBeVisible();
+  await expect(page.locator('.result .badge.self-checked')).toHaveCount(2);
+  await expect(page.getByTestId('self-checked-index')).toBeVisible();
+  const delta = page.getByTestId('debt-delta');
+  await expect(delta).toContainText('100.0');
+  const first = Number((await delta.locator('strong').nth(1).textContent()) ?? '100');
+  expect(first).toBeLessThan(100);
+  expect(apiCalls).toEqual([]);
+
+  // Then the model's quiz on the same account, one choice away.
+  await expect(page.getByLabel(/Written and graded by the model/)).toBeEnabled();
+  await page.getByLabel(/Written and graded by the model/).check();
+  await expect(page.getByText(/through the HintWise key \(they count against your daily allowance\)/)).toBeVisible();
   await page.getByLabel('Questions').selectOption('2');
   await page.getByRole('button', { name: 'Start' }).click();
 
   await expect(page.getByText('[1/2]')).toBeVisible();
   await expect(page.getByText('level 1 of 5: purpose and placement')).toBeVisible();
   await expect(page.getByText('Orientation: read this first')).toBeVisible();
-  await page.getByLabel('Your answer').fill('It streams the reply to the browser as it is written and saves the exchange.');
+  const modelUnits = [await asked()];
+  await page.getByLabel('Your answer').fill('It builds the persona prompt and picks how to retrieve.');
   await page.getByRole('button', { name: 'Next' }).click();
   await expect(page.getByText('[2/2]')).toBeVisible();
-  await page.getByLabel('Your answer').fill('It keeps the cost of each visitor within the daily budget.');
+  modelUnits.push(await asked());
+  await page.getByLabel('Your answer').fill('It lets the owner review answers and fix the persona.');
   await page.getByRole('button', { name: 'Answer and grade' }).click();
 
   await expect(page.getByRole('heading', { name: 'Graded' })).toBeVisible();
   await expect(page.getByText('2 correct (one grading call).')).toBeVisible();
-  const delta = page.getByTestId('debt-delta');
-  await expect(delta).toContainText('100.0');
+  await expect(page.locator('.result .badge.self-checked')).toHaveCount(0);
+  expect(apiCalls).toEqual(['/api/questions', '/api/grade']);
   const after = Number((await delta.locator('strong').nth(1).textContent()) ?? '100');
-  expect(after).toBeLessThan(100);
+  expect(after).toBeLessThan(first);
 
+  // The debt table: each unit labelled by how it was checked.
   await page.getByRole('link', { name: 'See your debt per unit' }).click();
   await expect(page.getByTestId('debt-tile')).toHaveText(after.toFixed(1));
+  await expect(page.getByTestId('debt-self-note')).toBeVisible();
+  const modelOnly = modelUnits.filter((u) => !selfUnits.includes(u));
+  expect(modelOnly.length).toBeGreaterThan(0);
+  const rowOf = (name: string) => page.locator('table.debt tbody tr').filter({ has: page.getByRole('link', { name, exact: true }) });
+  for (const name of selfUnits) {
+    await expect(rowOf(name).locator('.badge.measured')).toBeVisible();
+    await expect(rowOf(name).locator('.badge.self-checked')).toBeVisible();
+  }
+  for (const name of modelOnly) {
+    await expect(rowOf(name).locator('.badge.measured')).toBeVisible();
+    await expect(rowOf(name).locator('.badge.self-checked')).toHaveCount(0);
+  }
 
   await page.getByRole('link', { name: 'Settings' }).click();
   await page.getByText('Delete my account', { exact: true }).first().click();
@@ -78,6 +133,7 @@ test('"I don\'t know" at level 1 shows the answer with no call and records a kno
   await page.goto('/#/settings');
   await page.getByLabel(/The HintWise key/).check();
   await page.goto('/#/r/1/quiz');
+  await page.getByLabel(/Written and graded by the model/).check();
   await page.getByLabel('Questions').selectOption('1');
   await page.getByRole('button', { name: 'Start' }).click();
   await page.getByRole('button', { name: "I don't know" }).click();
@@ -101,6 +157,7 @@ test('a missed question comes back in Review the next day, and a correct answer 
 
   // A one-question quiz answered wrong: graded wrong through the fake gateway, the answer shown (level 1).
   await page.getByRole('link', { name: 'Quiz' }).click();
+  await page.getByLabel(/Written and graded by the model/).check();
   await page.getByLabel('Questions').selectOption('1');
   await page.getByRole('button', { name: 'Start' }).click();
   await expect(page.getByText('[1/1]')).toBeVisible();
@@ -172,6 +229,9 @@ test('a quiz on a unit that names only directories gets code from the top files 
   await page.getByLabel(/The HintWise key/).check();
   for (const sitting of [1, 2]) {
     await page.goto('/#/r/1/quiz');
+    // Chosen once, kept by this browser for the second sitting.
+    if (sitting === 1) await page.getByLabel(/Written and graded by the model/).check();
+    await expect(page.getByLabel(/Written and graded by the model/)).toBeChecked();
     await page.getByLabel('Questions').selectOption('1');
     await page.getByLabel('Unit').selectOption('frontend-spa');
     const written = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/questions');

@@ -171,6 +171,15 @@ export function sittingRows(results: Graded[], prior: ReviewRecord[], opts: Para
 }
 
 /**
+ * The latest miss on a unit and level, the record an item's question comes from (`phrasing`'s
+ * miss): the page checks the item the way that miss was checked (ui/screens/review.ts checkedBy).
+ */
+export function lastMiss<T extends ReviewRecord>(records: T[], unit: string, level: number): T | undefined {
+  const misses = ordered(records).filter((r) => unitOf(r) === unit && levelOf(r) === level && r.verdict !== 'correct' && r.question);
+  return misses[misses.length - 1];
+}
+
+/**
  * What to ask for an item: the latest missed question's phrasings (the question and its
  * variants), the first one not asked last, with that miss's reference (review._phrasing).
  */

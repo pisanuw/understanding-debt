@@ -6,6 +6,7 @@
  * person's answers and review items on it).
  */
 import { label, nextLevel } from '../../core/ladder';
+import { isSelfChecked } from '../../core/quiz';
 import { decayNote, debtOf } from '../../core/scoring';
 import { childrenOf, connections, githubLink, orientationOf, parseGitHubUrl, topLevel, unitById, type SpecUnit } from '../../core/specs';
 import { repoHref, unitHref, type App, type RepoView, type Route } from '../app';
@@ -199,7 +200,7 @@ function unitPage(app: App, v: RepoView, unitId: string): HTMLElement {
   box.append(walkthroughCard(app, v, u));
   const al = h('ul', { class: 'list' });
   for (const r of [...recs].reverse()) {
-    al.append(h('li', null, h('div', { class: 'small muted' }, `${day(r.ts)} · level ${r.level} · `, badge(r.verdict, r.verdict), r.revealed ? ' · answer shown' : ''), h('div', null, r.question)));
+    al.append(h('li', null, h('div', { class: 'small muted' }, `${day(r.ts)} · level ${r.level} · `, badge(r.verdict, r.verdict), r.revealed ? ' · answer shown' : '', isSelfChecked(r) ? ' · ' : '', isSelfChecked(r) ? selfBadge() : null), h('div', null, r.question)));
   }
   const inReview = reviewItems(recs);
   box.append(

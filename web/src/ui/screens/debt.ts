@@ -71,7 +71,7 @@ export function debtTab(_app: App, v: RepoView): HTMLElement {
         'p',
         { class: 'muted small', 'data-testid': 'self-checked-note' },
         selfBadge(),
-        ': you marked these answers yourself against the reference answer (questions written in advance, or a review with no model in use); no model graded them. They count as you marked them.',
+        ': you marked these answers yourself against the reference answer (questions written in advance and their reviews, or a review with no model in use); no model graded them. They count as you marked them.',
       ),
     );
   if (sc.unknownShare.length) box.append(h('p', { class: 'muted small' }, `Some answers were given at a commit this analysis has no change figures for (${sc.unknownShare.join(', ')}); they are not faded.`));
