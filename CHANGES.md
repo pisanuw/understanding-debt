@@ -136,3 +136,5 @@
 2026-11-15 [doc] docs/DEPLOY.md rewritten for HintWise (owner and Plabs steps, env vars, caps estimate, untested parts), supabase/README.md, README hosted section, BRIEFING and ROADMAP Phase 4b.
 
 2026-11-15 [decision] Phase 4b answers (15-minute rule): shared analyses stay labelled, $0.25/day default cap, self-assessment records, large repos as samples or local run + push, review queue ported next.
+2026-11-15 [note] Three hosted samples made (15 calls each) and checked; load SQL in samples/ for Plabs. Usage and limits in HOSTING.md 'Measured on the samples'.
+2026-11-15 [note] Security: udebt's claude -p calls run the analysed repo's .claude hooks (sentry-javascript ran pnpm install + build). Fix flags in TESTBEDS.md; code fix is UDebt's, needs owner's yes.

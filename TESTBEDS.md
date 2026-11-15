@@ -475,6 +475,51 @@ snapshot had.
   since Phase 3.5 (ROADMAP Phase 5). With a free ceiling the slope is not distinguishable
   from 0 (new points: k 0.04, 95% -0.20 to 0.29).
 
+## Sample prep for the hosted app (2026-11-15)
+
+The three samples are in `samples/` as load SQL, and their usage is in HOSTING.md, "Measured on
+the samples". Three findings came out of making them.
+
+### `udebt` runs the analysed repository's Claude Code hooks
+
+`ClaudeCLI` (`udebt/llm.py`) runs `claude -p` with its working directory inside the clone.
+Claude Code then loads the clone's `.claude/settings.json` (hooks, permissions, env) and its
+`.mcp.json`, and `-p` skips the workspace-trust prompt.
+
+sentry-javascript's SessionStart hook runs `scripts/claude-cloud-setup.sh` when
+`CLAUDE_CODE_REMOTE=true`. In this cloud session each of the 15 calls therefore ran
+`pnpm install --frozen-lockfile` and `pnpm run build:dev` in the clone. The result was 2.9 GB of
+`node_modules`, and an nx daemon that was still running after the job ended. Any repository can
+put any command in such a hook.
+
+- **Reproduced:** in a repository whose only content is a SessionStart hook that touches a file,
+  plain `claude -p` ran the hook. The same call with
+  `--setting-sources user --strict-mcp-config` did not.
+- **A second gap:** with read tools, `_run` passes only `--allowedTools Read Glob Grep`. Every
+  default tool is still offered; only automatic approval is limited. `chat` already passes
+  `--tools Read Glob Grep`.
+- **How common:** 16 of the screened clones ship hooks in `.claude/settings.json`:
+  ComfyUI_frontend, posthog, prefect, ruff, cline, dd-trace-rb, kibana, sentry-javascript,
+  mlflow (PreToolUse on Bash), n8n, bun, streamlit, supabase, tldraw, twenty and vercel/ai.
+- **The hosted worker is not affected.** It runs its own read tools over the gateway, keeps
+  paths inside the clone, and checks symlinks out as plain files.
+- **Workaround for the samples:** the measurement wrapper adds the flags above. The fix in
+  `udebt/llm.py` belongs to the UDebt session, with the owner's yes.
+
+### The replay is the slow part on a large team
+
+After its last model call, the first sentry-javascript attempt (851 contributors) spent 1 h
+45 min in the replay and was still running when the 2-hour job limit stopped it. With
+`--no-export`, which the hosted app can use because it needs neither replay nor export, the whole
+run took 528 s. huggingface_hub's export was 67 MB (snapshots for 378 developers at 287 points).
+
+### Integration-test apps count as source
+
+sentry-javascript's map covers 27% of the "non-test source files", and udebt warns that the map
+may be wrong. Yet it covers 77% of the product code under `packages/`. The denominator includes
+6,068 files under `dev-packages/`: the e2e-tests applications and the browser, node and
+cloudflare integration tests. Test detection does not recognise them.
+
 ## Caveats
 
 - **Disclosure-only.** Every AI share is a lower bound. Zed (2%), Ruff (2%) and openai/codex

@@ -215,3 +215,62 @@ the walkthroughs add one per unit.
 7. **Samples:** huggingface_hub, sentry-javascript and mlflow. Their specs are generated now
    on the owner's subscription, with `udebt worker run ... --llm --walkthroughs 12
    --no-excerpts`: references, no stored code.
+
+## Measured on the samples (2026-11-15)
+
+The samples were made with the `claude` CLI. Its default model is the cheaper of the gateway's
+two. The load SQL and how it was made are in `samples/` (README there); the findings from making
+it are in TESTBEDS.md, "Sample prep".
+
+| | huggingface_hub | sentry-javascript | mlflow |
+|---|--:|--:|--:|
+| commits | 2,920 | 17,695 | 14,477 |
+| units (sub-units) | 12 (6) | 12 (3) | 12 (18) |
+| map coverage of non-test source | 85% | 27% (77% of `packages/`) | 77% |
+| CLI calls / model turns | 15 / 129 | 15 / 151 | 15 / 172 |
+| largest output (tokens) | 5,602 | 4,565 | 6,943 |
+| calls with more than 4,096 output tokens | 4 | 2 | 4 |
+| wall time | 808 s (with export) | 528 s | 707 s |
+| default model, cached / uncached | $4.25 / $15.81 | $2.74 / $5.60 | $2.77 / $6.47 |
+| cheaper model, cached / uncached | $2.44 / $7.91 | $1.45 / $2.80 | $1.49 / $3.24 |
+
+**How these are priced:**
+- From the token counts the CLI reported, at the gateway's prices per million tokens: the default
+  model at $4 in, $20 out, $0.20 cache read and $5 cache write; the cheaper model at $2, $10,
+  $0.20 and $2.50.
+- "Uncached" bills every input token at the full price. The hosted tool loop does that today,
+  because it sends no `cache_control`.
+- The huggingface_hub run offered every default tool (before the wrapper fix), and its larger
+  system prompt makes it the most expensive.
+
+**What the numbers mean for the limits:**
+1. **Gateway `max_tokens`.** Under decision 3 the gateway carries only quiz writing and grading.
+   Those answers run from a few hundred to 1,500 tokens (the UDebt session's estimate), so the
+   default of 4096 holds. Analysis calls reach 6,943 tokens, but they run on the person's own key,
+   where the worker allows 16,000 (`UDEBT_BYOK_MAX_TOKENS`). If analyses ever go through the
+   gateway, its `max_tokens` must be at least 8,192.
+2. **Quiz input on the samples.** A question call carries up to four references per unit.
+   - Median code per unit: 6,450 characters (huggingface_hub), 4,747 (sentry-javascript) and
+     4,334 (mlflow).
+   - A two-unit call is therefore 9,000 to 13,000 characters (about 2,200 to 3,200 tokens), and a
+     five-unit call 22,000 to 32,000, all under the 60,000 cap.
+   - That is the scale of the digitalme fixture behind the UDebt session's estimate ($0.07 for a
+     two-question sitting, $0.16 for five, at the default model's price), so the estimate carries
+     over to the samples.
+3. **Per-person caps.** $0.25 a day is about three two-question sittings on the default model and
+   about seven on the cheaper one.
+   - Recommendation, for the owner: set udebt's `default_model` to the cheaper model, and keep
+     $0.25 per person and $2 for the app per day until the gateway's `usage` shows real sittings.
+   - The cheaper model made these samples, as every logged call shows. The synthetic experiments
+     in TESTBEDS.md also ran on the CLI's default with no model set, though their reports do not
+     record the model.
+4. **A new analysis on the person's own key**, as the hosted worker would run it (a map,
+   orientations, the tour and three walkthroughs):
+   - cheaper model: $0.63 to $1.04 cached, $1.10 to $2.91 uncached;
+   - default model: $1.21 to $1.87 cached, $2.20 to $5.82 uncached.
+
+   Adding `cache_control` to the tool loop would bring the uncached figures down to about the
+   cached ones.
+5. **Units with no code for the question writer:** 1 of 18 (huggingface_hub), 1 of 15
+   (sentry-javascript) and 12 of 30 (mlflow). These sub-units list only directories and have no
+   walkthrough or orientation, so `refsForUnit` finds no file, and a quiz on them gets no code.
