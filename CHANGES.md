@@ -156,3 +156,5 @@
 2026-11-15 [doc] DEPLOY.md: Plabs steps 1, 2 and 7 marked done (migrations, SHARED_TABLES, the three sample loads in production); step 8 waits on the owner's yes to Plabs; owner steps still open.
 
 2026-11-15 [code] .udebt/map.json refreshed (12 units, 7 sub-units, 98% of clustered source; covers web/, udebt/hosted/, supabase/) so this repository can be the fourth hosted sample at this pin.
+
+2026-11-15 [code] udebt/hosted/samples.py: understanding-debt registered as the fourth sample at e9c1c8c (no licence); the other session makes its analysis at that pin.
