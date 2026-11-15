@@ -30,6 +30,7 @@ udebt dashboard [--open]        a static, self-contained HTML dashboard
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -1278,6 +1279,74 @@ def cmd_worker(args) -> int:
     )  # fmt: skip
     if m["note"]:
         print(f"Note: {m['note']}.")
+    return 0
+
+
+def cmd_remote(args) -> int:
+    from . import remote
+
+    root, store = _ctx(args)
+    store.require()
+    try:
+        if args.action == "set":
+            if not args.url:
+                raise SystemExit("`udebt remote set <url>`")
+            print(f"Wrote {remote.save_config(store, args.url)} (gitignored).")
+        elif args.action == "token":
+            url = remote.load_config(store)["url"]
+            token = sys.stdin.readline().strip()
+            if not token:
+                raise SystemExit("Paste the token on stdin (it is not taken as an argument).")
+            print(f"Saved the token for {url} in {remote.save_token(url, token)} (mode 0600).")
+        else:
+            cfg = remote.load_config(store)
+            try:
+                remote.token_for(cfg["url"])
+                tok = "set"
+            except remote.RemoteError:
+                tok = "missing (UDEBT_TOKEN, or `udebt remote token`)"
+            print(f"remote {cfg['url']}; token {tok}")
+    except remote.RemoteError as e:
+        raise SystemExit(str(e)) from e
+    return 0
+
+
+def cmd_push(args) -> int:
+    from . import remote
+
+    root, store = _ctx(args)
+    store.require()
+    try:
+        r = remote.push(root, store, dry_run=args.dry_run)
+    except remote.RemoteError as e:
+        raise SystemExit(f"udebt push: {e}") from e
+    what = (f"{r['points']} points, {r['evidence']} evidence records, {r['risk_events']} risk "
+            f"events, {r['bytes'] / 1024:.0f} KB")  # fmt: skip
+    if not r["sent"]:
+        print(f"Would push {what} to {r['url']} (dry run: the payload conforms to the contract).")
+        return 0
+    got = (r["reply"] or {}).get("imported", r["reply"])
+    print(f"Pushed {what} to {r['url']}. The host: {json.dumps(got, sort_keys=True)}")
+    return 0
+
+
+def cmd_pull(args) -> int:
+    from . import remote
+
+    root, store = _ctx(args)
+    store.require()
+    try:
+        r = remote.pull(store)
+    except remote.RemoteError as e:
+        raise SystemExit(f"udebt pull: {e}") from e
+    added = r["evidence_added"]
+    print(
+        f"Pulled from {r['url']}: {sum(added.values())} new evidence record(s)"
+        + (f" ({', '.join(f'{d} {n}' for d, n in sorted(added.items()))})" if added else "")
+        + f", {r['points']} snapshot points (.udebt/remote/snapshots.json)"
+        + (f"; {r['invalid']} row(s) broke the contract and were skipped" if r["invalid"] else "")
+        + "."
+    )
     return 0
 
 
@@ -2534,6 +2603,18 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--storage-path", help="where the export lives in the app's bucket")
     x.add_argument("--out", help="write the SQL here instead of stdout")
     x.set_defaults(fn=cmd_worker)
+
+    s = sub.add_parser("remote", help="the hosted store push and pull talk to")
+    s.add_argument("action", nargs="?", choices=["show", "set", "token"], default="show")
+    s.add_argument("url", nargs="?")
+    s.set_defaults(fn=cmd_remote)
+
+    s = sub.add_parser("push", help="send the export (the contract's import) to the remote")
+    s.add_argument("--dry-run", action="store_true", help="build and check it, send nothing")
+    s.set_defaults(fn=cmd_push)
+
+    s = sub.add_parser("pull", help="take evidence and snapshots back from the remote")
+    s.set_defaults(fn=cmd_pull)
 
     s = sub.add_parser("validate", help="check a JSON file against the versioned contract")
     s.add_argument("file")
