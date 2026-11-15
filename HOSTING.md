@@ -220,6 +220,25 @@ the walkthroughs add one per unit.
    - yes to the cheaper `default_model` with the default caps;
    - yes to the Plabs session loading `samples/*.sql` into production. The `app_udebt`
      migrations must be applied first.
+9. **A fourth sample (owner, 2026-11-15):** "I want https://github.com/pisanuw/understanding-debt
+   to be one of the sample repositories". These choices were made under the 15-minute rule, and
+   the owner can reverse any of them:
+   - it is added, not swapped for another sample;
+   - its committed `.udebt/map.json` is refreshed first. The map dated 12 Nov covers 15% of
+     today's source and none of `web/`, `udebt/hosted/` or `supabase/`;
+   - no licence for now.
+10. **No login (owner, 2026-11-15):** "The web site should be usable without any login, any
+    progress on quizzes would just be saved on browser". Under the platform rules, anonymous
+    visitors get no grants in app schemas, and the gateway serves signed-in users only. These
+    choices were made under the 15-minute rule, and the owner can reverse any of them:
+    - anonymous visitors use the samples, served as static JSON with the site;
+    - their quizzes on the samples are written in advance on the owner's subscription and
+      checked by the learner against the reference answer, with no model call. Visitors who
+      give their own key also get quizzes the model writes and grades;
+    - their progress stays in the browser;
+    - signed-in users keep server records, and the app offers to copy browser progress into
+      the account at sign-in;
+    - adding a repository still needs sign-in.
 
 ## Measured on the samples (2026-11-15)
 
