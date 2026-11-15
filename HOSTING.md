@@ -270,6 +270,9 @@ the walkthroughs add one per unit.
       - Progress stays in the browser.
       - The cap notice names the shared allowance and suggests signing in for one's own.
     - Option B was rejected: a shared udebt account would need a password secret on Netlify.
+    - No Turnstile bot check for now (owner, 2026-11-15: "skipping Turnstile for now"): the stand-in's
+      $1.00 a day bounds what a bot can spend, and signed-in users keep the rest of the app's caps.
+      Add it if visitors' allowance is drained.
 
 ## Use without signing in, as built (2026-11-15)
 
