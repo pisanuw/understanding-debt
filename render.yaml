@@ -1,0 +1,39 @@
+# The udebt analysis service on Render (Phase 4b, HOSTING.md): udebt.hosted.worker_service,
+# reached at https://udebt-api.hintwise.org (the Plabs session's "Set CNAME / Render domain").
+# The owner creates the service from this file (Render dashboard: New, Blueprint), on the free
+# plan by the owner's decision of 2026-11-15; a new service adds a bill, so it needs the
+# owner's yes. Placeholders only: no secret is written here. The service holds no Anthropic
+# key and no Supabase service-role key: each job uses the person's own key and session token.
+services:
+  - type: web
+    name: udebt-api
+    runtime: python
+    plan: free
+    region: virginia          # near the Supabase project (us-east-1)
+    branch: main
+    autoDeploy: false         # deploy by hand after the owner's yes
+    buildCommand: pip install .
+    startCommand: python -m udebt.hosted.worker_service --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: SUPABASE_URL
+        value: https://auth.hintwise.org
+      - key: SUPABASE_ANON_KEY  # public by design: claude-built-apps platform/supabase.json
+        sync: false
+      - key: UDEBT_ALLOWED_ORIGINS
+        value: https://udebt.hintwise.org
+      # Limits sized for a 512 MB free instance (docs/DEPLOY.md: measured locally, not on Render).
+      - key: UDEBT_MAX_COMMITS
+        value: "6000"
+      - key: UDEBT_MAX_MB
+        value: "200"
+      - key: UDEBT_CLONE_TIMEOUT
+        value: "300"
+      - key: UDEBT_WALKTHROUGHS
+        value: "3"
+      # Analysing a new repository needs the person's own key (owner decision 3). Set to 1
+      # only after the owner opens analyses to the HintWise key through the gateway.
+      - key: UDEBT_ALLOW_GATEWAY
+        value: "0"

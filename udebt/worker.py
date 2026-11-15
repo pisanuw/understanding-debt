@@ -279,10 +279,13 @@ def run(
     log=print,
     model: Any = None,
     since: list[str] | None = None,
+    export: bool = True,
 ) -> dict[str, Any]:
     """Analyse `url` at `rev` into `out` (made if missing); returns the manifest. `model` (an
     llm.LLM, such as the hosted worker's tool loop over a Messages API) makes the model steps
-    in-process and implies `llm`; `since` lists earlier analysed commits for `changed_since`."""
+    in-process and implies `llm`; `since` lists earlier analysed commits for `changed_since`;
+    `export=False` skips the replay and the export (the hosted learner app uses neither, and on
+    a large team the replay is the slowest part)."""
     from . import replay
     from .contributors import as_dict, contributors
     from .mapping import commits_for, discover, history_candidates, mappable_files, weights_for
@@ -317,19 +320,21 @@ def run(
                for c in cons], files)  # fmt: skip
         counts: dict[str, Any] = {"commits": measured["commits"], "contributors": len(cons)}
         if source != "none":
-            h = replay.load(root, store)
-            res = replay.ensure(h, None, save=False)
-            if res.note:  # a committed series made under other rules: replay it afresh
-                res = replay.ensure(h, None, rebuild=True, save=False)
-            data = replay.export_data(h, res)
-            data["map"] = contract.sanitize_map(store.require_map())
-            contract.check("import", data)
-            _write(out, "export.json", data, files)
-            _write(out, "map.json", data["map"], files)
+            sanitized = contract.sanitize_map(store.require_map())
+            if export:
+                h = replay.load(root, store)
+                res = replay.ensure(h, None, save=False)
+                if res.note:  # a committed series made under other rules: replay it afresh
+                    res = replay.ensure(h, None, rebuild=True, save=False)
+                data = replay.export_data(h, res)
+                data["map"] = sanitized
+                contract.check("import", data)
+                _write(out, "export.json", data, files)
+                counts.update(points=len(data["snapshots"]), devs=len(data["devs"]))
+            _write(out, "map.json", sanitized, files)
             specs = _specs(root, store, excerpts, since)
             _write(out, "specs.json", specs, files)
-            counts.update(units=len(specs["units"]), points=len(data["snapshots"]),
-                          devs=len(data["devs"]), walkthroughs=len(specs["walkthroughs"]),
+            counts.update(units=len(specs["units"]), walkthroughs=len(specs["walkthroughs"]),
                           tour=specs["tour"] is not None)  # fmt: skip
         manifest = {
             "format": FORMAT,

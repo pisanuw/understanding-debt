@@ -1280,6 +1280,7 @@ def cmd_worker(args) -> int:
             args.url, Path(args.out), args.rev, limits=limits,
             map_file=Path(args.map) if args.map else None, llm=args.llm,
             walkthroughs=args.walkthroughs, excerpts=not args.no_excerpts,
+            export=not args.no_export,
         )  # fmt: skip
     except worker.WorkerError as e:
         raise SystemExit(f"udebt worker: {e} (nothing written; the clone is deleted)") from e
@@ -1287,8 +1288,8 @@ def cmd_worker(args) -> int:
     print(
         f"Wrote {len(m['files']) + 1} files to {args.out} for {m['repo']} at {m['sha'][:8]}: "
         f"{c['commits']} commits, map from {m['map_source']}"
-        + (f", {c['units']} units, {c['points']} points, {c['walkthroughs']} walkthroughs"
-           if "units" in c else "")
+        + (f", {c['units']} units, {c.get('points', 0)} points, {c['walkthroughs']} "
+           "walkthroughs" if "units" in c else "")
         + f", {m['llm_calls']} model call(s), {m['seconds']} s. The clone is deleted."
     )  # fmt: skip
     if m["note"]:
@@ -2620,6 +2621,8 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--walkthroughs", type=int, default=0,
                    help="with --llm: walkthroughs for the N most important units")  # fmt: skip
     x.add_argument("--no-excerpts", action="store_true", help="leave code lines out of specs")
+    x.add_argument("--no-export", action="store_true",
+                   help="skip the replay and export.json (unused by the hosted app)")  # fmt: skip
     x.add_argument("--max-commits", type=int, default=20_000)
     x.add_argument("--max-mb", type=int, default=500)
     x.add_argument("--timeout", type=int, default=900, help="seconds for the clone")
