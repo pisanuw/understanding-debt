@@ -183,3 +183,4 @@
 2026-11-15 [code] Model use without sign-in, owner's choice A: udebt side built behind VITE_UDEBT_ANON_MODEL (off), visitors share one allowance on the samples; gateway part is Plabs'.
 2026-11-15 [code] Visitor model calls follow Plabs' anonymous-mode spec: anon-key bearer plus x-hintwise-app-key (HINTWISE_APP_KEY, Netlify secret); refused or missing key answers 503.
 2026-11-15 [decision] Owner: no Turnstile on visitors' model calls for now (the stand-in's $1.00/day bounds abuse); add it if the shared allowance is drained.
+2026-11-15 [code] Visitors' HintWise key turned on: VITE_UDEBT_ANON_MODEL=1 in netlify.toml (page); functions turn on with HINTWISE_APP_KEY (netlify.toml never reaches them).

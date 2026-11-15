@@ -16,6 +16,9 @@
   VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFya3R4bHJseWNlZmZ5b3pkd2hxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4ODEwMTAsImV4cCI6MjA5MjQ1NzAxMH0.Vuku-irT3kAHZYibK23q6dpyOEqV_Eg5zB78I3dyshE"
   # The API base URL: the analysis service on Render (udebt.hosted.worker_service).
   VITE_UDEBT_WORKER_URL = "https://udebt-api.hintwise.org"
+  # Visitors who are not signed in use the HintWise key on the samples, all one user for the gateway
+  # (HOSTING.md decision 12). The page only; the functions turn on with the HINTWISE_APP_KEY secret.
+  VITE_UDEBT_ANON_MODEL = "1"
 
 # The functions at /api (web/netlify/functions: questions, grade, excerpt) read SUPABASE_URL and
 # SUPABASE_ANON_KEY at run time. Variables set in this file reach the build only, so those two

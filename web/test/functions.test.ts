@@ -231,7 +231,8 @@ describe('the functions in live mode', () => {
     expect(acalls[0].init?.headers).toEqual({ authorization: 'Bearer anon', [APP_KEY_HEADER]: 'app-secret', 'content-type': 'application/json' });
     expect((await handleAllowance(post('/api/allowance', {}, null), { env: LIVE, fetch: liveFetch() })).status).toBe(401);
     expect(readEnv({ VITE_UDEBT_ANON_MODEL: '1' }).anonModel).toBe(true);
-    expect(readEnv({ HINTWISE_APP_KEY: '  s3cret \n' }).appKey).toBe('s3cret');
+    expect(readEnv({ HINTWISE_APP_KEY: '  s3cret \n' })).toMatchObject({ appKey: 's3cret', anonModel: true }); // the key turns the functions' side on
+    expect(readEnv({ HINTWISE_APP_KEY: '  ' })).toMatchObject({ appKey: null, anonModel: false });
     // Switched on without the app key: the server's setting, said so, and the gateway not called.
     const nokey: Call[] = [];
     const n = await handleQuestions(post('/api/questions', body, null), { env: { ...LIVE, anonModel: true }, fetch: liveFetch({}, nokey), open });

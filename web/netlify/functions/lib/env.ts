@@ -19,8 +19,9 @@ export interface FnEnv {
   /**
    * The HintWise key for visitors who are not signed in (owner, 2026-11-15: "All unsigned users
    * are considered "one user" in terms of quota"), on the samples at their pins only:
-   * VITE_UDEBT_ANON_MODEL=1, set once on Netlify for builds (the page) and functions (here).
-   * Off until the gateway's anonymous mode exists.
+   * On when HINTWISE_APP_KEY is present (the gateway's anonymous mode accepts nothing without
+   * it), or with VITE_UDEBT_ANON_MODEL=1 in the functions' own environment. The page's switch is
+   * VITE_UDEBT_ANON_MODEL in netlify.toml, which reaches the build only, not the functions.
    */
   anonModel?: boolean;
   /**
@@ -54,7 +55,7 @@ export function readEnv(env: Record<string, string | undefined> = process.env): 
     fakes: env.UDEBT_FAKES === '1' && !onNetlify,
     fakeRepos: parseRepos(env.UDEBT_FAKE_REPOS),
     fakeCap: env.UDEBT_FAKES === '1' && !onNetlify && env.UDEBT_FAKE_CAP === '1',
-    anonModel: env.VITE_UDEBT_ANON_MODEL === '1',
+    anonModel: env.VITE_UDEBT_ANON_MODEL === '1' || Boolean(env.HINTWISE_APP_KEY?.trim()),
     appKey: env.HINTWISE_APP_KEY?.trim() || null,
   };
 }
