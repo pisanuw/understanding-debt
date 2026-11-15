@@ -105,8 +105,10 @@ def _write(out: Path, name: str, data: Any, files: dict[str, int]) -> None:
     files[name] = p.stat().st_size
 
 
-def _ensure_map(root: Path, store: Store, map_file: Path | None, llm: bool) -> tuple[str, int]:
-    """(where the map came from, model calls made)."""
+def _ensure_map(root: Path, store: Store, map_file: Path | None, llm: bool,
+                model: Any = None) -> tuple[str, int]:  # fmt: skip
+    """(where the map came from, model calls made). `model` (an llm.LLM) writes a missing map
+    in-process; else `llm` runs `udebt map` with the configured model."""
     if store.map_path.exists():
         return "repository", 0
     if map_file is not None:
@@ -121,6 +123,16 @@ def _ensure_map(root: Path, store: Store, map_file: Path | None, llm: bool) -> t
             if src.is_file():
                 shutil.copyfile(src, store.dir / name)
         return "given", 0
+    if model is not None:
+        from .llm import LLMError
+        from .mapping import build_map
+
+        store.init()
+        try:
+            build_map(root, store, model, retry=False)
+        except (LLMError, SystemExit) as e:
+            raise WorkerError(f"the map could not be written: {e}") from e
+        return "llm", 1
     if llm:
         from . import cli
 
@@ -131,9 +143,48 @@ def _ensure_map(root: Path, store: Store, map_file: Path | None, llm: bool) -> t
     return "none", 0
 
 
-def _specs(root: Path, store: Store, excerpts_too: bool) -> dict[str, Any]:
+def changed_since(root: Path, store: Store, shas: list[str]) -> dict[str, dict[str, float]]:
+    """For each earlier commit in `shas` that this history has, the share of every unit (and
+    sub-unit) changed since it: the share-changed decay's input, computed as `status` does
+    (weighted changed lines landed after that commit over the unit's size now). The hosted app
+    fades a person's answers given at an earlier analysis by it. Unknown commits are left out."""
+    from . import units as hier
+    from .ledger import Ledger
+    from .mapping import commits_for, weights_for
+    from .quiz import unit_sizes_at
+    from .sizes import share
+    from .weights import line_weights
+
+    if not shas:
+        return {}
+    m = store.require_map()
+    commits = commits_for(root, store)
+    weights = weights_for(root, store, commits)
+    ledger = Ledger(commits, m["units"])
+    lws = line_weights(weights)
+    sizes = unit_sizes_at(root, store, m["units"])
+    out: dict[str, dict[str, float]] = {}
+    for given in dict.fromkeys(shas):
+        try:
+            full = _git(root, "rev-parse", "--verify", "--quiet", f"{given}^{{commit}}").strip()
+        except WorkerError:
+            continue
+        if full not in ledger.pos:
+            continue
+        out[full] = {
+            u["id"]: share(
+                ledger.since(ledger.touches(u), full, weights, lws)[1], sizes.get(u["id"], 0.0)
+            )  # fmt: skip
+            for u, _ in hier.walk(m["units"])
+        }
+    return out
+
+
+def _specs(root: Path, store: Store, excerpts_too: bool, since: list[str] | None = None
+           ) -> dict[str, Any]:  # fmt: skip
     """Units with their decisions and orientations, the tour as Markdown, the walkthroughs with
-    their lines: what the hosted app shows and quizzes from."""
+    their lines: what the hosted app shows and quizzes from. With `since` (earlier analysed
+    commits), `changed_since` says how much of each unit changed after each of them."""
     from . import dig, excerpts, repo, tour
     from . import orientation as orient
     from . import units as hier
@@ -170,7 +221,7 @@ def _specs(root: Path, store: Store, excerpts_too: bool) -> dict[str, Any]:
                           "head": w.get("head")}  # fmt: skip
     t = tour.cached(m, graph)
     md = tour.markdown(t, m, graph, root.name) if t else None
-    return {
+    specs = {
         "units": units,
         "connections": graph.edges(),
         "hubs": graph.hubs,
@@ -178,22 +229,32 @@ def _specs(root: Path, store: Store, excerpts_too: bool) -> dict[str, Any]:
         "tour": {"markdown": md[0], "minutes": md[1]} if md else None,
         "walkthroughs": walks,
     }
+    if since:
+        specs["changed_since"] = changed_since(root, store, since)
+    return specs
 
 
-def _llm_specs(root: Path, store: Store, walkthroughs: int) -> int:
+def _llm_specs(root: Path, store: Store, walkthroughs: int, model: Any = None) -> int:
     """Orientations for every top-level unit, the tour, and walkthroughs for the most
-    important units, through the configured model; returns the calls made."""
-    from . import cli, dig
+    important units, through `model` (an llm.LLM) or else the configured model; returns the
+    calls made."""
+    from . import dig, tour
     from . import orientation as orient
     from .llm import get_llm
+    from .mapping import commits_for, weights_for
+    from .unitgraph import build
 
-    llm = get_llm(model=store.config.model)
+    llm = model if model is not None else get_llm(model=store.config.model)
     m = store.require_map()
     calls = 0
     if orient.ensure(root, store, llm, m, [u["id"] for u in m["units"]]):
         calls += 1
-    if cli.main(["--repo", str(root), "tour", "--out", str(store.dir / "tour.md")]) == 0:
-        calls += 1
+    m = store.require_map()
+    commits = commits_for(root, store)
+    graph = build(root, m["units"], commits, weights_for(root, store, commits),
+                  max_files=store.config.cochange_max_files)  # fmt: skip
+    _t, fresh = tour.ensure(root, store, llm, m, graph)
+    calls += int(fresh)
     top = sorted(m["units"], key=lambda u: -float(u.get("importance") or 0))[:walkthroughs]
     for u in top:
         m = store.require_map()
@@ -216,8 +277,12 @@ def run(
     excerpts: bool = True,
     work_dir: Path | None = None,
     log=print,
+    model: Any = None,
+    since: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Analyse `url` at `rev` into `out` (made if missing); returns the manifest."""
+    """Analyse `url` at `rev` into `out` (made if missing); returns the manifest. `model` (an
+    llm.LLM, such as the hosted worker's tool loop over a Messages API) makes the model steps
+    in-process and implies `llm`; `since` lists earlier analysed commits for `changed_since`."""
     from . import replay
     from .contributors import as_dict, contributors
     from .mapping import commits_for, discover, history_candidates, mappable_files, weights_for
@@ -233,10 +298,11 @@ def run(
         log(f"Cloning {public_url(url)}{' at ' + rev if rev else ''}...")
         measured = clone(url, root, rev, limits)
         store = Store(root)
-        source, calls = _ensure_map(root, store, map_file, llm)
+        llm = llm or model is not None
+        source, calls = _ensure_map(root, store, map_file, llm, model)
         store.init()
         if llm and source != "none":
-            calls += _llm_specs(root, store, walkthroughs)
+            calls += _llm_specs(root, store, walkthroughs, model)
         log(f"Analysing {measured['commits']} commits (map: {source})...")
         commits = commits_for(root, store)
         weights = weights_for(root, store, commits)
@@ -260,7 +326,7 @@ def run(
             contract.check("import", data)
             _write(out, "export.json", data, files)
             _write(out, "map.json", data["map"], files)
-            specs = _specs(root, store, excerpts)
+            specs = _specs(root, store, excerpts, since)
             _write(out, "specs.json", specs, files)
             counts.update(units=len(specs["units"]), points=len(data["snapshots"]),
                           devs=len(data["devs"]), walkthroughs=len(specs["walkthroughs"]),

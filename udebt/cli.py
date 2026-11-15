@@ -1255,15 +1255,21 @@ def cmd_worker(args) -> int:
     from . import worker
 
     if args.action == "sql":
-        from .loadsql import analysis_sql
+        from .loadsql import LoadError, analysis_json, analysis_sql
 
-        sql = analysis_sql(
-            Path(args.dir), dialect=args.dialect, user_id=args.user_id, license=args.license,
-            with_export=not args.no_export, storage_path=args.storage_path,
-        )  # fmt: skip
+        kw = dict(user_id=args.user_id, license=args.license, with_export=not args.no_export,
+                  storage_path=args.storage_path, public=args.public, url=args.url)  # fmt: skip
+        try:
+            if args.dialect == "json":
+                sql = analysis_json(Path(args.dir), **kw)
+            else:
+                sql = analysis_sql(Path(args.dir), dialect=args.dialect, **kw)
+        except LoadError as e:
+            raise SystemExit(f"udebt worker sql: {e}") from e
         if args.out:
             Path(args.out).write_text(sql, encoding="utf-8")
-            print(f"Wrote {args.out} ({len(sql) / 1024:.0f} KB of SQL)")
+            kind = "JSON" if args.dialect == "json" else "SQL"
+            print(f"Wrote {args.out} ({len(sql) / 1024:.0f} KB of {kind})")
         else:
             sys.stdout.write(sql)
         return 0
@@ -2620,11 +2626,15 @@ def build_parser() -> argparse.ArgumentParser:
     x.set_defaults(fn=cmd_worker)
     x = wk.add_parser("sql", help="an idempotent SQL load of a worker output (app_udebt)")
     x.add_argument("dir", help="the --out directory of `udebt worker run`")
-    x.add_argument("--dialect", choices=["postgres", "sqlite"], default="postgres")
+    x.add_argument("--dialect", choices=["postgres", "sqlite", "json"], default="postgres",
+                   help="json: the rows, for the web app's preview and tests")  # fmt: skip
     x.add_argument("--user-id", help="load as one person's analysis (default: a shared sample)")
     x.add_argument("--license", help="the repository's licence, shown with a sample")
     x.add_argument("--no-export", action="store_true", help="leave the export out (Storage)")
     x.add_argument("--storage-path", help="where the export lives in the app's bucket")
+    x.add_argument("--public", action="store_true",
+                   help="hosted: a GitHub URL, no export, no commit emails")  # fmt: skip
+    x.add_argument("--url", help="the repository URL to store (default: the manifest's)")
     x.add_argument("--out", help="write the SQL here instead of stdout")
     x.set_defaults(fn=cmd_worker)
 

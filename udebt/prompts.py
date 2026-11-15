@@ -489,31 +489,61 @@ def _unit_lines(u: dict[str, Any], *, history: bool = True, level: bool = True) 
     return "\n".join(lines)
 
 
+# The paragraphs the local question writer and grader share with the hosted ones (the web app's
+# Netlify functions build their prompts from these, through udebt.hosted.prompt_parts, so the
+# two never drift apart).
+ORIENTATION_RULE = """\
+Some units carry the orientation the developer has just read: what the unit is for, its
+decision and alternatives, where it lives and who shaped it. A level 1 question on such a
+unit must not be answerable by copying a sentence of that text: ask one consequence that
+follows from it, such as what a user would notice first if the unit stopped working, or why
+it has to run before or after one named step of a request."""
+
+REVEALED_RULE = """\
+Some units list questions the developer missed and was then shown the answer to. Ask the
+same fact again in other words: a different phrasing or a different angle on the same
+point, never the same wording."""
+
+OBJECTIVE_RULE = """\
+Every question must have an answer the code (or the cited commits) determines, so it can be
+graded objectively. Avoid trivia (exact names, line counts, versions) at every level."""
+
+REFERENCE_RULE = """\
+The reference answer says what a correct answer must contain, and the developer reads it
+right after a miss, so it teaches: at levels 1-3 it is at most two sentences of plain
+language with no identifiers (the files go in `evidence`); at levels 4-5 at most three
+sentences, and it may name files and functions. With each question give `variants`: two more
+phrasings of the same question, each one part, asking the same fact, so the reference answer
+fits all three."""
+
+GRADE_RULES = """\
+Each item carries its LEVEL on the question ladder: 1 purpose and placement, 2 decision and
+alternatives, 3 consequence across units (the architecture); 4 behaviour under failure, 5
+implementation (depth). At levels 1-3 the question is about the architecture in plain
+language, so grade the developer's grasp of roles, decisions and consequences, not their recall
+of names: a correct answer that names no file, function or identifier is correct, and is never
+marked down for lacking them. Verdicts:
+- correct: the answer captures the behaviour or decision, even if worded differently
+- partial: right direction but missing a consequence or wrong on a detail that matters; at
+  levels 1-3, partial means the role or the decision is right but a dependency or a
+  consequence that matters is missing
+- wrong: contradicts how the code works, or asserts something the code does not do
+- unknown: the developer said they do not know, or the answer is empty
+
+Grade only what the QUESTION asks: the reference may cover more than the question does, and an
+answer is not marked down for leaving out what was not asked.
+
+Give two sentences of feedback per item: what was right, and the one thing to look at in the
+code."""
+
+
 def questions_prompt(units: list[dict[str, Any]], per_unit: int) -> str:
     """One call for every question of a quiz run. Each unit carries the `level` to ask it at
     (ladder.next_level, or a forced level) and, when the developer was just shown one, the
     orientation text (`shown_orientation`)."""
     oriented = any(u.get("shown_orientation") for u in units)
-    orientation_rule = (
-        """
-Some units carry the orientation the developer has just read: what the unit is for, its
-decision and alternatives, where it lives and who shaped it. A level 1 question on such a
-unit must not be answerable by copying a sentence of that text: ask one consequence that
-follows from it, such as what a user would notice first if the unit stopped working, or why
-it has to run before or after one named step of a request.
-"""
-        if oriented
-        else ""
-    )
-    revealed_rule = (
-        """
-Some units list questions the developer missed and was then shown the answer to. Ask the
-same fact again in other words: a different phrasing or a different angle on the same
-point, never the same wording.
-"""
-        if any(u.get("revealed") for u in units)
-        else ""
-    )
+    orientation_rule = f"\n{ORIENTATION_RULE}\n" if oriented else ""
+    revealed_rule = f"\n{REVEALED_RULE}\n" if any(u.get("revealed") for u in units) else ""
     return f"""TASK: questions
 
 You are testing whether a developer understands the ARCHITECTURE of the repository in the
@@ -530,16 +560,9 @@ The ladder:
 
 {NO_IDENTIFIERS}
 {orientation_rule}{revealed_rule}
-Every question must have an answer the code (or the cited commits) determines, so it can be
-graded objectively. Avoid trivia (exact names, line counts, versions) at every level. Use the
-read-only tools to verify every reference answer against the actual code; `git show <sha>` is
-not available, so rely on the code and the commit subjects given. Cite the files you relied on
-in `evidence`. The reference answer says what a correct answer must contain, and the developer
-reads it right after a miss, so it teaches: at levels 1-3 it is at most two sentences of plain
-language with no identifiers (the files go in `evidence`); at levels 4-5 at most three
-sentences, and it may name files and functions. With each question give `variants`: two more
-phrasings of the same question, each one part, asking the same fact, so the reference answer
-fits all three.
+{OBJECTIVE_RULE} Use the read-only tools to verify every reference answer against the
+actual code; `git show <sha>` is not available, so rely on the code and the commit subjects
+given. Cite the files you relied on in `evidence`. {REFERENCE_RULE}
 
 Units:
 {chr(10).join(_unit_lines(u) for u in units)}
@@ -634,23 +657,7 @@ Grade each developer ANSWER against the code in the current directory. The REFER
 earlier by another model and may itself be wrong; if the answer and reference disagree, check the
 EVIDENCE files with the read-only tools and trust the code.
 
-Each item carries its LEVEL on the question ladder: 1 purpose and placement, 2 decision and
-alternatives, 3 consequence across units (the architecture); 4 behaviour under failure, 5
-implementation (depth). At levels 1-3 the question is about the architecture in plain
-language, so grade the developer's grasp of roles, decisions and consequences, not their recall
-of names: a correct answer that names no file, function or identifier is correct, and is never
-marked down for lacking them. Verdicts:
-- correct: the answer captures the behaviour or decision, even if worded differently
-- partial: right direction but missing a consequence or wrong on a detail that matters; at
-  levels 1-3, partial means the role or the decision is right but a dependency or a
-  consequence that matters is missing
-- wrong: contradicts how the code works, or asserts something the code does not do
-- unknown: the developer said they do not know, or the answer is empty
-
-Grade only what the QUESTION asks: the reference may cover more than the question does, and an
-answer is not marked down for leaving out what was not asked.
-
-Give two sentences of feedback per item: what was right, and the one thing to look at in the code.
+{GRADE_RULES}
 Return `index` matching the ### number.
 
 {chr(10).join(blocks)}
