@@ -3,8 +3,10 @@
  * (UDEBT_SHOTS=1 npm run e2e; written to UDEBT_SHOTS_DIR, default ../.udebt/dashboard,
  * as hosted-<screen>-<width>-<scheme>.png), the Review tab and a review sitting among them
  * (hosted-review-*.png, a day later on Playwright's fake clock) and a quiz on a unit that names
- * only directories (hosted-tree-*.png: the question, and the grade with the files it rests on).
- * Also checks that no page scrolls sideways.
+ * only directories (hosted-tree-*.png: the question, and the grade with the files it rests on),
+ * and udebt without signing in (hosted-anon-*.png: the front page, a sample, an advance-quiz
+ * question, the self-check step, the recorded sitting with its label, the debt, and the copy
+ * offer at sign-in). Also checks that no page scrolls sideways.
  */
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
@@ -142,6 +144,50 @@ for (const width of [1280, 390]) {
       await expect(page.getByTestId('evidence')).toBeVisible();
       await shot(page, 'tree-graded', width, scheme);
       await page.evaluate(() => sessionStorage.clear());
+    });
+  }
+}
+
+for (const width of [1280, 390]) {
+  for (const scheme of ['light', 'dark'] as const) {
+    test(`without signing in at ${width}px, ${scheme}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.clock.setFixedTime(new Date('2026-11-15T10:00:00Z'));
+      await page.goto('/');
+      await expect(page.getByRole('heading', { name: 'Start with a sample: no account needed' })).toBeVisible();
+      await shot(page, 'anon-home', width, scheme);
+      await page.locator('a.repo-card', { hasText: 'digitalme' }).click();
+      await expect(page.getByRole('heading', { name: 'Units' })).toBeVisible();
+      await shot(page, 'anon-sample', width, scheme);
+      await page.getByRole('link', { name: 'Quiz' }).click();
+      await page.getByRole('button', { name: 'Start' }).click();
+      await expect(page.getByText(/^\[1\/2\]/)).toBeVisible();
+      await page.getByLabel('Your answer').fill('It streams the reply to the browser as it is written and saves the exchange.');
+      await shot(page, 'anon-question', width, scheme);
+      await page.getByRole('button', { name: 'Show the answer' }).click();
+      await expect(page.getByTestId('reference')).toBeVisible();
+      await shot(page, 'anon-check', width, scheme);
+      await page.getByRole('button', { name: 'Correct' }).click();
+      await page.getByLabel('Your answer').fill('It renders the slides.');
+      await page.getByRole('button', { name: 'Show the answer' }).click();
+      await page.getByRole('button', { name: 'Wrong' }).click();
+      await expect(page.getByRole('heading', { name: 'Recorded' })).toBeVisible();
+      await shot(page, 'anon-graded', width, scheme);
+      await page.getByRole('link', { name: 'See your debt per unit' }).click();
+      await expect(page.getByTestId('debt-self-note')).toBeVisible();
+      await shot(page, 'anon-debt', width, scheme);
+      await page.goto('/#/settings');
+      await expect(page.getByRole('heading', { name: 'What udebt stores' })).toBeVisible();
+      await shot(page, 'anon-settings', width, scheme);
+      await page.getByRole('navigation', { name: 'Account' }).getByRole('link', { name: 'Sign in' }).click();
+      await page.getByRole('button', { name: 'Continue with Google' }).click();
+      await expect(page.getByTestId('offer')).toBeVisible();
+      await shot(page, 'anon-offer', width, scheme);
+      await page.evaluate(() => {
+        sessionStorage.clear();
+        localStorage.clear();
+      });
     });
   }
 }

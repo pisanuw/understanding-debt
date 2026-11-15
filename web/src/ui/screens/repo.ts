@@ -13,9 +13,18 @@ import { add, badge, button, day, extLink, fmt, h } from '../dom';
 import { renderMarkdown } from '../markdown';
 import { items as reviewItems } from '../../core/review';
 import { debtTab } from './debt';
-import { quizTab } from './quiz';
+import { quizTab, selfBadge } from './quiz';
 import { countBadge, dueText, queue, reviewTab } from './review';
 import { walkthroughCard } from './walkthrough';
+
+/** The header's "self-checked" label beside the debt index, hidden while the index rests on graded answers only. */
+function indexLabel(shown: boolean): HTMLElement {
+  const b = selfBadge();
+  b.dataset.testid = 'self-checked-index';
+  b.title = 'The debt index rests in part on answers you checked yourself against the reference answer.';
+  b.hidden = !shown;
+  return b;
+}
 
 function header(app: App, v: RepoView, tab: string): HTMLElement {
   const g = parseGitHubUrl(v.repo.url);
@@ -36,7 +45,9 @@ function header(app: App, v: RepoView, tab: string): HTMLElement {
       'div',
       { class: 'repo-title' },
       h('h1', null, v.repo.name),
-      v.scores ? h('span', { class: 'stat' }, 'debt index ', h('strong', { 'data-testid': 'debt-index' }, fmt(v.scores.index, 1))) : null,
+      v.scores
+        ? h('span', { class: 'stat' }, 'debt index ', h('strong', { 'data-testid': 'debt-index' }, fmt(v.scores.index, 1)), ' ', indexLabel(v.scores.selfCheckedIndex))
+        : null,
     ),
     h(
       'p',
@@ -48,6 +59,7 @@ function header(app: App, v: RepoView, tab: string): HTMLElement {
       a?.manifest.generated_at ? ` · analysed ${day(a.manifest.generated_at)}` : '',
       a && a.user_id === null ? ' · prepared by HintWise' : a && a.user_id === app.user?.id ? ' · your analysis' : a ? ' · shared by another person' : '',
     ),
+    app.anonymous ? h('p', { class: 'small local-note', 'data-testid': 'local-note' }, 'Not signed in: your answers on this sample stay in this browser. ', h('a', { href: '#/signin' }, 'Sign in'), ' to keep them in your account.') : null,
     tabs,
   );
 }
@@ -212,7 +224,7 @@ export async function repoScreen(app: App, route: Extract<Route, { name: 'repo' 
   const tab = route.name === 'unit' ? 'specs' : route.tab;
   const s = h('section', { class: 'repo' }, header(app, v, tab));
   if (route.name === 'unit') s.append(unitPage(app, v, route.unit));
-  else if (tab === 'quiz') s.append(quizTab(app, v));
+  else if (tab === 'quiz') s.append(await quizTab(app, v));
   else if (tab === 'review') s.append(reviewTab(app, v));
   else if (tab === 'debt') s.append(debtTab(app, v));
   else s.append(specsTab(v));

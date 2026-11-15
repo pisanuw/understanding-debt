@@ -6,7 +6,7 @@
   --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11, 11, 11, 0.1); --wash: rgba(11, 11, 11, 0.04);
   --accent: #2a65c2; --accent-ink: #ffffff;
   --good: #0ca30c; --good-text: #006300; --warning: #c98a00; --critical: #c42b2b;
-  --you: #e8f0fb; --code: #f3f2ee; --banner: #fff4d6;
+  --you: #e8f0fb; --code: #f3f2ee; --banner: #fff4d6; --self: #6b4fbb;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
@@ -14,7 +14,7 @@
     --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #a29f96;
     --grid: #2c2c2a; --axis: #45443f; --ring: rgba(255, 255, 255, 0.1); --wash: rgba(255, 255, 255, 0.05);
     --accent: #6ea8f5; --accent-ink: #0b0b0b; --good-text: #3fcf3f; --warning: #f0b429; --critical: #ff7b72;
-    --you: #18263a; --code: #141413; --banner: #3a2f10;
+    --you: #18263a; --code: #141413; --banner: #3a2f10; --self: #b9a2f5;
   }
 }
 :root[data-theme='dark'] {
@@ -22,7 +22,7 @@
   --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #a29f96;
   --grid: #2c2c2a; --axis: #45443f; --ring: rgba(255, 255, 255, 0.1); --wash: rgba(255, 255, 255, 0.05);
   --accent: #6ea8f5; --accent-ink: #0b0b0b; --good-text: #3fcf3f; --warning: #f0b429; --critical: #ff7b72;
-  --you: #18263a; --code: #141413; --banner: #3a2f10;
+  --you: #18263a; --code: #141413; --banner: #3a2f10; --self: #b9a2f5;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -98,6 +98,10 @@ label { color: var(--ink-2); font-size: 14px; }
 .badge.partial, .badge.klass-assisted { border-color: var(--warning); }
 .badge.wrong, .badge.klass-ai { border-color: var(--critical); color: var(--critical); }
 .badge.sample { border-color: var(--accent); color: var(--accent); }
+/* Answers the learner marked against the reference answer: their own provenance colour. */
+.badge.self-checked { border-color: var(--self); color: var(--self); }
+.local-note { color: var(--ink-2); margin: 4px 0 0; }
+.self-check .marks button { min-width: 6.5em; }
 .verdict { font-size: 15px; margin: 6px 0; }
 .q-text { font-size: 17px; font-weight: 550; }
 .answer { background: var(--you); border-radius: 8px; padding: 10px 12px; margin-top: 8px; overflow-wrap: break-word; }

@@ -58,6 +58,18 @@ export interface Grade {
   feedback: string;
 }
 
+/**
+ * The provenance of an answer the learner marked against the reference answer (an advance quiz,
+ * or a review with no model to hand): the record's `type`, so the debt says what it rests on.
+ */
+export const SELF_CHECKED = 'self-checked';
+export const SELF_FEEDBACK = 'Self-checked against the reference answer: no model graded it.';
+
+/** True for an answer the learner marked themselves. */
+export function isSelfChecked(r: { type?: string | null }): boolean {
+  return r.type === SELF_CHECKED;
+}
+
 export const REVEALED_VERDICTS: Verdict[] = ['unknown', 'wrong', 'partial'];
 export const NO_REFERENCE = '(graded against the code)';
 export const UNKNOWN_FEEDBACK = 'Marked as a known unknown. No misconception recorded.';
@@ -192,8 +204,8 @@ export function sittingTs(prior: { ts: string }[], now: Date = new Date()): stri
   return new Date(t).toISOString();
 }
 
-/** The records a graded sitting leaves: one timestamp, metadata only. */
-export function recordRows(results: Graded[], opts: { repoId: number; sha: string | null; ts: string; source?: string; forced?: boolean }): EvidenceRow[] {
+/** The records a graded sitting leaves: one timestamp, metadata only; `type` SELF_CHECKED for a self-checked one. */
+export function recordRows(results: Graded[], opts: { repoId: number; sha: string | null; ts: string; source?: string; forced?: boolean; type?: string }): EvidenceRow[] {
   return results.map((r) => ({
     repo_id: opts.repoId,
     sha: opts.sha,
@@ -203,7 +215,7 @@ export function recordRows(results: Graded[], opts: { repoId: number; sha: strin
     level: levelOf(r),
     verdict: r.verdict,
     confidence: r.answer.trim() ? Math.min(3, Math.max(1, Math.round(r.confidence || 2))) : 1,
-    type: 'quiz',
+    type: opts.type ?? 'quiz',
     source: opts.source ?? 'quiz',
     question: r.question,
     revealed: !!r.revealed,

@@ -1,6 +1,8 @@
 /**
  * Settings: how udebt calls the model (the HintWise key through the gateway, the person's
  * own Anthropic key, or off), the account (sign out, "Delete my account"), and what is stored.
+ * Not signed in, the HintWise key is not offered (the gateway is for signed-in people), the
+ * account panel is the sign-in panel, and the answers kept in this browser can be deleted.
  */
 import { mountSignIn } from '../../lib/auth';
 import { getByokKey, getMode, setByokKey, setMode, type LlmMode } from '../../model/prefs';
@@ -10,10 +12,11 @@ import { button, h, toast } from '../dom';
 export function settingsScreen(app: App): HTMLElement {
   const storage = app.deps.storage;
   const current = getMode(storage);
+  const anonymous = app.anonymous;
   const modes: [LlmMode, string, string][] = [
-    ['gateway', 'The HintWise key', 'Questions are written and graded through HintWise, within a daily allowance per person. Nothing to set up.'],
-    ['byok', 'My own Anthropic key', 'Your key stays in this browser and goes only to api.anthropic.com, except when you ask udebt to analyse a new repository: then it is sent once to udebt’s analysis service, used for that job only and never stored. No allowance applies.'],
-    ['off', 'Off', 'Read the specs and walkthroughs without any model call.'],
+    ['gateway', 'The HintWise key', anonymous ? 'Sign in to use it: questions are written and graded through HintWise, within a daily allowance per person.' : 'Questions are written and graded through HintWise, within a daily allowance per person. Nothing to set up.'],
+    ['byok', 'My own Anthropic key', 'Your key stays in this browser and goes only to api.anthropic.com, except when you ask udebt to analyse a new repository: then it is sent once to udebt’s analysis service, used for that job only and never stored. No allowance applies. No account needed.'],
+    ['off', 'Off', 'No model call: read the specs and walkthroughs, and answer the questions written in advance for the samples, checking yourself against the reference answer.'],
   ];
   const keyBox = h('div', { class: 'byok', hidden: current !== 'byok' });
   const keyInput = h('input', { type: 'password', autocomplete: 'off', spellcheck: 'false', placeholder: getByokKey(storage) ? 'A key is saved in this browser' : 'sk-ant-...', 'aria-label': 'Your Anthropic API key', class: 'grow' });
@@ -31,7 +34,7 @@ export function settingsScreen(app: App): HTMLElement {
   );
   const fs = h('fieldset', { class: 'modes' }, h('legend', null, 'How udebt calls the model'));
   for (const [m, title, text] of modes) {
-    const inp = h('input', { type: 'radio', name: 'llm-mode', value: m, checked: m === current });
+    const inp = h('input', { type: 'radio', name: 'llm-mode', value: m, checked: m === current, disabled: anonymous && m === 'gateway' });
     inp.addEventListener('change', () => {
       setMode(m, storage);
       keyBox.hidden = m !== 'byok';
@@ -39,27 +42,42 @@ export function settingsScreen(app: App): HTMLElement {
     });
     fs.append(h('label', { class: 'mode' }, inp, h('span', null, h('strong', null, title), h('span', { class: 'small muted' }, text))));
   }
+  if (anonymous && current === 'gateway') fs.append(h('p', { class: 'small warn' }, 'Not signed in: until you sign in or choose your own key, quizzes use the questions written in advance.'));
   const account = h('div', { id: 'account' });
   app.onLeave(mountSignIn(account, app.deps.signIn));
+  const stored = anonymous
+    ? h(
+        'ul',
+        null,
+        h('li', null, 'Not signed in: your answers on the samples stay in this browser (its local storage, one entry per sample): for each answer the unit, the ladder level, the question, the verdict, your confidence and whether the answer was shown. Never the text of your answer. Nothing of it is sent to HintWise.'),
+        h('li', null, 'Answers you checked yourself against a reference answer are marked self-checked, and the debt says so.'),
+        h('li', null, 'When you sign in, udebt asks once whether to copy these answers into your account, keep them separate, or discard them.'),
+        h('li', null, 'The samples’ analyses and questions are files of this site; their code is read from GitHub at the pinned commit through udebt’s functions, which keep nothing.'),
+      )
+    : h(
+        'ul',
+        null,
+        h('li', null, 'For each answer: the unit, the ladder level, the question, the verdict, your confidence and whether the answer was shown. Never the text of your answer, and not the grader’s feedback. Answers you checked yourself against a reference answer are marked self-checked.'),
+        h('li', null, 'The repositories you added, your quiz sessions (the questions asked) and the analyses you asked for.'),
+        h('li', null, 'Analyses of public repositories (units, decisions, file and line references, never code) are shared with every signed-in person, as is the fact that a repository is in udebt.'),
+        h('li', null, 'Where: HintWise’s database (Supabase, US East). The HintWise gateway records the cost of each model call. "Delete my account" above removes your records, sessions and repositories in udebt and every other HintWise app.'),
+      );
+  const local = app.deps.anon;
+  const forget = local
+    ? button('Delete the answers kept in this browser', () => {
+        void local.forgetAll().then((n) => {
+          app.forget();
+          toast(n ? `Deleted ${n} answer(s) kept in this browser.` : 'This browser keeps no answers.');
+        });
+      })
+    : null;
   const s = h(
     'section',
     { class: 'settings' },
     h('h1', null, 'Settings'),
     h('div', { class: 'card' }, fs, keyBox),
-    h('div', { class: 'card' }, h('h2', null, 'Account'), account),
-    h(
-      'div',
-      { class: 'card' },
-      h('h2', null, 'What udebt stores'),
-      h(
-        'ul',
-        null,
-        h('li', null, 'For each answer: the unit, the ladder level, the question, the verdict, your confidence and whether the answer was shown. Never the text of your answer, and not the grader’s feedback.'),
-        h('li', null, 'The repositories you added, your quiz sessions (the questions asked) and the analyses you asked for.'),
-        h('li', null, 'Analyses of public repositories (units, decisions, file and line references, never code) are shared with every signed-in person, as is the fact that a repository is in udebt.'),
-        h('li', null, 'Where: HintWise’s database (Supabase, US East). The HintWise gateway records the cost of each model call. "Delete my account" above removes your records, sessions and repositories in udebt and every other HintWise app.'),
-      ),
-    ),
+    h('div', { class: 'card' }, h('h2', null, anonymous ? 'Sign in' : 'Account'), account),
+    h('div', { class: 'card' }, h('h2', null, 'What udebt stores'), stored, forget ? h('div', { class: 'row gap-top' }, forget) : null),
   );
   s.dataset.title = 'Settings';
   return s;

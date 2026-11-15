@@ -14,12 +14,30 @@ import { authorize } from './auth';
 import { readEnv, type FnEnv } from './env';
 import { callGateway } from './gateway';
 import { GitHubRefused, dirFiles, excerpt } from './github';
-import { HttpError, bearer, errorResponse, json, readJson } from './http';
+import { HttpError, bearer, bearerOrNull, errorResponse, json, readJson } from './http';
 import { insertRecords, priorRecords } from './records';
+import { openToAnyone } from './samples';
 
 export interface HandlerDeps {
   env?: FnEnv;
   fetch?: typeof fetch;
+  /** Who may read without a token (default: the registered samples at their pins, samples.ts). */
+  open?: (repoUrl: string, sha: string) => boolean;
+}
+
+/**
+ * The code-reading functions' check: with a token, the signed-in person and a repository the app
+ * knows (auth.ts, unchanged); without one, only a registered sample at its pinned commit, so a
+ * visitor who is not signed in can read the samples' code and nothing else (HOSTING.md
+ * decision 10). No token never reaches Supabase.
+ */
+async function mayRead(req: Request, repoUrl: string, sha: string, env: FnEnv, doFetch: typeof fetch, open: (u: string, s: string) => boolean): Promise<void> {
+  const token = bearerOrNull(req);
+  if (token) {
+    await authorize(token, repoUrl, env, doFetch);
+    return;
+  }
+  if (!open(repoUrl, sha)) throw new HttpError(401, 'Sign in first.', { error: 'Sign in first: without signing in, only the samples at their pinned commits can be read.' });
 }
 
 function deps(token: string, env: FnEnv, doFetch: typeof fetch): Deps {
@@ -91,13 +109,16 @@ export async function handleGrade(req: Request, opts: HandlerDeps = {}): Promise
   }
 }
 
-/** GET /api/excerpt?repo=&sha=&path=&start=&end= -> {path, start, end, lines, cut}; never cached. */
+/**
+ * GET /api/excerpt?repo=&sha=&path=&start=&end= -> {path, start, end, lines, cut}; never cached.
+ * Without a token: a registered sample at its pin only (mayRead).
+ */
 export async function handleExcerpt(req: Request, opts: HandlerDeps = {}): Promise<Response> {
   const env = opts.env ?? readEnv();
   const doFetch = opts.fetch ?? fetch;
   try {
     if (req.method !== 'GET') throw new HttpError(405, 'Use GET.', { error: 'Use GET.' });
-    const token = bearer(req);
+    bearerOrNull(req);
     const q = new URL(req.url).searchParams;
     const g = parseGitHubUrl(q.get('repo') ?? '');
     const sha = safeSha(q.get('sha'));
@@ -105,7 +126,7 @@ export async function handleExcerpt(req: Request, opts: HandlerDeps = {}): Promi
     const end = Number(q.get('end') ?? start + 59);
     const ref = parseRef(`${q.get('path') ?? ''}:${Number.isFinite(start) ? start : 1}-${Number.isFinite(end) ? end : 60}`);
     if (!g || !sha || !ref) throw new HttpError(400, 'Bad excerpt request.', { error: 'repo, sha (40 characters) and a path inside the repository are needed.' });
-    await authorize(token, g.url, env, doFetch);
+    await mayRead(req, g.url, sha, env, doFetch, opts.open ?? openToAnyone);
     const got = await excerpt(g, sha, { ...ref, end: Math.min(ref.end, ref.start + MAX_LINES - 1) }, env, doFetch);
     if (!got) return json(404, { error: `${ref.path} could not be read at ${sha.slice(0, 8)} (missing, binary or too large).` });
     return json(200, got);
@@ -121,7 +142,7 @@ export const MAX_TREE_DIRS = 20;
  * GET /api/tree?repo=&sha=&path=<directory>[&path=...] -> {sha, dirs: {<directory>: {files:
  * [{path, size}], total}}, truncated}: the top files under each directory at the sha, by the
  * rule in src/core/topfiles.ts; never cached. 503 with `retry_after` (seconds) while GitHub
- * refuses tree requests.
+ * refuses tree requests. Without a token: a registered sample at its pin only (mayRead).
  */
 export async function handleTree(req: Request, opts: HandlerDeps & { now?: () => number } = {}): Promise<Response> {
   const env = opts.env ?? readEnv();
@@ -129,7 +150,7 @@ export async function handleTree(req: Request, opts: HandlerDeps & { now?: () =>
   const now = opts.now ?? Date.now;
   try {
     if (req.method !== 'GET') throw new HttpError(405, 'Use GET.', { error: 'Use GET.' });
-    const token = bearer(req);
+    bearerOrNull(req);
     const q = new URL(req.url).searchParams;
     const g = parseGitHubUrl(q.get('repo') ?? '');
     const sha = safeSha(q.get('sha'));
@@ -137,7 +158,7 @@ export async function handleTree(req: Request, opts: HandlerDeps & { now?: () =>
     const dirs = [...new Set(asked.map((p) => safePath(p.trim().replace(/\/+$/, ''))).filter((p): p is string => p !== null))];
     if (!g || !sha || !dirs.length || asked.length > MAX_TREE_DIRS)
       throw new HttpError(400, 'Bad tree request.', { error: `repo, sha (40 characters) and 1 to ${MAX_TREE_DIRS} directories inside the repository are needed.` });
-    await authorize(token, g.url, env, doFetch);
+    await mayRead(req, g.url, sha, env, doFetch, opts.open ?? openToAnyone);
     const got = await dirFiles(g, sha, dirs, env, doFetch, now());
     if (!got) return json(404, { error: `The tree of ${g.owner}/${g.repo} could not be read at ${sha.slice(0, 8)}.` });
     return json(200, { sha, ...got });

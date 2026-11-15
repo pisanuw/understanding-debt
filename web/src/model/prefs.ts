@@ -27,21 +27,40 @@ function defaultStorage(): Store {
   return memoryStore;
 }
 
+/** A read that a blocked storage answers with null (llm.ts reads it the same way when it works). */
+function read(storage: Store, key: string): string | null {
+  try {
+    return storage.getItem(key);
+  } catch {
+    return memoryStore.getItem(key);
+  }
+}
+
+function write(storage: Store, key: string, value: string | null): void {
+  try {
+    if (value === null) storage.removeItem(key);
+    else storage.setItem(key, value);
+  } catch {
+    // blocked or full: kept in memory for this page
+    if (value === null) memoryStore.removeItem(key);
+    else memoryStore.setItem(key, value);
+  }
+}
+
 export function getMode(storage: Store = defaultStorage()): LlmMode {
-  const v = storage.getItem(MODE_KEY);
+  const v = read(storage, MODE_KEY);
   return v === 'byok' || v === 'gateway' ? v : 'off';
 }
 
 export function setMode(mode: LlmMode, storage: Store = defaultStorage()): void {
-  storage.setItem(MODE_KEY, mode);
+  write(storage, MODE_KEY, mode);
 }
 
 export function getByokKey(storage: Store = defaultStorage()): string | null {
-  const v = storage.getItem(BYOK_KEY);
+  const v = read(storage, BYOK_KEY);
   return v && v.trim() ? v.trim() : null;
 }
 
 export function setByokKey(key: string | null, storage: Store = defaultStorage()): void {
-  if (key && key.trim()) storage.setItem(BYOK_KEY, key.trim());
-  else storage.removeItem(BYOK_KEY);
+  write(storage, BYOK_KEY, key && key.trim() ? key.trim() : null);
 }

@@ -31,8 +31,16 @@ export function errorResponse(e: unknown): Response {
 
 /** The bearer token of the request, or a 401. */
 export function bearer(req: Request): string {
-  const h = req.headers.get('authorization') ?? '';
-  const m = /^Bearer\s+([A-Za-z0-9._~+/=-]{8,4096})$/.exec(h.trim());
+  const t = bearerOrNull(req);
+  if (!t) throw new HttpError(401, 'Sign in first.', { error: 'Sign in first.' });
+  return t;
+}
+
+/** The bearer token of the request; null when it sends no Authorization header (a 401 for a malformed one). */
+export function bearerOrNull(req: Request): string | null {
+  const h = (req.headers.get('authorization') ?? '').trim();
+  if (!h) return null;
+  const m = /^Bearer\s+([A-Za-z0-9._~+/=-]{8,4096})$/.exec(h);
   if (!m) throw new HttpError(401, 'Sign in first.', { error: 'Sign in first.' });
   return m[1];
 }

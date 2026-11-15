@@ -1,13 +1,16 @@
 /**
  * Wires the app for the live site or the preview. Live: Supabase from VITE_SUPABASE_URL and
- * VITE_SUPABASE_ANON_KEY, the functions at /api, the worker at VITE_UDEBT_WORKER_URL.
- * Preview (no Supabase env, as `vite preview` and the Playwright walkthrough build it): the
- * fixture rows the dev server serves at /__udebt/fixture.json, the fake sign-in, and the
- * functions with their fakes.
+ * VITE_SUPABASE_ANON_KEY, the functions at /api, the worker at VITE_UDEBT_WORKER_URL, and for a
+ * visitor who is not signed in the samples' static JSON in the site (samples/, with their
+ * advance quizzes) and a store in this browser. Preview (no Supabase env, as `vite preview` and
+ * the Playwright walkthrough build it): the fixture rows the dev server serves at
+ * /__udebt/fixture.json (and its samples' advance quizzes at /__udebt/quizzes.json), the fake
+ * sign-in, and the functions with their fakes.
  */
 import { currentToken, type AuthClient, type SignInOptions } from '../lib/auth';
 import { getMode, type LlmMode } from '../model/prefs';
 import { getSupabase, hasSupabase } from '../lib/supabase';
+import { AdvanceQuizzes, FixtureSamples, LocalStore, StaticSamples, type SampleSource } from '../data/local';
 import { MemoryStore } from '../data/memory';
 import type { Fixture } from '../data/store';
 import { SupabaseStore, type TableClient } from '../data/supabase-store';
@@ -29,7 +32,13 @@ export const PREVIEW_ENV = { VITE_SUPABASE_URL: 'https://preview.invalid', VITE_
 /** The delete-account function's answer in the preview: deleted. */
 export const previewDeleteFetch: typeof fetch = async () => new Response(JSON.stringify({ status: 'deleted' }), { status: 200, headers: { 'content-type': 'application/json' } });
 
-export function previewDeps(fixture: Fixture, opts: { doFetch?: typeof fetch; session?: Storage; local?: Storage } = {}): AppDeps {
+/** The store and advance quizzes of a visitor who is not signed in, over a source of samples. */
+export function anonDeps(source: SampleSource, local?: Storage): Pick<AppDeps, 'anon' | 'advance'> {
+  const advance = new AdvanceQuizzes(source);
+  return { anon: new LocalStore(source, local ?? null), advance: (repoUrl, sha) => advance.for(repoUrl, sha) };
+}
+
+export function previewDeps(fixture: Fixture, opts: { doFetch?: typeof fetch; session?: Storage; local?: Storage; quizzes?: unknown[] } = {}): AppDeps {
   const fake = new FakeAuth(opts.session ?? null);
   const client = fake as unknown as AuthClient;
   const clientDeps: ClientDeps = { getToken: () => fake.token(), fetch: opts.doFetch };
@@ -55,6 +64,7 @@ export function previewDeps(fixture: Fixture, opts: { doFetch?: typeof fetch; se
     worker: null,
     preview: true,
     storage: opts.local,
+    ...anonDeps(new FixtureSamples(fixture, opts.quizzes ?? []), opts.local),
   };
 }
 
@@ -75,6 +85,7 @@ export function liveDeps(): AppDeps {
     worker: base ? new HttpWorkerClient(base) : null,
     preview: false,
     storage: safeStorage('localStorage'),
+    ...anonDeps(new StaticSamples('samples/'), safeStorage('localStorage')),
   };
 }
 
@@ -84,7 +95,9 @@ export async function boot(root: HTMLElement, doFetch: typeof fetch = (...a) => 
   else {
     const res = await doFetch('./__udebt/fixture.json');
     const fixture = (res.ok ? await res.json() : { repositories: [], analyses: [] }) as Fixture;
-    deps = previewDeps(fixture, { session: safeStorage('sessionStorage'), local: safeStorage('localStorage') });
+    const qs = await doFetch('./__udebt/quizzes.json').catch(() => null);
+    const quizzes = (qs?.ok ? await qs.json().catch(() => []) : []) as unknown[];
+    deps = previewDeps(fixture, { session: safeStorage('sessionStorage'), local: safeStorage('localStorage'), quizzes: Array.isArray(quizzes) ? quizzes : [] });
   }
   const app = new App(root, deps);
   app.start();

@@ -71,12 +71,18 @@ export interface ClientDeps {
   askDeps?: AskDeps;
 }
 
-async function call<T>(deps: ClientDeps, path: string, init: RequestInit = {}): Promise<T> {
+/**
+ * One call to /api with the person's token. `anyone`: the code-reading functions (excerpt, tree),
+ * which a visitor who is not signed in may call without a token for the samples at their pins;
+ * every other call needs the token and never leaves the page without one (the gateway is for
+ * signed-in people only).
+ */
+async function call<T>(deps: ClientDeps, path: string, init: RequestInit = {}, anyone = false): Promise<T> {
   const token = await deps.getToken();
-  if (!token) throw new ApiError(401, 'Sign in first.');
+  if (!token && !anyone) throw new ApiError(401, 'Sign in first.');
   const res = await (deps.fetch ?? fetch)(`${deps.base ?? ''}${path}`, {
     ...init,
-    headers: { ...(init.headers as Record<string, string> | undefined), authorization: `Bearer ${token}`, ...(init.body ? { 'content-type': 'application/json' } : {}) },
+    headers: { ...(init.headers as Record<string, string> | undefined), ...(token ? { authorization: `Bearer ${token}` } : {}), ...(init.body ? { 'content-type': 'application/json' } : {}) },
   });
   const data: unknown = await res.json().catch(() => ({}));
   const d = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
@@ -87,12 +93,12 @@ async function call<T>(deps: ClientDeps, path: string, init: RequestInit = {}): 
 
 /** GET /api/tree for the directories of a sitting's units (model/tree.ts keeps the answers). */
 export function treeVia(deps: ClientDeps): TreeFetch {
-  return (repoUrl, sha, dirs) => call<TreeAnswer>(deps, `/api/tree?${new URLSearchParams([['repo', repoUrl], ['sha', sha], ...dirs.map((d) => ['path', d])])}`);
+  return (repoUrl, sha, dirs) => call<TreeAnswer>(deps, `/api/tree?${new URLSearchParams([['repo', repoUrl], ['sha', sha], ...dirs.map((d) => ['path', d])])}`, {}, true);
 }
 
 export function excerptVia(deps: ClientDeps) {
   return (repoUrl: string, sha: string, ref: ExcerptRef) =>
-    call<Excerpt>(deps, `/api/excerpt?${new URLSearchParams({ repo: repoUrl, sha, path: ref.path, start: String(ref.start), end: String(ref.end) })}`);
+    call<Excerpt>(deps, `/api/excerpt?${new URLSearchParams({ repo: repoUrl, sha, path: ref.path, start: String(ref.start), end: String(ref.end) })}`, {}, true);
 }
 
 export class GatewayClient implements QuizClient {

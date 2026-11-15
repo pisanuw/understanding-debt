@@ -5,15 +5,20 @@
  * a question just missed before a new one, and the sitting graded in one call at its end,
  * then recorded (each record with its spaced-review state) and the debt recomputed. The Review
  * tab (review.ts) asks its items through the same flow.
+ *
+ * With no model to hand (a visitor who is not signed in and has no key of their own, or model
+ * features off), the tab asks the questions written in advance (core/advance.ts) through the
+ * self-check flow: the learner answers, reads the reference answer and marks their own answer
+ * (correct, partly right, wrong, didn't know), recorded as `self-checked` with no call.
  */
 import type { QuestionUnit } from '../../core/prompts';
+import { advancePicks, type AdvanceFile } from '../../core/advance';
 import { label, levelOf } from '../../core/ladder';
 import { parseRef, refsForUnit, type ExcerptRef } from '../../core/excerpts';
-import { markRevealed, mergeGrades, orientationWanted, pickUnits, revealText, revealedOn, revealedVariant, reveals, levelsFor, sittingTs, type Answered, type Graded, type Question } from '../../core/quiz';
+import { SELF_CHECKED, SELF_FEEDBACK, UNKNOWN_FEEDBACK, markRevealed, mergeGrades, orientationWanted, pickUnits, revealText, revealedOn, revealedVariant, reveals, levelsFor, sittingTs, type Answered, type Graded, type Question } from '../../core/quiz';
 import { sittingRows, stateAt } from '../../core/review';
 import { githubLink, orientationOf, orientationText, unitById, type Orientation, type SpecUnit } from '../../core/specs';
 import { CapError, capMessage } from '../../model/client';
-import { getMode } from '../../model/prefs';
 import { repoHref, unitHref, type App, type RepoTab, type RepoView } from '../app';
 import { badge, busy, button, clear, day, extLink, fmt, h } from '../dom';
 import { queue, showCount } from './review';
@@ -46,6 +51,11 @@ function confPicker(name: string): { el: HTMLElement; value: () => number } {
 function orientationBox(o: Orientation): HTMLElement {
   const dl = h('dl', { class: 'kv' }, h('dt', null, 'What it is for'), h('dd', null, o.purpose), h('dt', null, 'The decision'), h('dd', null, o.decision), h('dt', null, 'Who shaped it'), h('dd', null, o.shaped_by));
   return h('details', { open: true, class: 'orientation' }, h('summary', null, 'Orientation: read this first'), dl);
+}
+
+/** What to say when no model is in use. */
+export function offText(app: App): string {
+  return app.anonymous ? 'No model is in use: add your own Anthropic key in Settings, or sign in.' : 'Model features are off. Choose the HintWise key or your own key in Settings.';
 }
 
 /** Questions for a sitting: a stored variant where one is due (no call), the rest written in one call. */
@@ -92,8 +102,8 @@ export async function prepare(app: App, v: RepoView, n: number, only: string | n
     toWrite.forEach((w, i) => (w.refs = found[i]));
   }
   if (toWrite.length) {
-    const client = app.deps.quiz();
-    if (!client) throw new Error('Model features are off. Choose the HintWise key or your own key in Settings.');
+    const client = app.quiz();
+    if (!client) throw new Error(offText(app));
     for (const q of await client.writeQuestions({ repo: v.repo.url, sha: a.sha, units: toWrite, per_unit: 1 })) if (!chosen.has(q.unit_id)) chosen.set(q.unit_id, q);
   }
   const out: Served[] = [];
@@ -134,12 +144,12 @@ export function evidenceLine(repoUrl: string, sha: string, evidence: readonly st
   return line;
 }
 
-function resultCard(v: RepoView, r: Graded, next: number): HTMLElement {
+function resultCard(v: RepoView, r: Graded, next: number, self = false): HTMLElement {
   const card = h('div', { class: 'card result' });
   card.append(
     h('p', { class: 'small muted' }, h('a', { href: unitHref(v.repo.id, r.unit_id) }, unitById(v.analysis?.specs.units ?? [], r.unit_id)?.name ?? r.unit_id), ` · level ${levelOf(r)}`),
     h('p', null, r.question),
-    h('p', { class: 'verdict' }, badge(r.verdict, r.verdict), ` ${r.feedback}`),
+    h('p', { class: 'verdict' }, badge(r.verdict, r.verdict), self ? ' ' : '', self ? selfBadge() : null, ` ${r.feedback}`),
   );
   if (r.revealed && revealText(r)) card.append(h('div', { class: 'answer' }, h('strong', null, 'The answer'), revealText(r)));
   const code = v.analysis ? evidenceLine(v.repo.url, v.analysis.sha, r.evidence ?? []) : null;
@@ -173,10 +183,10 @@ export function askFlow(app: App, view: RepoView, box: HTMLElement, questions: S
     const before = v.scores?.index ?? 100;
     const ts = sittingTs(v.records);
     try {
-      const client = app.deps.quiz();
+      const client = app.quiz();
       let outcome: { grades: { index: number; verdict: Graded['verdict']; feedback: string }[]; recorded: unknown[] | null } = { grades: [], recorded: null };
       if (typed) {
-        if (!client) throw new Error('Model features are off. Choose the HintWise key or your own key in Settings.');
+        if (!client) throw new Error(offText(app));
         outcome = await client.grade(
           {
             repo: v.repo.url,
@@ -187,17 +197,15 @@ export function askFlow(app: App, view: RepoView, box: HTMLElement, questions: S
         );
       }
       const results = markRevealed(mergeGrades(given, outcome.grades));
-      if (outcome.recorded) await app.deps.store.records(v.repo.id).then((all) => app.refresh(v, all));
-      else app.refresh(v, [...v.records, ...(await app.deps.store.addRecords(sittingRows(results, v.records, { repoId: v.repo.id, sha: a.sha, ts, source })))]);
-      if (sessionId !== null) await app.deps.store.finishSession(sessionId).catch(() => undefined);
+      if (outcome.recorded) await app.store.records(v.repo.id).then((all) => app.refresh(v, all));
+      else app.refresh(v, [...v.records, ...(await app.store.addRecords(sittingRows(results, v.records, { repoId: v.repo.id, sha: a.sha, ts, source })))]);
+      if (sessionId !== null) await app.store.finishSession(sessionId).catch(() => undefined);
       const after = (await app.repoView(v.repo.id)) ?? v;
       clear(box);
       const counts = new Map<string, number>();
       for (const r of results) counts.set(r.verdict, (counts.get(r.verdict) ?? 0) + 1);
       const index = after.scores?.index ?? before;
-      const stat = box.ownerDocument.querySelector('[data-testid="debt-index"]');
-      if (stat) stat.textContent = fmt(index, 1);
-      showCount(box.ownerDocument, queue(after).due.length);
+      showHeader(box.ownerDocument, after);
       box.append(
         h(
           'div',
@@ -267,9 +275,203 @@ export function askFlow(app: App, view: RepoView, box: HTMLElement, questions: S
   next();
 }
 
-export function quizTab(app: App, v: RepoView): HTMLElement {
+/** The "self-checked" label: the learner marked the answer against the reference, no model graded it. */
+export function selfBadge(): HTMLElement {
+  return h('span', { class: 'badge self-checked', title: 'You marked this answer yourself against the reference answer; no model graded it.' }, 'self-checked');
+}
+
+/** Updates the repository header after a sitting: the debt index, its self-checked label, the Review count. */
+export function showHeader(doc: Document, v: RepoView): void {
+  const stat = doc.querySelector('[data-testid="debt-index"]');
+  if (stat) stat.textContent = fmt(v.scores?.index ?? 100, 1);
+  const self = doc.querySelector<HTMLElement>('[data-testid="self-checked-index"]');
+  if (self) self.hidden = !v.scores?.selfCheckedIndex;
+  showCount(doc, queue(v).due.length);
+}
+
+const MARKS: [Graded['verdict'], string][] = [
+  ['correct', 'Correct'],
+  ['partial', 'Partly right'],
+  ['wrong', 'Wrong'],
+  ['unknown', "I didn't know"],
+];
+
+/**
+ * Asks questions that carry their reference answer (written in advance, or a review item's
+ * kept reference) and lets the learner mark their own answers: answer, show the reference,
+ * mark; "I don't know" marks a known unknown at once. Recorded at the end as `self-checked`
+ * (`source` advance or review), each row with its review state, with no model call.
+ */
+export function selfCheckFlow(app: App, view: RepoView, box: HTMLElement, questions: Served[], source: 'advance' | 'review' = 'advance'): void {
+  let i = 0;
+  const results: Graded[] = [];
+
+  async function finish(btn: HTMLButtonElement | null): Promise<void> {
+    if (!results.length) {
+      clear(box).append(h('div', { class: 'card' }, 'Nothing answered, nothing recorded.'));
+      return;
+    }
+    const done = btn ? busy(btn, 'Recording') : () => undefined;
+    const v = (await app.repoView(view.repo.id)) ?? view;
+    const a = v.analysis;
+    if (!a) return;
+    const before = v.scores?.index ?? 100;
+    try {
+      const rows = sittingRows(results, v.records, { repoId: v.repo.id, sha: a.sha, ts: sittingTs(v.records), source, type: SELF_CHECKED });
+      app.refresh(v, [...v.records, ...(await app.store.addRecords(rows))]);
+      const after = (await app.repoView(v.repo.id)) ?? v;
+      const index = after.scores?.index ?? before;
+      showHeader(box.ownerDocument, after);
+      const counts = new Map<string, number>();
+      for (const r of results) counts.set(r.verdict, (counts.get(r.verdict) ?? 0) + 1);
+      clear(box).append(
+        h(
+          'div',
+          { class: 'card summary' },
+          h('h3', null, 'Recorded'),
+          h('p', null, `${[...counts].map(([k, n]) => `${n} ${k}`).join(', ')}, `, selfBadge(), ' (no model call).'),
+          h('p', { class: 'delta', 'data-testid': 'debt-delta' }, 'Debt index ', h('strong', null, fmt(before, 1)), ' → ', h('strong', null, fmt(index, 1)), index < before ? ' ↓' : ''),
+          h('p', { class: 'row' }, h('a', { href: repoHref(v.repo.id, 'debt') }, 'See your debt per unit'), source === 'review' ? tabLink(app, v, 'review', 'Back to Review') : tabLink(app, v, 'quiz', 'Another sitting')),
+        ),
+      );
+      for (const r of results) box.append(resultCard(after, r, levelsFor([{ id: r.unit_id }], after.records).get(r.unit_id) ?? 1, true));
+    } catch (e) {
+      done();
+      box.append(h('p', { class: 'error' }, errorText(e)));
+    }
+  }
+
+  function next(): void {
+    clear(box);
+    if (i >= questions.length) {
+      void finish(null);
+      return;
+    }
+    const q = questions[i];
+    const last = i + 1 >= questions.length;
+    const card = h('div', { class: 'card question self-check' });
+    card.append(h('p', { class: 'small muted' }, `[${i + 1}/${questions.length}] ${q.unit_name} · ${label(levelOf(q))} · `, selfBadge()));
+    if (q.orientation) card.append(orientationBox(q.orientation));
+    card.append(h('p', { class: 'verdict q-text' }, q.question));
+    const ta = h('textarea', { 'aria-label': 'Your answer', placeholder: 'One or two sentences, in plain language. It stays on this page: never sent, never stored.' });
+    const conf = confPicker(`conf-${q.id}`);
+    const out = h('div');
+    const answerBox = () => {
+      out.append(h('div', { class: 'answer', 'data-testid': 'reference' }, h('strong', null, 'The answer'), revealText(q)));
+      const code = view.analysis ? evidenceLine(view.repo.url, view.analysis.sha, q.evidence ?? []) : null;
+      if (code) out.append(code);
+    };
+    const keep = (r: Graded) => {
+      results.push(r);
+      i += 1;
+      if (last) void finish(null);
+      else next();
+    };
+    const show = button(
+      'Show the answer',
+      () => {
+        if (!ta.value.trim()) {
+          ta.focus();
+          return;
+        }
+        ta.disabled = true;
+        show.hidden = true;
+        dunno.hidden = true;
+        stop.hidden = true;
+        // The confidence was stated before the reference was seen: it stays as it was.
+        const said = conf.value();
+        for (const r of conf.el.querySelectorAll('input')) r.disabled = true;
+        answerBox();
+        const marks = h('div', { class: 'row marks', role: 'group', 'aria-label': 'How did your answer compare?' });
+        // No mark is highlighted, so none is suggested.
+        for (const [verdict, text] of MARKS) marks.append(button(text, () => keep({ ...q, answer: ta.value, confidence: said, revealed: true, verdict, feedback: SELF_FEEDBACK })));
+        out.append(h('p', { class: 'gap-top' }, h('strong', null, 'How did your answer compare?'), ' Mark it honestly: the debt counts it as you mark it.'), marks);
+        (marks.querySelector('button') as HTMLButtonElement).focus();
+      },
+      'primary',
+    );
+    const dunno = button("I don't know", () => {
+      ta.disabled = true;
+      show.hidden = true;
+      dunno.hidden = true;
+      stop.hidden = true;
+      out.append(h('p', { class: 'verdict gap-top' }, badge('unknown', 'unknown'), ' A known unknown: no penalty.'));
+      answerBox();
+      const nb = button(last ? 'Record my answers' : 'Next question', () => keep({ ...q, answer: '', confidence: 1, revealed: true, verdict: 'unknown', feedback: UNKNOWN_FEEDBACK }), 'primary');
+      out.append(nb);
+      nb.focus();
+    });
+    const stop = button('Finish now', () => void finish(stop));
+    stop.hidden = results.length === 0;
+    card.append(ta, h('div', { class: 'row gap-top' }, conf.el, show, dunno, stop), out);
+    box.append(card);
+    ta.focus();
+  }
+  next();
+}
+
+/** The quiz tab with no model in use: the questions written in advance, self-checked. */
+function advanceTab(app: App, v: RepoView, file: AdvanceFile): HTMLElement {
+  const a = v.analysis as NonNullable<RepoView['analysis']>;
+  const flow = h('div', { id: 'quiz-flow' });
+  const nSel = h('select', { id: 'quiz-n', 'aria-label': 'Questions' });
+  for (const k of [1, 2, 3, 4, 5]) nSel.append(h('option', { value: String(k), selected: k === 2 }, String(k)));
+  const asked = new Set(file.questions.map((q) => q.unit_id));
+  const uSel = h('select', { id: 'quiz-unit', class: 'grow', 'aria-label': 'Unit' }, h('option', { value: '' }, 'Most debt first'));
+  for (const u of a.specs.units) {
+    if ((u.scope ?? 'architectural') !== 'architectural' || !asked.has(u.id)) continue;
+    uSel.append(h('option', { value: u.id, selected: app.quizUnit === u.id }, `${u.parent ? ' ' : ''}${u.name}`));
+  }
+  app.quizUnit = null;
+  const go = button(
+    'Start',
+    () => {
+      const scores = v.scores?.scores ?? [];
+      const { picks, skipped } = advancePicks(file, a.specs.units, scores, v.records, Number(nSel.value), uSel.value || null);
+      if (!picks.length) {
+        const past = skipped.some((x) => x.level > 3);
+        clear(flow).append(
+          h('p', { class: 'warn' }, past ? 'Levels 4 and 5 need code reading and a real grader, so no questions are written for them in advance. ' : 'No question was written in advance for this unit at your level. ', app.anonymous ? 'Add your own Anthropic key in Settings, or sign in, for questions written and graded for you.' : 'Choose the HintWise key or your own key in Settings for questions written and graded for you.'),
+        );
+        return;
+      }
+      const served: Served[] = picks.map((p, k) => ({ ...p.question, id: `a${k}`, unit_name: p.unit.name, orientation: orientationWanted(v.records.filter((r) => r.unit_id === p.unit.id), p.level) ? (p.question.orientation ?? orientationOf(p.unit)) : null }));
+      selfCheckFlow(app, v, flow, served, 'advance');
+    },
+    'primary',
+  );
+  return h(
+    'div',
+    null,
+    h('p', { class: 'sub' }, 'Questions written in advance for this repository, each unit at your level on the ladder (levels 1-3). Answer, then read the reference answer and mark your own answer: no model call, and your answer text is never sent or stored.'),
+    h(
+      'div',
+      { class: 'card' },
+      h('div', { class: 'row' }, h('label', { for: 'quiz-n' }, 'Questions'), nSel, h('label', { for: 'quiz-unit' }, 'Unit'), uSel, go),
+      h(
+        'p',
+        { class: 'muted small' },
+        'Recorded as ',
+        selfBadge(),
+        app.anonymous ? ' in this browser. For questions written for you and graded by a model, add your own Anthropic key in ' : '. For questions written for you and graded by a model, choose the HintWise key or your own key in ',
+        h('a', { href: '#/settings' }, 'Settings'),
+        app.anonymous ? ' or ' : '.',
+        app.anonymous ? h('a', { href: '#/signin' }, 'sign in') : null,
+        app.anonymous ? '.' : null,
+      ),
+    ),
+    flow,
+  );
+}
+
+export async function quizTab(app: App, v: RepoView): Promise<HTMLElement> {
   const a = v.analysis;
   if (!a) return h('p', null, 'This repository has no analysis yet.');
+  const mode = app.mode();
+  if (mode === 'off') {
+    const file = await app.advanceFor(v);
+    if (file?.questions.length) return advanceTab(app, v, file);
+  }
   const flow = h('div', { id: 'quiz-flow' });
   const nSel = h('select', { id: 'quiz-n', 'aria-label': 'Questions' });
   for (const k of [1, 2, 3, 4, 5]) nSel.append(h('option', { value: String(k), selected: k === 2 }, String(k)));
@@ -279,7 +481,6 @@ export function quizTab(app: App, v: RepoView): HTMLElement {
     uSel.append(h('option', { value: u.id, selected: app.quizUnit === u.id }, `${u.parent ? ' ' : ''}${u.name}`));
   }
   app.quizUnit = null;
-  const mode = getMode(app.deps.storage);
   const note =
     mode === 'gateway'
       ? 'Questions are written in one call and your answers graded in one more, through the HintWise key (they count against your daily allowance). A question you missed comes back in other words without a call.'
@@ -291,7 +492,7 @@ export function quizTab(app: App, v: RepoView): HTMLElement {
     void prepare(app, v, Number(nSel.value), uSel.value || null)
       .then(async (qs) => {
         done();
-        const id = await app.deps.store.startSession(v.repo.id, a.sha, qs.map((q) => ({ unit_id: q.unit_id, level: q.level, question: q.question }))).catch(() => null);
+        const id = await app.store.startSession(v.repo.id, a.sha, qs.map((q) => ({ unit_id: q.unit_id, level: q.level, question: q.question }))).catch(() => null);
         askFlow(app, v, flow, qs, id);
       })
       .catch((e: unknown) => {
@@ -308,7 +509,11 @@ export function quizTab(app: App, v: RepoView): HTMLElement {
       'div',
       { class: 'card' },
       h('div', { class: 'row' }, h('label', { for: 'quiz-n' }, 'Questions'), nSel, h('label', { for: 'quiz-unit' }, 'Unit'), uSel, go),
-      note ? h('p', { class: 'muted small' }, note) : h('p', { class: 'warn small' }, 'Model features are off. ', h('a', { href: '#/settings' }, 'Choose the HintWise key or your own key'), ' to take a quiz.'),
+      note
+        ? h('p', { class: 'muted small' }, note)
+        : app.anonymous
+          ? h('p', { class: 'warn small' }, 'No questions were written in advance for this repository yet. ', h('a', { href: '#/settings' }, 'Add your own Anthropic key'), ' or ', h('a', { href: '#/signin' }, 'sign in'), ' to take a quiz.')
+          : h('p', { class: 'warn small' }, 'Model features are off. ', h('a', { href: '#/settings' }, 'Choose the HintWise key or your own key'), ' to take a quiz.'),
     ),
     flow,
   );

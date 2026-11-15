@@ -406,19 +406,24 @@ describe('the review queue', () => {
     expect(rows[1].data.review).toMatchObject({ reps: 0, ease: 2.1 });
   });
 
-  it('needs a model mode, leaves out units the analysis no longer has, and keeps the badge in step', async () => {
+  it('self-checks with no model, waits for one without a reference, leaves out units the analysis no longer has, and keeps the badge in step', async () => {
     await start();
     setMode('gateway', local);
     await miss();
-    const store = app.deps.store as unknown as { rows: { unit_id: string; unit: string }[] };
+    const store = app.deps.store as unknown as { rows: { unit_id: string; unit: string; data: { reference?: string } }[] };
     store.rows.push({ ...structuredClone(store.rows[0]), unit_id: 'gone', unit: 'gone' });
     app.forget();
     at('2026-11-16T10:00:00Z');
     setMode('off', local);
     await go('#/r/1/review');
     expect(byText('h2', 'Due now: 1')).toBeTruthy();
+    expect(($<HTMLButtonElement>('button.primary') as HTMLButtonElement).disabled).toBe(false);
+    expect(byText('p', /No model is in use: you compare each answer/)).toBeTruthy();
+    for (const r of store.rows) delete r.data.reference;
+    app.forget();
+    await go('#/r/1/review');
     expect(($<HTMLButtonElement>('button.primary') as HTMLButtonElement).disabled).toBe(true);
-    expect(byText('p', /Model features are off/)).toBeTruthy();
+    expect(byText('p', /1 item\(s\) have no reference answer to check against and wait for a model/)).toBeTruthy();
     const b = countBadge(0);
     document.body.append(b);
     expect(b.hidden).toBe(true);

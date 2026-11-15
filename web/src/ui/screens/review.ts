@@ -5,14 +5,18 @@
  * most overdue first, each in a stored phrasing not asked last time with the reference kept
  * from the miss, through the quiz's answer box ("I don't know" with no call, the answer shown
  * at levels 1-2 on a miss), graded in one call at its end and recorded with `source: review`.
+ * With no model in use (a visitor who is not signed in without a key of their own, or model
+ * features off), a sitting goes through the self-check flow instead: each item's kept reference
+ * is shown after the answer and the learner marks it (`self-checked`, no call); an item with no
+ * reference to check against waits for a model.
  */
 import { label } from '../../core/ladder';
 import { SITTING, items as reviewItems, parseTs, type ReviewItem } from '../../core/review';
+import { revealText } from '../../core/quiz';
 import { unitById } from '../../core/specs';
-import { getMode } from '../../model/prefs';
 import { unitHref, type App, type RepoView } from '../app';
 import { button, day, h } from '../dom';
-import { askFlow, type Served } from './quiz';
+import { askFlow, selfBadge, selfCheckFlow, type Served } from './quiz';
 
 /** The analysis's unit ids: an item on a unit it no longer has is left out (as `udebt serve`). */
 export function unitIds(v: RepoView): Set<string> {
@@ -69,21 +73,33 @@ export function reviewTab(app: App, v: RepoView): HTMLElement {
   if (due.length) {
     const nSel = h('select', { id: 'review-n', 'aria-label': 'Items' });
     for (const k of [1, 2, 3, 5, 10]) nSel.append(h('option', { value: String(k), selected: k === SITTING }, String(k)));
-    const mode = getMode(app.deps.storage);
+    const mode = app.mode();
+    const checkable = due.filter((it) => revealText(it.question));
     const go = button(
       'Review what is due',
       () => {
         for (const c of cards) c.hidden = true;
-        askFlow(app, v, flow, served(v, due, Number(nSel.value)), null, 'review');
+        if (mode === 'off') selfCheckFlow(app, v, flow, served(v, checkable, Number(nSel.value)), 'review');
+        else askFlow(app, v, flow, served(v, due, Number(nSel.value)), null, 'review');
       },
       'primary',
     );
-    go.disabled = mode === 'off';
+    go.disabled = mode === 'off' && !checkable.length;
+    const waiting = due.length - checkable.length;
     start.append(
       itemList(v, due, now, 'review-due'),
       h('div', { class: 'row gap-top' }, h('label', { for: 'review-n' }, 'Items'), nSel, go),
       mode === 'off'
-        ? h('p', { class: 'warn small' }, 'Model features are off. ', h('a', { href: '#/settings' }, 'Choose the HintWise key or your own key'), ' to review.')
+        ? h(
+            'p',
+            { class: checkable.length ? 'muted small' : 'warn small' },
+            'No model is in use: you compare each answer with the one kept from the miss and mark it yourself, recorded as ',
+            selfBadge(),
+            ' with no call.',
+            waiting ? ` ${waiting} item(s) have no reference answer to check against and wait for a model: ` : ' ',
+            h('a', { href: '#/settings' }, app.anonymous ? 'add your own key' : 'choose the HintWise key or your own key'),
+            ' for a grader.',
+          )
         : h('p', { class: 'muted small' }, mode === 'gateway' ? 'One grading call per sitting through the HintWise key (it counts against your daily allowance); no call writes questions, and "I don\'t know" costs none.' : 'One grading call per sitting with your own Anthropic key, straight from this browser; no call writes questions.'),
     );
   } else {

@@ -12,7 +12,7 @@ import { badge, busy, button, clear, day, h } from '../dom';
 export const POLL_MS = 5000;
 
 function jobsList(app: App, box: HTMLElement): void {
-  void app.deps.store
+  void app.store
     .jobs()
     .then((jobs) => {
       clear(box);
@@ -26,6 +26,16 @@ function jobsList(app: App, box: HTMLElement): void {
 }
 
 export async function addScreen(app: App): Promise<HTMLElement> {
+  if (app.anonymous) {
+    const s = h(
+      'section',
+      null,
+      h('h1', null, 'Add a repository'),
+      h('p', { class: 'warn' }, 'Adding a repository needs an account: ', h('a', { href: '#/signin' }, 'sign in'), ' first. The samples need none: ', h('a', { href: '#/' }, 'start with one'), '.'),
+    );
+    s.dataset.title = 'Add a repository';
+    return s;
+  }
   const url = h('input', { type: 'url', id: 'add-url', class: 'grow', placeholder: 'https://github.com/owner/name', 'aria-label': 'Repository URL', required: true });
   const rev = h('input', { type: 'text', id: 'add-rev', placeholder: 'commit (optional)', 'aria-label': 'Commit', size: '14' });
   const out = h('div', { class: 'gap-top' });
@@ -44,9 +54,9 @@ export async function addScreen(app: App): Promise<HTMLElement> {
     const done = busy(go, 'Checking');
     void (async () => {
       try {
-        const known = await app.deps.store.findRepository(g.url);
-        if (known && (await app.deps.store.analyses(known.id)).length) {
-          await app.deps.store.addMine(known.id);
+        const known = await app.store.findRepository(g.url);
+        if (known && (await app.store.analyses(known.id)).length) {
+          await app.store.addMine(known.id);
           app.forget();
           out.append(h('p', null, `${known.name} is in your list: `, h('a', { href: repoHref(known.id) }, 'open it'), '.'));
           return;
@@ -67,7 +77,7 @@ export async function addScreen(app: App): Promise<HTMLElement> {
         out.append(h('p', null, `Analysing ${g.owner}/${g.repo} (${r.status}). This takes a few minutes; this page shows the result when it is done.`));
         jobsList(app, jobs);
         const timer = setInterval(() => {
-          void app.deps.store.jobs().then((js) => {
+          void app.store.jobs().then((js) => {
             const j = r.job === null ? js[0] : js.find((x) => x.id === r.job);
             if (j && (j.status === 'done' || j.status === 'failed')) {
               clearInterval(timer);
