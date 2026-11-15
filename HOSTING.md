@@ -11,6 +11,9 @@ It replaces parts of ROADMAP Phase 4: sign-in is HintWise's Google and email sig
 Supabase, not GitHub OAuth, and model calls go through the HintWise LLM gateway or the user's
 own key, not an organisation key stored in Supabase.
 
+**Checked with the Plabs session, 2026-11-15** (claude-built-apps aeed6d5, information only):
+the guide is current. Its answers are folded in below, marked "(Plabs)".
+
 ## What the owner asked for (2026-11-15)
 
 - A deployed app on Netlify, Render and Supabase where a signed-in user points udebt at any
@@ -53,12 +56,24 @@ From `docs/new-app-guide.md`; the section numbers are that guide's.
     default.
   - Default caps: $2 per day per app, and $0.25 per person per day across HintWise.
   - The owner sets numbers after measuring; the Plabs session applies them.
+  - (Plabs) Each request is one model call, with at most 200 messages and 64 tools.
+    `max_tokens` is the per-app column `platform.llm_apps.max_tokens`, default 4096, with
+    no platform ceiling beyond the model's own limit. photo2pgn runs at 12000, the owner's
+    number. Edge Function wall-clock time for one long call is not measured.
+  - (Plabs) A server, such as the Render worker, may call the gateway with the signed-in
+    person's session token. The gateway checks the token and needs no Origin header. The
+    token expires (about an hour by default, not checked for this project), and every call
+    counts against that person's caps.
 - **Footer, logo, favicon (§6):**
   - udebt is its own repository (option B), so the page embeds the exact output of
     `footerHtml('<slug>')` from `scripts/site-footer.mjs` in `index.html`, just before
     `</body>` and outside the app root.
-  - A sha256 test pins it.
-  - A strict `style-src` lists `FOOTER_STYLE_CSP`.
+  - A sha256 test pins it. (Plabs) For the slug `udebt` the markup is 2231 bytes, sha256
+    `dc713ce9950e2cb7cabc6a20f439d96e2c1e39666b483c3e9acb65f6cd4685c8`; another slug
+    changes the hash. It must be in the HTML the server sends, never inserted by React or
+    `innerHTML`.
+  - A strict `style-src` lists `FOOTER_STYLE_CSP`, today
+    `'sha256-4VDViIffTKl8oDDJg58VHCVBOHSQm7GPM7eZ1fAKuzc='`.
   - udebt has no icon, so it uses the HintWise favicon tag from
     `platform/brand/favicon-link.html`.
 - **Option B steps (§1, §3, §10):**
@@ -67,7 +82,10 @@ From `docs/new-app-guide.md`; the section numbers are that guide's.
   - The Plabs session attaches `<slug>.hintwise.org`, applies migrations (copied byte for
     byte into `claude-built-apps/<slug>/supabase/migrations/`), adds the label to
     `EXTERNAL_APP_LABELS`, and redeploys `sign-in-link` and `delete-account`. Each
-    production step needs the owner's yes.
+    production step needs the owner's yes. (Plabs) `EXTERNAL_APP_LABELS` in
+    `platform/src/signin/validate.ts` is `['stepwise', 'photo2pgn']` today. Until `udebt`
+    is added and both functions are redeployed, email links and account deletion are
+    refused for the app.
 - **Quality (§9):**
   - Before each push: `npm run lint && npm run typecheck && npm run coverage && npm run
     build`, with coverage at least 85%, and a Playwright walkthrough with fakes.
@@ -83,8 +101,13 @@ characters. The gateway is a plain Messages API proxy:
 - **No file tools of its own.** `tools` pass through, so the worker has to run the tool
   loop itself: the model asks to read a file, the worker reads it from its clone and sends
   the result back, one gateway call per turn.
+- **The loop resends everything.** (Plabs) Each turn is a new gateway call that resends the
+  whole conversation, so an open-ended tool loop costs more every turn and runs into the
+  1 MB body limit. The worker should do the structural work offline, as udebt already does
+  (clusters, history, weights), and give the model a curated set of files in one or a few
+  calls rather than letting it browse.
 - **4096 output tokens.** A map of 12 units and their sub-units may need more. The Plabs
-  session can raise an app's `max_tokens`.
+  session can raise an app's `max_tokens`; the owner picks the number.
 - **Caps.** One map on the owner's key will likely exceed the $0.25 per person per day
   default, and possibly the app's $2 per day. Nothing has been measured on the gateway yet,
   and the platform asks for measurement before choosing numbers.
@@ -103,7 +126,7 @@ Proposal:
 | part | where | what |
 |---|---|---|
 | Web app | Netlify, `https://<slug>.hintwise.org` | sign in; repository list (the three samples plus the person's own); specs view (units and sub-units, each unit's decision, alternatives and why, the decisions that shaped it, the tour, orientations); the quiz ladder; dig and walkthroughs; the person's debt per unit. The local `udebt serve` teaching layer (Phase 3.3) is the starting point. |
-| Analysis worker | Render, its own Python service (not `backend-hub`, which is a shared Node instance with 512 MB) | clone a public repository within size limits; run the offline core (structure, history mining, weights, replay); run the model steps through the gateway with the person's token, or with their own key; write results with the person's token. |
+| Analysis worker | Render, its own Python service, at `udebt-api.hintwise.org` | clone a public repository within size limits; run the offline core (structure, history mining, weights, replay); run the model steps through the gateway with the person's token, or with their own key; write results with the person's token; delete the clone when the job ends. (Plabs) `backend-hub` is the documented first choice, but its free 512 MB Node instance very likely cannot hold Python plus clones of hundreds of MB (not measured). A new Render service needs the owner's yes because it adds a bill. The "Set CNAME / Render domain" workflow can point `udebt-api.hintwise.org` at it, and the gateway's CORS accepts any one-label `https://<label>.hintwise.org`. |
 | Data | Supabase, schema `app_<slug_>` | repositories and pinned shas; analyses (the map, specs, orientations, tour) per repository and sha; each person's repositories; quiz records per person (own-row policies); quiz sessions. |
 | Files | Supabase Storage, private bucket `<slug>` | large analysis artefacts if a row is too big. |
 
@@ -115,14 +138,26 @@ Smaller decisions this proposal makes, open to change:
 - **Public GitHub repositories only in v1,** within size limits (commits, clone size) that
   have to be chosen. Private repositories need GitHub access and the metadata-only storage
   ROADMAP Phase 4 describes.
-- **Grading against the code** needs the code. For public repositories the analysis stores
-  the excerpts each unit's questions rely on, so quizzes need no clone. Private repositories
-  would need the worker.
+- **Grading against the code without storing code.** (Plabs) Cloned code is not kept beyond
+  the job. The analysis stores references instead: path, line range and the pinned sha for
+  what each unit's questions rely on. For a public repository, the excerpts are fetched from
+  GitHub at that sha when a quiz is written or graded, so no clone and no stored code are
+  needed. Private repositories would need the worker.
 - **Shared analyses without the service-role key.** A sample's analysis is readable by every
-  signed-in person but written by no app code. The Plabs session loads it with the Supabase
-  admin workflow after the owner's yes. A person's own analysis is written with their token
-  and readable by them. Whether a person's analysis of a public repository should be shared
-  is an owner decision.
+  signed-in person but written by no app code. (Plabs) `check-schema` fails any table a
+  signed-in stranger can read unless it is listed in `SHARED_TABLES` in
+  `platform/supabase-admin.mjs` (today only `platform.llm_apps`). An entry such as
+  `app_udebt.samples` is a Plabs commit. The table needs row level security, a
+  `select to authenticated using (true)` policy, no insert, update or delete grants, and
+  nothing for `anon`. The rows are loaded with the Supabase admin workflow after the
+  owner's yes: `migrate udebt`, with the migrations copied into
+  `claude-built-apps/udebt/supabase/migrations/`, or `sql <file>` for a one-off. The `sql`
+  logs are public, so private data stays out. A person's own analysis is written with their
+  token and readable by them. Whether a person's analysis of a public repository should be
+  shared is an owner decision, and needs the same `SHARED_TABLES` step.
+- **Safety in the worker.** (Plabs) Accept public `https://github.com/` URLs only, cap clone
+  size and depth, guard against SSRF and against symlinks or paths escaping the clone, and
+  never put an Anthropic key on Render. The README says what is stored (Supabase, US East).
 
 ## The three sample repositories
 
@@ -150,7 +185,7 @@ the walkthroughs add one per unit.
 | Sample analyses and specs, made locally with the `claude` CLI and checked | the "UDebt: Nov 12" session (testbeds), with the owner's yes for the calls |
 | Rename the repo to the slug (before the first deploy) | owner |
 | Import the repo into Netlify with previews off; create the Render service | owner |
-| Attach `<slug>.hintwise.org`; Render domain; apply migrations; `EXTERNAL_APP_LABELS` and redeploy `sign-in-link` and `delete-account`; load the sample analyses; set gateway caps and `max_tokens` | the Plabs session, each with the owner's yes |
+| Attach `<slug>.hintwise.org`; Render domain (`udebt-api.hintwise.org`); apply migrations; add `udebt` to `EXTERNAL_APP_LABELS` and redeploy `sign-in-link` and `delete-account`; add the shared tables to `SHARED_TABLES`; load the sample analyses; set gateway caps and `max_tokens` | the Plabs session, each with the owner's yes |
 
 ## Decisions for the owner
 
@@ -169,9 +204,12 @@ Numbered for answers; each has a recommendation.
 
    This replaces ROADMAP decision 1 (an organisation key stored in Supabase), which the
    platform's "never put an Anthropic key in an app" rule rules out.
-4. **The Render worker.** It needs its own Python service with disk, which is a cost.
-   Recommended: one small service that sleeps when idle, with repositories limited to about
-   20,000 commits and a 500 MB clone in v1.
+4. **The Render worker.** It needs its own Python service with disk, which is a cost (Plabs
+   confirms `backend-hub` very likely won't fit). Recommended: one small service that
+   sleeps when idle, at `udebt-api.hintwise.org`. In v1, repositories are limited to about
+   20,000 commits and a 500 MB clone, and each clone is deleted after its job.
+   **Gateway numbers to set:** the app's `max_tokens`, measured first; the photo2pgn
+   precedent is 12000. Also the per-person call caps.
 5. **Repository scope.** Recommended: public GitHub repositories only in v1.
 6. **Sharing analyses.** Should a person's analysis of a public repository be visible to
    others who add the same repository? Recommended: yes for public repositories, which saves
