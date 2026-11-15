@@ -644,9 +644,12 @@ def export_data(
     points = data["points"]
     cons = contributors(h.commits, cfg.identities, set())
     d = cfg.decay
+    from .contract import CONTRACT
+
     return {
         "format": "udebt-export",
         "version": 1,
+        "contract": CONTRACT,  # contract.py: the shapes this export (the import format) keeps
         "repo": h.root.name,
         "head": h.fp[-1],
         "generated_at": now_iso(),
@@ -672,4 +675,5 @@ def export_data(
         "evidence": evidence(h, with_answers),
         "risk_events": [e for e in data["risk"]["events"] if e["level"] in risk_levels],
         "heavy_commits": heavy_commits(h),
+        "fingerprint": data["fingerprint"],  # what the series was made with: a change is a rebuild
     }

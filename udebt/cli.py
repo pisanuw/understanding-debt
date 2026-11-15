@@ -30,6 +30,7 @@ udebt dashboard [--open]        a static, self-contained HTML dashboard
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -1202,6 +1203,153 @@ def cmd_digest(args) -> int:
     return 0
 
 
+def cmd_validate(args) -> int:
+    """Check a JSON file (or every line of a .jsonl) against the contract."""
+    import json as _json
+
+    from . import contract
+
+    p = Path(args.file)
+    text = p.read_text(encoding="utf-8")
+    if p.suffix == ".jsonl":
+        items = [_json.loads(x) for x in text.splitlines() if x.strip()]
+        kind = args.kind or "record"
+    else:
+        items = [_json.loads(text)]
+        kind = args.kind or _kind_of(items[0], p.name)
+    errors = [f"line {i + 1}: {e}" if len(items) > 1 else e
+              for i, it in enumerate(items) for e in contract.validate(kind, it)]  # fmt: skip
+    if errors:
+        print(f"{p}: {len(errors)} problem(s) as {kind} (contract {contract.CONTRACT}):")
+        for e in errors[:40]:
+            print(f"  {e}")
+        return 1
+    print(f"{p}: {kind}: conforms to contract {contract.CONTRACT}")
+    return 0
+
+
+def _kind_of(data, name: str) -> str:
+    if isinstance(data, dict):
+        if data.get("format") == "udebt-export":
+            return "import" if "map" in data else "export"
+        if "fingerprint" in data and "points" in data:
+            return "snapshots"
+        if "developers" in data:
+            return "responsibility"
+        if "commits" in data and "units" not in data:
+            return "commits"
+        if "units" in data:
+            return "map"
+    raise SystemExit(f"Cannot tell what {name} is; pass --kind.")
+
+
+def cmd_worker(args) -> int:
+    from . import worker
+
+    if args.action == "sql":
+        from .loadsql import analysis_sql
+
+        sql = analysis_sql(
+            Path(args.dir), dialect=args.dialect, user_id=args.user_id, license=args.license,
+            with_export=not args.no_export, storage_path=args.storage_path,
+        )  # fmt: skip
+        if args.out:
+            Path(args.out).write_text(sql, encoding="utf-8")
+            print(f"Wrote {args.out} ({len(sql) / 1024:.0f} KB of SQL)")
+        else:
+            sys.stdout.write(sql)
+        return 0
+
+    limits = worker.Limits(args.max_commits, args.max_mb, args.timeout)
+    try:
+        m = worker.run(
+            args.url, Path(args.out), args.rev, limits=limits,
+            map_file=Path(args.map) if args.map else None, llm=args.llm,
+            walkthroughs=args.walkthroughs, excerpts=not args.no_excerpts,
+        )  # fmt: skip
+    except worker.WorkerError as e:
+        raise SystemExit(f"udebt worker: {e} (nothing written; the clone is deleted)") from e
+    c = m["counts"]
+    print(
+        f"Wrote {len(m['files']) + 1} files to {args.out} for {m['repo']} at {m['sha'][:8]}: "
+        f"{c['commits']} commits, map from {m['map_source']}"
+        + (f", {c['units']} units, {c['points']} points, {c['walkthroughs']} walkthroughs"
+           if "units" in c else "")
+        + f", {m['llm_calls']} model call(s), {m['seconds']} s. The clone is deleted."
+    )  # fmt: skip
+    if m["note"]:
+        print(f"Note: {m['note']}.")
+    return 0
+
+
+def cmd_remote(args) -> int:
+    from . import remote
+
+    root, store = _ctx(args)
+    store.require()
+    try:
+        if args.action == "set":
+            if not args.url:
+                raise SystemExit("`udebt remote set <url>`")
+            print(f"Wrote {remote.save_config(store, args.url)} (gitignored).")
+        elif args.action == "token":
+            url = remote.load_config(store)["url"]
+            token = sys.stdin.readline().strip()
+            if not token:
+                raise SystemExit("Paste the token on stdin (it is not taken as an argument).")
+            print(f"Saved the token for {url} in {remote.save_token(url, token)} (mode 0600).")
+        else:
+            cfg = remote.load_config(store)
+            try:
+                remote.token_for(cfg["url"])
+                tok = "set"
+            except remote.RemoteError:
+                tok = "missing (UDEBT_TOKEN, or `udebt remote token`)"
+            print(f"remote {cfg['url']}; token {tok}")
+    except remote.RemoteError as e:
+        raise SystemExit(str(e)) from e
+    return 0
+
+
+def cmd_push(args) -> int:
+    from . import remote
+
+    root, store = _ctx(args)
+    store.require()
+    try:
+        r = remote.push(root, store, dry_run=args.dry_run)
+    except remote.RemoteError as e:
+        raise SystemExit(f"udebt push: {e}") from e
+    what = (f"{r['points']} points, {r['evidence']} evidence records, {r['risk_events']} risk "
+            f"events, {r['bytes'] / 1024:.0f} KB")  # fmt: skip
+    if not r["sent"]:
+        print(f"Would push {what} to {r['url']} (dry run: the payload conforms to the contract).")
+        return 0
+    got = (r["reply"] or {}).get("imported", r["reply"])
+    print(f"Pushed {what} to {r['url']}. The host: {json.dumps(got, sort_keys=True)}")
+    return 0
+
+
+def cmd_pull(args) -> int:
+    from . import remote
+
+    root, store = _ctx(args)
+    store.require()
+    try:
+        r = remote.pull(store)
+    except remote.RemoteError as e:
+        raise SystemExit(f"udebt pull: {e}") from e
+    added = r["evidence_added"]
+    print(
+        f"Pulled from {r['url']}: {sum(added.values())} new evidence record(s)"
+        + (f" ({', '.join(f'{d} {n}' for d, n in sorted(added.items()))})" if added else "")
+        + f", {r['points']} snapshot points (.udebt/remote/snapshots.json)"
+        + (f"; {r['invalid']} row(s) broke the contract and were skipped" if r["invalid"] else "")
+        + "."
+    )
+    return 0
+
+
 def cmd_serve(args) -> int:
     from . import serve
 
@@ -1376,6 +1524,15 @@ def cmd_risk(args) -> int:
         deep=args.deep,
     )
     level = risk_mod.overall(risks)
+    if args.check_run:  # the GitHub check-run body this change would get (checks.py)
+        from . import checks
+
+        head = changes[-1].sha if not args.staged else "staged"
+        ack = {"login": args.ack, "via": "cli"} if args.ack else None
+        body = checks.payload(head, email, checks.rows(risks), soft_block=args.soft_block,
+                              ack=ack)  # fmt: skip
+        print(json.dumps(body, indent=2))
+        return 0
     print(f"\nRisk for {email}: {what}  ->  {level}")
     if not risks:
         print("No architectural unit touched.")
@@ -1657,10 +1814,11 @@ def cmd_export(args) -> int:
     import csv
     import json as _json
 
-    from . import replay
+    from . import contract, replay
 
     root, store, h, res, _ = _replayed(args)
     data = replay.export_data(h, res, with_answers=args.with_answers)
+    contract.check("export", data)  # the export is the import format: never write a broken one
     if args.format == "json":
         out = Path(args.out) if args.out else store.dir / "export" / "udebt-export.json"
         text = _json.dumps(data, indent=1, ensure_ascii=False) + "\n"
@@ -2326,6 +2484,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--since", metavar="DATE", help="with --history: landed on or after DATE")
     s.add_argument("--all", action="store_true", help="with --history: CAUTION events too")
+    s.add_argument("--check-run", action="store_true",
+                   help="print the GitHub check-run body for this change instead")  # fmt: skip
+    s.add_argument("--soft-block", action="store_true",
+                   help="with --check-run: as if opted into soft blocking")  # fmt: skip
+    s.add_argument("--ack", metavar="LOGIN", help="with --check-run: acknowledged by this lead")
     s.set_defaults(fn=cmd_risk)
 
     s = sub.add_parser("snapshot", help="replay debt at past points into .udebt/snapshots.json")
@@ -2428,6 +2591,50 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--format", choices=["table", "json"], default="table")
     s.set_defaults(fn=cmd_digest)
+
+    s = sub.add_parser("worker", help="analyse a repository in a transient clone (hosted)")
+    wk = s.add_subparsers(dest="action", required=True)
+    x = wk.add_parser("run", help="clone, analyse, write contract files, delete the clone")
+    x.add_argument("url", help="a git URL or a local path")
+    x.add_argument("--rev", help="the commit to analyse (default: the default branch)")
+    x.add_argument("--out", required=True, help="the directory to write into")
+    x.add_argument("--map", help="a map.json to use when the repository commits none")
+    x.add_argument("--llm", action="store_true",
+                   help="write a missing map, orientations and tour with the model")  # fmt: skip
+    x.add_argument("--walkthroughs", type=int, default=0,
+                   help="with --llm: walkthroughs for the N most important units")  # fmt: skip
+    x.add_argument("--no-excerpts", action="store_true", help="leave code lines out of specs")
+    x.add_argument("--max-commits", type=int, default=20_000)
+    x.add_argument("--max-mb", type=int, default=500)
+    x.add_argument("--timeout", type=int, default=900, help="seconds for the clone")
+    x.set_defaults(fn=cmd_worker)
+    x = wk.add_parser("sql", help="an idempotent SQL load of a worker output (app_udebt)")
+    x.add_argument("dir", help="the --out directory of `udebt worker run`")
+    x.add_argument("--dialect", choices=["postgres", "sqlite"], default="postgres")
+    x.add_argument("--user-id", help="load as one person's analysis (default: a shared sample)")
+    x.add_argument("--license", help="the repository's licence, shown with a sample")
+    x.add_argument("--no-export", action="store_true", help="leave the export out (Storage)")
+    x.add_argument("--storage-path", help="where the export lives in the app's bucket")
+    x.add_argument("--out", help="write the SQL here instead of stdout")
+    x.set_defaults(fn=cmd_worker)
+
+    s = sub.add_parser("remote", help="the hosted store push and pull talk to")
+    s.add_argument("action", nargs="?", choices=["show", "set", "token"], default="show")
+    s.add_argument("url", nargs="?")
+    s.set_defaults(fn=cmd_remote)
+
+    s = sub.add_parser("push", help="send the export (the contract's import) to the remote")
+    s.add_argument("--dry-run", action="store_true", help="build and check it, send nothing")
+    s.set_defaults(fn=cmd_push)
+
+    s = sub.add_parser("pull", help="take evidence and snapshots back from the remote")
+    s.set_defaults(fn=cmd_pull)
+
+    s = sub.add_parser("validate", help="check a JSON file against the versioned contract")
+    s.add_argument("file")
+    s.add_argument("--kind", choices=["map", "record", "snapshots", "commits", "responsibility",
+                                      "export", "import", "evidence"])  # fmt: skip
+    s.set_defaults(fn=cmd_validate)
 
     s = sub.add_parser("serve", help="the teaching surface in your browser, on 127.0.0.1")
     s.add_argument("--port", type=int, default=0, help="default: a free port")

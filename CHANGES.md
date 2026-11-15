@@ -106,6 +106,14 @@
 2026-11-15 [doc] README digest section, serve batch grading and tutor persistence, why reference answers stay in map.json; BRIEFING and ROADMAP Phase 3.4.
 2026-11-15 [code] Synthetic reports are named <shas>-<date>-<HHMMSS>.json, with a counter after that, and a new run never overwrites one (two hf runs were lost).
 2026-11-15 [code] Leakage guard: synthetic questions, answers and grades read temporary worktrees without .udebt/ (clean_worktree: true); every claude call is denied .udebt/.
+2026-11-15 [decision] Phase 4a re-scoped: hosting moves to the HintWise platform (HOSTING.md); build only the platform-agnostic core, park the Starlette API draft.
+2026-11-15 [code] udebt/contract.py: contract v1 for map, records, snapshots, commits, responsibility, export and import; udebt validate; exports carry contract and fingerprint.
+2026-11-15 [code] udebt worker run: transient clone within limits, offline core, export, sanitized map and specs with walkthrough excerpts, manifest; the clone always deleted.
+2026-11-15 [code] supabase/migrations app_udebt: shared repositories and analyses, own-row records, authenticated only; SQLite twin; udebt worker sql loads an analysis.
+2026-11-15 [code] udebt push and pull over the contract (POST /import, GET /pull), token from env or a 0600 file, idempotent both ways; tested on a stdlib stub.
+2026-11-15 [code] checks.py and webhooks.py: advisory check runs, opt-in soft block cleared by a lead's label or /udebt ack, a pure webhook router; udebt risk --check-run.
+2026-11-15 [note] Contract holds for digitalme, dsa-instructor, huggingface_hub exports; worker 2 s on digitalme, 38 s on dsa-instructor; RLS verified on Postgres 16.
+2026-11-15 [doc] README Hosted section, docs/DEPLOY.md (deployment follows HOSTING.md), BRIEFING Phase 4a, ROADMAP Phase 4a done and 4b pending, Handoff.
 2026-11-15 [plan] HOSTING.md: hosted udebt on the HintWise platform (Google/email via Supabase, gateway or BYOK, option B footer), 3 cached samples, 7 owner decisions.
 2026-11-15 [note] Level-5 synthetic on hf bb3d3b55, 3 isolated sets: pooled share vs wrongness rho 0.74 p 0.005 (level 3: 0.29); the L3-L5 gap tracks share (rho 0.80): decay per level.
 2026-11-15 [doc] HOSTING.md checked with Plabs: udebt footer sha256, SHARED_TABLES for shared rows, worker at udebt-api.hintwise.org, no stored code (references + fetch at sha).
