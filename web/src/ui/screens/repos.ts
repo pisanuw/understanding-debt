@@ -29,11 +29,31 @@ export async function repoCard(app: App, r: Repository): Promise<HTMLElement> {
   );
 }
 
+/**
+ * Fills `grid` with the repositories' cards once they are read, all of them side by side (each
+ * its own analysis and records), so a screen draws its text at once and the cards follow.
+ * `empty` stands in when there is no repository; `tail` goes after the cards.
+ */
+export function fillCards(app: App, grid: HTMLElement, empty: () => HTMLElement | null, tail: HTMLElement | null = null): Promise<void> {
+  grid.setAttribute('aria-busy', 'true');
+  return app.store
+    .repositories()
+    .then(({ repos }) => Promise.all(repos.map((r) => repoCard(app, r))))
+    .then((cards) => {
+      const none = cards.length ? null : empty();
+      grid.replaceChildren(...cards, ...(none ? [none] : []), ...(tail ? [tail] : []));
+    })
+    .catch((e: unknown) => {
+      const why = e instanceof Error ? e.message : String(e);
+      grid.replaceChildren(h('p', { class: 'error', role: 'alert' }, `The repositories could not be loaded (${why}). Try again in a moment.`), ...(tail ? [tail] : []));
+    })
+    .finally(() => grid.removeAttribute('aria-busy'));
+}
+
 export async function reposScreen(app: App): Promise<HTMLElement> {
-  const { repos } = await app.store.repositories();
-  const grid = h('div', { class: 'cards' });
-  for (const r of repos) grid.append(await repoCard(app, r));
-  grid.append(h('a', { class: 'card repo-card add-card', href: '#/add' }, h('strong', null, '+ Add a repository'), h('div', { class: 'muted small' }, 'Any public GitHub repository: shared if someone already analysed it, else analysed with your own key.')));
+  const grid = h('div', { class: 'cards' }, h('p', { class: 'muted small loading' }, 'Loading the repositories…'));
+  const add = h('a', { class: 'card repo-card add-card', href: '#/add' }, h('strong', null, '+ Add a repository'), h('div', { class: 'muted small' }, 'Any public GitHub repository: shared if someone already analysed it, else analysed with your own key.'));
+  void fillCards(app, grid, () => null, add);
   const s = h(
     'section',
     null,

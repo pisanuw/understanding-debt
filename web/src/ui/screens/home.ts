@@ -6,15 +6,15 @@
 import { mountSignIn } from '../../lib/auth';
 import type { App } from '../app';
 import { h } from '../dom';
-import { repoCard } from './repos';
+import { fillCards } from './repos';
 
 export const LEAD =
   'udebt maps a repository into the architectural units and the decisions that shaped them, then asks you one question at a time, from what each part is for down to how it works. Your understanding debt goes down as you answer.';
 
 export async function homeScreen(app: App): Promise<HTMLElement> {
-  const { repos } = await app.store.repositories();
-  const grid = h('div', { class: 'cards' });
-  for (const r of repos) grid.append(await repoCard(app, r));
+  // The text and the sign-in panel draw at once; the samples' cards follow as they are read.
+  const grid = h('div', { class: 'cards' }, h('p', { class: 'muted small loading' }, 'Loading the samples…'));
+  void fillCards(app, grid, () => h('p', { class: 'muted' }, 'The samples could not be loaded. Try again in a moment.'));
   const panel = h('div', { id: 'signin', 'aria-label': 'Sign in' });
   app.onLeave(mountSignIn(panel, app.deps.signIn));
   const s = h(
@@ -28,7 +28,7 @@ export async function homeScreen(app: App): Promise<HTMLElement> {
       { class: 'sub' },
       'Read a sample’s architecture, then answer questions written in advance and check yourself against the reference answer. Your answers stay in this browser.',
     ),
-    repos.length ? grid : h('p', { class: 'muted' }, 'The samples could not be loaded. Try again in a moment.'),
+    grid,
     h(
       'div',
       { class: 'card signin-card' },

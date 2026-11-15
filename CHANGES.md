@@ -185,3 +185,4 @@
 2026-11-15 [decision] Owner: no Turnstile on visitors' model calls for now (the stand-in's $1.00/day bounds abuse); add it if the shared allowance is drained.
 2026-11-15 [code] Visitors' HintWise key turned on: VITE_UDEBT_ANON_MODEL=1 in netlify.toml (page); functions turn on with HINTWISE_APP_KEY (netlify.toml never reaches them).
 2026-11-15 [note] Visitors' HintWise key live (main 770ecec): tokenless /api/allowance answered 200, anonymous: true, user-day cap $1.00; non-sample commits refused.
+2026-11-15 [code] Landing page: text draws at once, sample cards load in parallel (was one after another), samples index preloaded; ~1s blank wait gone.

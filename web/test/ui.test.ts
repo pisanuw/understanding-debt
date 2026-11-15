@@ -570,13 +570,26 @@ describe('small pieces', () => {
     expect(listeners()).toBe(base + 1);
   });
 
-  it('shows an error screen when a screen fails', async () => {
+  it('keeps the page and says why when the repositories cannot be read', async () => {
     await start();
     app.deps.store.repositories = async () => {
       throw new Error('database down');
     };
     app.forget();
     await go('#/');
+    await tick();
+    expect(byText('h1', 'Repositories')).toBeTruthy(); // the screen's text drew at once
+    expect(byText('p', 'The repositories could not be loaded (database down). Try again in a moment.')).toBeTruthy();
+    expect($('a.add-card')).toBeTruthy();
+  });
+
+  it('shows an error screen when a screen fails', async () => {
+    await start();
+    app.deps.store.analyses = async () => {
+      throw new Error('database down');
+    };
+    app.forget();
+    await go('#/r/1');
     expect(byText('h1', 'Something went wrong')).toBeTruthy();
     expect(byText('p', 'database down')).toBeTruthy();
   });
