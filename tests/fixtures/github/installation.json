@@ -1,0 +1,2 @@
+{"action": "created", "installation": {"id": 555, "account": {"login": "acme"}},
+ "sender": {"login": "alice"}}

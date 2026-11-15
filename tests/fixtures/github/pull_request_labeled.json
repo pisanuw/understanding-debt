@@ -1,0 +1,5 @@
+{"action": "labeled", "number": 7, "label": {"name": "udebt-acknowledged"},
+ "pull_request": {"number": 7, "user": {"login": "bob"},
+   "head": {"sha": "4444444444444444444444444444444444444444"},
+   "base": {"sha": "2222222222222222222222222222222222222222"}},
+ "repository": {"full_name": "acme/shop"}, "sender": {"login": "lena"}}

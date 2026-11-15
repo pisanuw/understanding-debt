@@ -1524,6 +1524,15 @@ def cmd_risk(args) -> int:
         deep=args.deep,
     )
     level = risk_mod.overall(risks)
+    if args.check_run:  # the GitHub check-run body this change would get (checks.py)
+        from . import checks
+
+        head = changes[-1].sha if not args.staged else "staged"
+        ack = {"login": args.ack, "via": "cli"} if args.ack else None
+        body = checks.payload(head, email, checks.rows(risks), soft_block=args.soft_block,
+                              ack=ack)  # fmt: skip
+        print(json.dumps(body, indent=2))
+        return 0
     print(f"\nRisk for {email}: {what}  ->  {level}")
     if not risks:
         print("No architectural unit touched.")
@@ -2475,6 +2484,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--since", metavar="DATE", help="with --history: landed on or after DATE")
     s.add_argument("--all", action="store_true", help="with --history: CAUTION events too")
+    s.add_argument("--check-run", action="store_true",
+                   help="print the GitHub check-run body for this change instead")  # fmt: skip
+    s.add_argument("--soft-block", action="store_true",
+                   help="with --check-run: as if opted into soft blocking")  # fmt: skip
+    s.add_argument("--ack", metavar="LOGIN", help="with --check-run: acknowledged by this lead")
     s.set_defaults(fn=cmd_risk)
 
     s = sub.add_parser("snapshot", help="replay debt at past points into .udebt/snapshots.json")

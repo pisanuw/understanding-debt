@@ -1,0 +1,4 @@
+{"action": "created",
+ "issue": {"number": 7, "pull_request": {"url": "https://api.github.com/repos/acme/shop/pulls/7"}},
+ "comment": {"body": "/udebt ack\nI will review the storage change.", "user": {"login": "lena"}},
+ "repository": {"full_name": "acme/shop"}, "sender": {"login": "lena"}}
