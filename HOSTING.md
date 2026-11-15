@@ -15,7 +15,9 @@ own key, not an organisation key stored in Supabase.
 the guide is current. Its answers are folded in below, marked "(Plabs)".
 
 **Status 2026-11-15:** built by the UDebt session (ROADMAP Phase 4b) and tested locally with fakes;
-not deployed. The deployment steps, in order, are in `docs/DEPLOY.md`.
+not deployed. The deployment steps, in order, are in `docs/DEPLOY.md`. Use without signing in
+(decision 10) is built too, as described in "Use without signing in, as built" below; its advance
+quizzes are not written yet.
 
 ## What the owner asked for (2026-11-15)
 
@@ -239,6 +241,42 @@ the walkthroughs add one per unit.
     - signed-in users keep server records, and the app offers to copy browser progress into
       the account at sign-in;
     - adding a repository still needs sign-in.
+
+## Use without signing in, as built (2026-11-15)
+
+Decision 10 as the UDebt session built it; the choices below were made under the 15-minute rule,
+and the owner can reverse any of them (BRIEFING, "Phase 4b, use without signing in").
+
+- **The samples as static files.** `web/public/samples/index.json` lists the registered samples
+  (`udebt/hosted/samples.py`) with their pins; `<name>.json` holds each sample's rows, exactly what
+  `udebt worker sql --dialect json --public` writes, derived from the committed `samples/<name>.sql`
+  by `python -m udebt.hosted.static_samples` (no worker output needed). A registered sample with no
+  script, or no quiz file, is listed with `null`.
+- **Code without a token, for the samples only.** `/api/excerpt` and `/api/tree` answer a request
+  without a token when it names a registered sample at its pinned commit (the index, bundled with
+  the functions), and refuse anything else with 401; with a token they check it as before. This
+  was chosen over reading raw.githubusercontent.com from the browser: no CSP change, one code
+  path with the same limits, the preview's fakes cover it, and nothing new is open beyond what the
+  site already serves. The functions never touch Supabase for such a request.
+- **Advance quizzes.** `udebt worker quizzes` writes, per sample, three questions per unit and
+  level 1-3 with the hosted quiz's own prompt, each with its reference answer and, at level 1, the
+  orientation (`<name>.quizzes.json`, format version 1, contract kind `quizzes`). The coordinating
+  session runs it on the owner's subscription (51 calls for the four samples at the defaults;
+  docs/DEPLOY.md). Levels 4-5 are never written in advance.
+- **Self-checked answers.** A visitor answers, reads the reference and marks the answer (correct,
+  partly right, wrong, didn't know; confidence fixed before the reference shows). The record's
+  `type` is `self-checked`, which the scoring counts like any other answer and the page labels
+  wherever the debt rests on it. A visitor with their own key gets model-written questions and
+  grading as before; the HintWise key needs an account.
+- **Progress in the browser.** One localStorage entry per sample holds the visitor's records in
+  the same shape as the server's, read through the same store interface, so debt, review and the
+  ladder behave the same; with storage blocked the visit works in memory.
+- **The copy offer.** After sign-in, answers the browser keeps that were never offered are offered
+  once: copy into the account (the person's own token, every field kept), keep separate, or
+  discard. Copying, keeping or discarding marks them decided, so they are not offered again.
+- **What an anonymous session can write:** nothing on the server. Only the copy (after sign-in,
+  with the person's token) and account deletion write there; the gateway client refuses to send
+  without a token, and the tests watch every request the page makes while not signed in.
 
 ## Measured on the samples (2026-11-15)
 

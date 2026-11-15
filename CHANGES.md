@@ -160,3 +160,8 @@
 2026-11-15 [code] udebt/hosted/samples.py: understanding-debt registered as the fourth sample at e9c1c8c (no licence); the other session makes its analysis at that pin.
 2026-11-15 [decision] Owner: understanding-debt as a 4th sample, site usable without login (progress in browser). Options chosen under the 15-minute rule: HOSTING.md decisions 9-10.
 2026-11-15 [note] Fourth sample made at e9c1c8c (19 units, 12 walkthroughs, 14 calls, 328 s; checks pass, no emails): samples/understanding-debt.sql. Production load needs owner's yes.
+
+2026-11-15 [code] Samples as static JSON for visitors without an account: python -m udebt.hosted.static_samples derives web/public/samples/ from samples/*.sql (loadsql.rows_from_sql).
+2026-11-15 [code] udebt worker quizzes: advance questions per unit, levels 1-3, with the hosted prompt (Python port, parity fixture); contract kind quizzes added, CONTRACT stays 1.
+2026-11-15 [code] web: no login needed for samples; answers in localStorage, self-checked advance quizzes and reviews, excerpt/tree open at sample pins, copy offer at sign-in.
+2026-11-15 [decision] No-login choices (15-minute rule): functions not browser for excerpts, self-checked at full weight, off-mode users get advance quizzes too; BRIEFING open questions.

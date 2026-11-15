@@ -674,6 +674,7 @@ queue followed the same day as v1's next feature (Phase 4b answer 5), also teste
 | digest | deferred: an analysis keeps no commits since an answer; the worker would have to precompute digests per unit |
 | 8 spaced review | done: `web/src/core/review.ts` (SM-2 per unit and level as `udebt/review.py` folds it, checked case by case against `web/test/fixtures/review-parity.json`, 20 record sets written by `tests/test_hosted_review_parity.py`); each record carries its state on `data.review` (no schema change); `/api/grade` takes `source: review` and folds the state from the person's earlier records on the sitting's units; a Review tab (due items, coming up, a sitting of up to N items through the quiz's flow, one grading call, reveal at levels 1-2, gateway or own key), the number due on the tab and the repository card; vitest 218 tests, coverage 98.2% statements, 88.4% branches; Playwright: a miss due a day later on the fake clock, reviewed, its state moved; 28 screenshots `hosted-review-*.png` |
 | 9 tree fallback | done (owner's yes of 2026-11-15): a unit that names only directories (12 of mlflow's 30 units, 1 of 18 on huggingface_hub, 1 of 15 on sentry-javascript) is quizzed from the top tracked files under them, lines 1-60; the rule in `udebt/topfiles.py` and `web/src/core/topfiles.ts` (source, then other, docs, tests and fixtures; larger first; mechanical files never; at most four, directories in turns), checked against each other on `web/test/fixtures/topfiles-parity.json`; the worker records `files` on such units (no contract change); for older analyses `/api/tree` lists the tree at the sha (one unauthenticated GitHub call per repository and sha, kept in the function's memory, refusals respected) and the page keeps each directory's answer for the session; a graded question shows the files it rests on; on a clone of mlflow at the pin each of the 12 units gets four source files; vitest 316 tests, 98.41% statements; Playwright quizzes digitalme's `frontend`-only unit; 8 screenshots `hosted-tree-*.png` |
+| 10 use without signing in | done (owner's requirement of 2026-11-15, HOSTING.md decision 10; design under the 15-minute rule): the registered samples as static JSON in the site (`web/public/samples/`, derived from `samples/*.sql` by `python -m udebt.hosted.static_samples`, `--check` in the Python tests), answers in the browser's localStorage per sample behind the same store interface (`LocalStore`), `/api/excerpt` and `/api/tree` open without a token to a registered sample at its pin only (no CSP change); questions written in advance by `udebt worker quizzes` (levels 1-3, three per unit and level, the hosted prompt ported to Python and checked against `prompts.ts` on `advance-prompt-parity.json`, contract kind `quizzes`), answered and self-checked against the reference (records of type `self-checked`, labelled in the header, the debt table and the results; review self-checks too with no model), own-key quizzes as before, no gateway without an account; the copy offer at sign-in (copy, keep separate, discard; never twice); vitest 349 tests, 98.66% statements; Playwright 21, among them the anonymous walkthrough; 32 screenshots `hosted-anon-*.png`; **the four samples' quiz files are still to write** (51 calls, docs/DEPLOY.md) |
 | tutor, teach-back | not ported in v1 (BRIEFING, Phase 4b): the tutor is next (Phase 4b answer 5) |
 
 **Remaining, in order (each production step after the owner's yes):**
@@ -1234,6 +1235,15 @@ through the new function `/api/tree`, so nothing needs reloading. Verified on ml
 questions in BRIEFING (Phase 4b tree fallback): GitHub's unauthenticated limit from Netlify's
 shared addresses, evidence shown only after grading, regenerating the samples.
 
+**Use without signing in is built** (owner's requirement of 2026-11-15; commits `b85fc9c`, `af38ba0`
+and the records after them): the samples as static JSON in the site, answers kept in the browser,
+questions written in advance and self-checked, the code-reading functions open to the samples at
+their pins, and the copy offer at sign-in. Tested with fakes; no model call, nothing deployed.
+Still to do: the coordinating session writes the four samples' advance quizzes on the owner's
+subscription (`udebt worker quizzes <sample> --clone <clone> --out
+web/public/samples/<sample>.quizzes.json`, 51 calls), then `python -m udebt.hosted.static_samples`
+and a commit. Decisions and open questions in BRIEFING ("Phase 4b, use without signing in").
+
 Earlier in the day: Phase 3.4 and Phase 3.5 done, Phase 4a done as re-scoped (see their
 sections).
 
@@ -1256,6 +1266,11 @@ For the next session:
   `pytest` needs `PYTHONPATH=.` (the package is not installed in pytest's tool environment). The
   local Postgres 16 cluster may be down: `pg_ctlcluster 16 main start`, then
   `UDEBT_TEST_PG=postgresql://postgres:postgres@127.0.0.1:5432/postgres`.
+- After changing a sample's load script in `samples/`, an advance-quiz file, `SAMPLES` or the
+  loader: `python -m udebt.hosted.static_samples` (`tests/test_static_samples.py` fails while
+  `web/public/samples/` is stale). After changing `web/src/core/prompts.ts`, `excerpts.ts`,
+  `specs.ts`'s orientation helpers or `assemble.ts`'s request caps: the Python port in
+  `udebt/hosted/advance.py` and `UDEBT_WRITE_PARITY=1 pytest tests/test_advance.py`.
 - The three samples are in `samples/` and loaded in production (`552ebbb`). Their outputs predate
   `files`, so the app lists 14 units' directories from GitHub. A regenerated sample (15 calls
   each, the owner's yes) would carry `files`: `python -m udebt.hosted.samples <dirs> --out <sql

@@ -800,10 +800,11 @@ they did not write (or that an AI wrote for them): sign in with Google or an ema
 HintWise account), pick a repository, read its architecture (the units and sub-units, each
 unit's decision, the alternatives and why, the commits that shaped it, an orientation, the
 tour, walkthroughs that trace one request through the code), and climb the quiz ladder until
-your understanding debt falls. Three public repositories are ready to start with
-(huggingface_hub, sentry-javascript and mlflow, analysed in advance); any other public GitHub
-repository can be added, at once if someone already analysed it, otherwise analysed with your
-own Anthropic key. Quizzes run on the HintWise key within a daily allowance, or on your own key.
+your understanding debt falls. Four public repositories are ready to start with
+(huggingface_hub, sentry-javascript, mlflow and udebt itself, analysed in advance), and they need
+no account (below); any other public GitHub repository can be added once signed in, at once if
+someone already analysed it, otherwise analysed with your own Anthropic key. Quizzes run on the
+HintWise key within a daily allowance, or on your own key.
 Not deployed yet: `docs/DEPLOY.md` has the steps, `web/README.md` the code.
 
 The scoring is the CLI's, ported to TypeScript and checked against it case by case: the
@@ -821,13 +822,58 @@ stored phrasings that you were not asked last time, with the reference answer ke
 miss, so a review sitting costs one grading call and none to write questions; a review answer
 counts on the ladder like any other. The tab and the repository card show how many are due.
 
-**What is stored, and where.** In HintWise's database (Supabase, US East), schema `app_udebt`:
+**Without signing in.** The samples work with no account (owner, 2026-11-15). The site serves
+them as static JSON (`web/public/samples/`, derived from the load scripts in `samples/`), reads
+their code from GitHub at each sample's pinned commit, and keeps your answers in this browser
+only, one entry per sample in its local storage: debt, the review queue and the ladder work from
+them as they do from the server. Quizzes come from questions written in advance for each unit at
+levels 1-3 (below): you answer, read the reference answer and mark your own answer (correct,
+partly right, wrong, or "I didn't know"); your confidence is fixed before the reference shows,
+and your answer text is never sent or stored. Those answers are recorded as **self-checked**, and
+the debt says so wherever it rests on them (the label beside the debt index, on the units in
+the debt table and on each result); they count as you marked them. Levels 4-5 are not written in
+advance, because they need code reading and a real grader. With your own Anthropic key (Settings)
+the model writes and grades questions as for a signed-in person; the HintWise key needs an
+account. A missed answer comes back in Review the next day and, with no model in use, is
+self-checked there too. When you sign in, udebt asks once what to do with the answers this
+browser keeps: copy them into your account (each keeps its provenance, so a self-checked answer
+stays self-checked), keep them separate (they stay in the browser for when you are signed out),
+or discard them; nothing happens without your choice, and the same answers are never offered
+again. Settings has "Delete the answers kept in this browser". Signed in with model features
+off, you get the same questions written in advance, self-checked.
+
+**Questions written in advance: `udebt worker quizzes`.** The questions for visitors without an
+account are written once per sample with the hosted quiz's own prompt (`udebt/hosted/advance.py`
+ports `web/src/core/prompts.ts`, and a parity test keeps the two identical), from code excerpts at
+the pinned commit, through the configured model (the `claude` CLI on a subscription, no tools):
+one call per level and batch of five units, three questions per unit and level, each with two
+other phrasings, its reference answer, the files it rests on and, at level 1, the orientation
+shown before it. From the repository root, with a clone that holds the pinned commit:
+
+```bash
+udebt worker quizzes mlflow --clone <clone> --plan        # the calls it would make; none made
+udebt worker quizzes mlflow --clone <clone> --out web/public/samples/mlflow.quizzes.json
+python -m udebt.hosted.static_samples                      # lists the file in index.json
+```
+
+The source is a registered sample's name (its `samples/<name>.sql`), a worker output, a load
+script or a rows file; `--levels` (within 1-3, default `1-3`), `--per` (1-3, default 3), `--batch`
+(units per call, default 5) and `--model` change the defaults. Without `--clone` the files are
+read from raw.githubusercontent.com and the tree from GitHub's API (unauthenticated). The file
+(format `udebt-advance-quizzes`, version 1) is contract kind `quizzes`: `udebt validate <file>`
+checks it, and the site lists a file only at the sample's pin. At the defaults the four samples
+take 12, 9, 18 and 12 calls (huggingface_hub, sentry-javascript, mlflow, udebt) for 162, 135, 270
+and 171 questions. `python -m udebt.hosted.static_samples --check` fails while
+`web/public/samples/` is stale.
+
+**What is stored, and where.** Without an account: only in your browser, as above. Signed in: in
+HintWise's database (Supabase, US East), schema `app_udebt`:
 
 - for each answer: the unit, the ladder level, the question, the verdict, your confidence,
   whether the answer was shown, the question's other phrasings, reference answer and cited
-  files (so a missed question can come back in other words), and the review state after it
-  (ease, interval, repetitions and when it is next due). Never the text of your answer, and not
-  the grader's feedback;
+  files (so a missed question can come back in other words), the review state after it
+  (ease, interval, repetitions and when it is next due), and `self-checked` as its type when you
+  marked it yourself. Never the text of your answer, and not the grader's feedback;
 - the repositories you added, your quiz sessions (the questions as asked) and your analysis
   jobs;
 - shared with every signed-in person: the repositories in udebt and their analyses (units,
@@ -856,8 +902,9 @@ sign-in is older than 15 minutes, then type DELETE). It deletes your records, se
 repository list and jobs here and your data in every other HintWise app. Analyses you started
 stay, without your name, because other people use them.
 
-**One honest limitation.** Your records are written with your own sign-in, so nothing stops you
-from editing them: the debt number is a self-assessment for learning, not a certificate of what
+**One honest limitation.** Your records are written with your own sign-in (or kept in your
+browser), and self-checked answers are graded by you, so nothing stops you from editing or
+flattering them: the debt number is a self-assessment for learning, not a certificate of what
 you know.
 
 ## Hosted: the platform-agnostic core (Phase 4a)
@@ -867,7 +914,8 @@ The hosted app (Phase 4b, above) lives on the HintWise platform (HOSTING.md; dep
 
 - **The contract** (`udebt/contract.py`, version 1): schemas for `map.json` (versions 1-3), a
   record, `snapshots.json`, `commits.json`, `responsibility.json`, the export and the import
-  payload (the export plus a sanitized map), checked by a small validator that names the
+  payload (the export plus a sanitized map), and since 2026-11-15 the hosted site's advance
+  quizzes (`quizzes`, a kind added without a new version), checked by a small validator that names the
   failing path (`$.units[3]: missing 'name'`) and by cross-field rules (every developer and
   unit a row names exists). Fields may be added without a new version; removing or retyping
   one bumps it. The export carries `contract` and the series' `fingerprint`, and `udebt

@@ -16,6 +16,7 @@ explicit yes; the UDebt session made none of them.
 | the analysis service | `udebt/hosted/worker_service.py` (`python -m udebt.hosted.worker_service`) | Render, `render.yaml` |
 | the migrations and the Plabs notes | `supabase/migrations/0001_app_udebt.sql`, `0002_hosted.sql`, `supabase/README.md` | the Supabase admin workflow in claude-built-apps |
 | the sample load | `python -m udebt.hosted.samples` | anywhere with Python 3.11+, then the admin workflow's `sql` |
+| the samples for visitors who are not signed in | `web/public/samples/` (`index.json`, `<name>.json`, `<name>.quizzes.json`), written by `python -m udebt.hosted.static_samples` from `samples/*.sql`; advance quizzes by `udebt worker quizzes` | static files in the Netlify site, built with it |
 
 No secret is stored anywhere: no Anthropic key, no Supabase service-role key. The functions and
 the worker act with the signed-in person's own token; the gateway holds the owner's key; a
@@ -41,6 +42,15 @@ worker, used for that job and dropped).
   the tree at the pinned sha with one unauthenticated call to api.github.com per repository and
   sha. No migration, no new variable, no step below changes; Netlify builds the new function
   with the others, and the samples in production need no reload.
+- Use without signing in (owner's requirement of 2026-11-15, HOSTING.md decision 10): the
+  registered samples as static JSON in the site (`web/public/samples/`, regenerated from
+  `samples/*.sql` with `python -m udebt.hosted.static_samples`), answers kept in the visitor's
+  browser, quizzes from questions written in advance and self-checked (or on the visitor's own
+  key), `/api/excerpt` and `/api/tree` answering without a token for a registered sample at its
+  pin only, and the copy offer at sign-in. No migration, no new variable, no CSP change; the
+  four samples' JSON files are committed. **The advance-quiz files are not written yet** (step
+  below; until then a visitor without a key sees "No questions were written in advance for this
+  repository yet").
 - The footer: the exact `footerHtml('udebt')` (2231 bytes, sha256
   `dc713ce9950e2cb7cabc6a20f439d96e2c1e39666b483c3e9acb65f6cd4685c8`) in `web/index.html`,
   pinned by `web/test/csp.test.ts`; `FOOTER_STYLE_CSP` in the CSP; the HintWise favicon.
@@ -67,6 +77,31 @@ worker, used for that job and dropped).
    Manual Deploy. Check `curl https://udebt-api.onrender.com/healthz` (the onrender.com name
    Render shows) prints `{"ok": true, ...}`.
 5. **Docs-only commits** carry `[skip netlify]` in the message from now on.
+
+### The samples for visitors who are not signed in (before or after the merge; no production step)
+
+1. **Advance quizzes**, by the coordinating session on the owner's subscription (the `claude`
+   CLI; 51 calls at the defaults: 12, 9, 18 and 12), from the repository root, each with a clone
+   that holds that sample's pinned commit (`udebt/hosted/samples.py`), `--plan` first to see the
+   calls:
+
+   ```bash
+   udebt worker quizzes huggingface_hub    --clone <clone> --out web/public/samples/huggingface_hub.quizzes.json
+   udebt worker quizzes sentry-javascript  --clone <clone> --out web/public/samples/sentry-javascript.quizzes.json
+   udebt worker quizzes mlflow             --clone <clone> --out web/public/samples/mlflow.quizzes.json
+   udebt worker quizzes understanding-debt --clone .       --out web/public/samples/understanding-debt.quizzes.json
+   ```
+
+   Defaults: `--levels 1-3 --per 3 --batch 5`. Without `--clone` the files come from
+   raw.githubusercontent.com and the tree from api.github.com, unauthenticated. Check each with
+   `udebt validate <file>` and read a few questions and reference answers before committing.
+2. **The index**: `python -m udebt.hosted.static_samples` (lists the quiz files in
+   `web/public/samples/index.json`), `--check` must then print `current`; commit the files.
+   Whenever a sample's load script changes (a regenerated sample, a new pin), rerun this, and
+   the sample's quiz file too (a file at another commit than the pin is refused).
+3. Netlify serves the files with the next build of `main`; nothing is loaded into Supabase for
+   them (anonymous visitors get no grants in app schemas, so the page reads the samples from the
+   site, not the database).
 
 ### Plabs session (each after the owner's yes; details in `supabase/README.md`)
 
@@ -100,11 +135,19 @@ worker, used for that job and dropped).
 curl -s https://udebt.hintwise.org/ | grep -c data-site-footer            # 1
 curl -sI https://udebt.hintwise.org/ | grep -i content-security-policy    # the policy in netlify.toml
 curl -s https://udebt-api.hintwise.org/healthz                            # {"ok": true, "busy": false, "version": 1}
-curl -s -o /dev/null -w '%{http_code}\n' https://udebt.hintwise.org/api/excerpt   # 401 without a token
-curl -s -o /dev/null -w '%{http_code}\n' https://udebt.hintwise.org/api/tree      # 401 without a token
+curl -s -o /dev/null -w '%{http_code}\n' https://udebt.hintwise.org/api/excerpt   # 400: no parameters
+curl -s https://udebt.hintwise.org/samples/index.json | grep -c '"sha"'            # 4: the registered samples
+# without a token: a registered sample at its pin is readable, anything else is not
+curl -s -o /dev/null -w '%{http_code}\n' 'https://udebt.hintwise.org/api/excerpt?repo=https://github.com/mlflow/mlflow&sha=f6ff35427d7e1134a83f8f9d8215d0049149162f&path=README.md'  # 200
+curl -s -o /dev/null -w '%{http_code}\n' 'https://udebt.hintwise.org/api/excerpt?repo=https://github.com/octocat/hello-world&sha=7fd1a60b01f91b314f59955a4e4d4e80d8edf11d&path=README'  # 401
 ```
 
-Then by hand: sign in with Google and with an email link; open each sample; read a unit's
+Then by hand, signed out: open each sample from the front page, read a unit's walkthrough, take
+a self-checked advance quiz (no model call), see the debt fall with the "self-checked" label, add
+an own key in Settings and take a model-written quiz; then sign in and choose "Copy into my
+account" in the offer, and find the answers on the sample's "Your debt" tab.
+
+Signed in: sign in with Google and with an email link; open each sample; read a unit's
 walkthrough (the code comes from GitHub); take a two-question quiz on the HintWise key; see the
 debt fall; quiz one of mlflow's sub-units that name only directories (for example "Scorers and
 registry") and see "In the code" name files under its directory; switch to an own key and take one more; the next day, review a question missed the
@@ -188,6 +231,12 @@ pause waits for it to start).
   each of the 12 units with no file now gets four source files (`udebt/topfiles.py` and the
   TypeScript handler agree file for file).
 - The three samples: their outputs had not arrived; the loader was tested on digitalme.
+- Use without signing in, live: Netlify serving `samples/*.json` (about 115-135 KB each, 30 KB
+  gzipped), function invocations from visitors who are not signed in (each walkthrough step is
+  one `/api/excerpt` call; Netlify counts them against the site's function usage), real
+  browsers' storage (private windows, cleared site data: the page then keeps answers in memory
+  for the visit), and Supabase sign-in landing back on the front page before the copy offer.
+  Tested with the preview's fakes only (vitest under jsdom, Playwright).
 
 ## Earlier phases
 

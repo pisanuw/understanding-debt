@@ -779,6 +779,65 @@ acceptable.
     of the 12 units with no file gets four source files (48 in all, each at least 60 lines), and
     the Python rule and the TypeScript handler pick the same files in the same order.
 
+- **Phase 4b, use without signing in (2026-11-15, owner's requirement; design by the coordinating
+  session under the 15-minute rule, details by the UDebt session; the owner can reverse any of
+  them):** "The web site should be usable without any login, any progress on quizzes would just
+  be saved on browser" (HOSTING.md decision 10, and "Use without signing in, as built"). Tested
+  with fakes; no model call, nothing deployed.
+  - **Samples only, as static JSON.** Anonymous visitors get no grants in app schemas, so the
+    page reads the registered samples from the site: `web/public/samples/index.json` and
+    `<name>.json`, the rows `udebt worker sql --dialect json --public` writes, derived from the
+    committed `samples/*.sql` (`loadsql.rows_from_sql` reads back what `analysis_sql` wrote; a
+    round-trip test in both dialects) by `python -m udebt.hosted.static_samples`, whose `--check`
+    the Python tests run. A registered sample with no script or quiz file is listed with `null`
+    (the fourth sample's script arrived the same day, so all four have JSON). Adding a repository
+    still needs an account.
+  - **Excerpts: the functions, opened to the samples at their pins** (not the browser reading
+    raw.githubusercontent.com): no CSP change, the same limits and code for both, the preview's
+    fakes cover it, and a request without a token can name nothing the site does not already
+    serve. `/api/excerpt` and `/api/tree` without a token answer only a registered sample at its
+    pin (the index bundled with the functions), else 401; with a token, unchanged. The tree's
+    unauthenticated GitHub calls (one per repository and sha while warm) now serve visitors too.
+  - **Advance quizzes** (`udebt worker quizzes`, `udebt/hosted/advance.py`): levels 1-3, three
+    per unit and level, every architectural unit (sub-units too, for "Quiz this unit"), one call
+    per level and batch of five units, with the hosted quiz's own prompt: a Python port of
+    `questionsPrompt` and of what the page and `/api/questions` put in it (the request's caps,
+    `refsForUnit`, the tree fallback, excerpts within 60,000 characters, UTF-16 lengths as
+    JavaScript counts them), checked character for character on
+    `web/test/fixtures/advance-prompt-parity.json`. The `claude` CLI answers through its
+    structured output with no tools; the prompt keeps its sentence about the `submit` tool so it
+    stays the hosted text. Questions without a reference answer are dropped (nothing to check
+    against). The file is versioned (`udebt-advance-quizzes` v1) and is contract kind `quizzes`;
+    adding a kind changes no existing one, so `CONTRACT` stays 1. The FakeLLM answers the hosted
+    prompt as the preview's fake gateway does (names, summaries, the excerpts it was given).
+  - **Self-checked provenance.** The record's `type` is `self-checked` (the column every row
+    has, also the CLI record's `type`), `source` `advance` or `review`. The scoring counts it
+    like any other answer; `repoScores` marks the units whose latest sittings hold one (or roll
+    it up or inherit it), and the page labels them in the header, the debt table and tiles and
+    each result. Every self-checked answer is `revealed` (its reference was shown), so a miss
+    comes back in other words, as after a revealed miss in a model quiz. Confidence is fixed
+    before the reference shows and no mark is highlighted.
+  - **Which question.** A missed one in other words first (`revealedVariant`), else the first at
+    that unit and level not asked, else the one asked longest ago; units past level 3 are skipped
+    with an explanation.
+  - **Who gets advance quizzes:** whoever has no model in use: a visitor without their own key,
+    and a signed-in person with model features off (their records go to the server, labelled).
+    Review with no model in use self-checks the items that kept a reference; others wait for a
+    model. A visitor with their own key gets model-written questions and grading; never the
+    gateway without an account (`App.quiz()`, and `GatewayClient` refuses to send without a token).
+  - **Progress in the browser:** `LocalStore`, one localStorage entry per sample
+    (`udebt.local.v1.<name>`), the same `UdebtStore` interface, every access in try/catch and
+    memory when storage is blocked (the mode and key preferences too). Repository ids there are
+    the index's order, so signing in or out returns to the list (not on the first sign-in state at
+    load). Settings can delete the answers kept in the browser.
+  - **The copy offer:** a card at the top of every signed-in screen while the browser holds
+    answers never offered: copy (the server store's `addRecords` with the person's token, every
+    field kept, under the account's repository of the same URL), keep separate, or discard; the
+    choice marks them decided (a high-water mark of local ids per sample), so they are never
+    offered twice. A sample the server does not know keeps its answers in the browser and says so;
+    a failed copy keeps the offer.
+  - **Cost:** the main bundle 343 KB (312 KB before).
+
 ## Non-goals (for now)
 
 - Editor or Claude Code hook integration (provenance tracking). Later phase.
@@ -811,6 +870,23 @@ acceptable.
   the three sample loads and the caps file.
 
 ## Open questions
+
+- Use without signing in: self-checked answers count at full weight, labelled. Discount them (for
+  example half the evidence), or leave them out of the index and show them beside it? Chosen: full
+  weight, as the owner's wording ("progress on quizzes") implies.
+- Use without signing in: a signed-in person with model features off also gets the questions
+  written in advance and self-checked reviews. Keep that, or offer them to visitors without an
+  account only? Chosen: offered to anyone with no model in use.
+- Use without signing in: after a copy the answers stay in the browser too (the person sees them
+  when signed out). Clear them on copy instead? Chosen: keep (it is a copy; "Discard" deletes).
+- Use without signing in: copied rows keep the review states folded from the browser's answers
+  only; what is due is always folded from all records, so the stamps are informational. Re-stamp
+  them against the account's earlier records at copy time?
+- Use without signing in: `/api/excerpt` keeps `no-store` for visitors' requests, so every
+  walkthrough step a visitor opens is a function invocation. Allow shared caching for requests
+  without a token at a pinned sha (immutable content), or rate-limit them, once usage is known?
+- Use without signing in: the advance questions cover every architectural unit, about 51 calls
+  for the four samples. Fewer per unit (`--per 2`), top-level units only, or levels 1-2 first?
 
 - Phase 4b tree fallback: `/api/tree` calls api.github.com unauthenticated, 60 requests an hour per
   IP address, from Netlify's shared outbound addresses. One call serves a repository at a sha
