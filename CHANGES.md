@@ -95,3 +95,4 @@
 2026-11-14 [note] Tutor smoke test on digitalme auth-rbac, 3 calls: --session-id then --resume worked, the tutor read the code and asked back; its check graded and recorded.
 2026-11-14 [code] serve fixes from 52 screenshots: tutor Markdown rendered (escaped), a stale series replayed in memory, full-bleed dashboard tab; tutor reattaches by URL.
 2026-11-14 [doc] README `udebt serve`, BRIEFING serve decisions and open questions, ROADMAP Phase 3.3 done and what Phase 4 reuses from serve; Handoff statuses final.
+2026-11-15 [note] Level-3 synthetic, 3 question sets on hf bb3d3b55: 0.81/0.88/0.96, no decay signal (pooled rho 0.29 p 0.18); same-day reports overwrite.
