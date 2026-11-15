@@ -96,3 +96,4 @@
 2026-11-14 [code] serve fixes from 52 screenshots: tutor Markdown rendered (escaped), a stale series replayed in memory, full-bleed dashboard tab; tutor reattaches by URL.
 2026-11-14 [doc] README `udebt serve`, BRIEFING serve decisions and open questions, ROADMAP Phase 3.3 done and what Phase 4 reuses from serve; Handoff statuses final.
 2026-11-15 [note] Level-3 synthetic, 3 question sets on hf bb3d3b55: 0.81/0.88/0.96, no decay signal (pooled rho 0.29 p 0.18); same-day reports overwrite.
+2026-11-15 [plan] HOSTING.md: hosted udebt on the HintWise platform (Google/email via Supabase, gateway or BYOK, option B footer), 3 cached samples, 7 owner decisions.
