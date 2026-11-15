@@ -1245,6 +1245,20 @@ def _kind_of(data, name: str) -> str:
 def cmd_worker(args) -> int:
     from . import worker
 
+    if args.action == "sql":
+        from .loadsql import analysis_sql
+
+        sql = analysis_sql(
+            Path(args.dir), dialect=args.dialect, user_id=args.user_id, license=args.license,
+            with_export=not args.no_export, storage_path=args.storage_path,
+        )  # fmt: skip
+        if args.out:
+            Path(args.out).write_text(sql, encoding="utf-8")
+            print(f"Wrote {args.out} ({len(sql) / 1024:.0f} KB of SQL)")
+        else:
+            sys.stdout.write(sql)
+        return 0
+
     limits = worker.Limits(args.max_commits, args.max_mb, args.timeout)
     try:
         m = worker.run(
@@ -2510,6 +2524,15 @@ def build_parser() -> argparse.ArgumentParser:
     x.add_argument("--max-commits", type=int, default=20_000)
     x.add_argument("--max-mb", type=int, default=500)
     x.add_argument("--timeout", type=int, default=900, help="seconds for the clone")
+    x.set_defaults(fn=cmd_worker)
+    x = wk.add_parser("sql", help="an idempotent SQL load of a worker output (app_udebt)")
+    x.add_argument("dir", help="the --out directory of `udebt worker run`")
+    x.add_argument("--dialect", choices=["postgres", "sqlite"], default="postgres")
+    x.add_argument("--user-id", help="load as one person's analysis (default: a shared sample)")
+    x.add_argument("--license", help="the repository's licence, shown with a sample")
+    x.add_argument("--no-export", action="store_true", help="leave the export out (Storage)")
+    x.add_argument("--storage-path", help="where the export lives in the app's bucket")
+    x.add_argument("--out", help="write the SQL here instead of stdout")
     x.set_defaults(fn=cmd_worker)
 
     s = sub.add_parser("validate", help="check a JSON file against the versioned contract")
