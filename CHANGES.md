@@ -187,3 +187,5 @@
 2026-11-15 [note] Visitors' HintWise key live (main 770ecec): tokenless /api/allowance answered 200, anonymous: true, user-day cap $1.00; non-sample commits refused.
 2026-11-15 [code] Landing page: text draws at once, sample cards load in parallel (was one after another), samples index preloaded; ~1s blank wait gone.
 2026-11-15 [code] netlify.toml: /assets/* (content-hashed scripts and styles) cached a year, immutable, so repeat visits skip revalidation.
+
+2026-11-16 [code] sign-in links wait for a "Finish signing in" click (Plabs, same fix as the HintWise template): mail scanners were spending single-use links on page load

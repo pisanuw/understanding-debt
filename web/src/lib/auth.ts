@@ -157,6 +157,14 @@ export type CompleteResult =
   | { status: 'kept'; current: string; accept: () => Promise<CompleteResult> }
   /** Another account is signed in: `accept` verifies the link (switching accounts) when the visitor says so. */
   | { status: 'confirm'; hint: string; accept: () => Promise<CompleteResult> }
+  /**
+   * Nobody is signed in: `accept` verifies the link when the visitor clicks
+   * "Finish signing in". Never on page load: mail scanners (Microsoft Safe
+   * Links among them) open links in a browser that runs scripts, and a
+   * single-use link they verified is spent before the person clicks it.
+   * `hint` is the masked address, or ''.
+   */
+  | { status: 'finish'; hint: string; accept: () => Promise<CompleteResult> }
   | { status: 'error'; message: string };
 
 /** The parts of window that completeSignInFromUrl touches. */
@@ -187,8 +195,11 @@ export function maskEmail(email: string | null | undefined): string {
  * Finishes a sign-in link: when the page URL has token_hash and type, takes
  * them (and email_hint) out of the address bar first (history.replaceState,
  * so a reload does not reuse the link), then:
- * - nobody signed in: supabase.auth.verifyOtp({ token_hash, type: 'email' }),
- *   which works in any browser, not only the one that asked;
+ * - nobody signed in: offers "Finish signing in" ({ status: 'finish' });
+ *   its `accept` calls supabase.auth.verifyOtp({ token_hash, type: 'email' }),
+ *   which works in any browser, not only the one that asked. Waiting for
+ *   the click keeps a mail scanner that opens the page from spending the
+ *   single-use link;
  * - an account with the same masked address signed in already: keeps the
  *   session and offers to use the link instead ({ status: 'kept' }; masks
  *   collide, so the link is never dropped silently);
@@ -216,7 +227,7 @@ export async function completeSignInFromUrl(client: AuthClient = getSupabase(), 
   };
   const { data } = await client.auth.getSession();
   const current = data.session?.user;
-  if (!current) return verify();
+  if (!current) return { status: 'finish', hint, accept: verify };
   if (hint && maskEmail(current.email) === hint) return { status: 'kept', current: hint, accept: verify };
   return { status: 'confirm', hint: hint || 'another account', accept: verify };
 }
@@ -399,6 +410,8 @@ export function mountSignIn(el: HTMLElement, opts: SignInOptions = {}): () => vo
   let failedChecks = 0;
   /** A sign-in link waiting for the visitor's yes: "Switch to ...?", or "Use the link instead". */
   let pendingSwitch: { note: string; label: string; accept: () => Promise<CompleteResult> } | null = null;
+  /** A sign-in link waiting for the visitor's click while signed out: "Finish signing in". */
+  let pendingFinish: { label: string; accept: () => Promise<CompleteResult> } | null = null;
   let shownUser: User | null = null;
   let shownUserId: string | null = null;
   ensureSignInStyles(el.ownerDocument);
@@ -503,6 +516,7 @@ export function mountSignIn(el: HTMLElement, opts: SignInOptions = {}): () => vo
       shownUserId = user?.id ?? null;
     }
     if (user) {
+      pendingFinish = null;
       const who = document.createElement('p');
       who.className = 'hw-signin-user';
       who.textContent = `Signed in as ${user.email ?? user.id}`;
@@ -534,6 +548,22 @@ export function mountSignIn(el: HTMLElement, opts: SignInOptions = {}): () => vo
       return;
     }
     pendingSwitch = null;
+    if (pendingFinish) {
+      const offer = pendingFinish;
+      const note = document.createElement('p');
+      note.className = 'hw-signin-note';
+      note.textContent = 'Your sign-in link is ready.';
+      const finish = button(offer.label, () => {
+        pendingFinish = null;
+        finish.disabled = true;
+        void offer.accept().then((r) => {
+          if (r.status === 'error') say(r.message);
+          render(shownUser);
+        });
+      });
+      finish.classList.add('hw-signin-switch', 'hw-signin-finish');
+      el.append(note, finish);
+    }
     const google = googleButton(() => void signInWithGoogle(redirectTo, client));
 
     const form = document.createElement('form');
@@ -569,6 +599,10 @@ export function mountSignIn(el: HTMLElement, opts: SignInOptions = {}): () => vo
   if (opts.completeFromUrl !== false) {
     void completeSignInFromUrl(client, opts.window ?? window).then((r) => {
       if (r.status === 'error') say(r.message);
+      if (r.status === 'finish') {
+        pendingFinish = { label: r.hint ? `Finish signing in as ${r.hint}` : 'Finish signing in', accept: r.accept };
+        if (!shownUserId) render(shownUser);
+      }
       if (r.status === 'confirm' || r.status === 'kept') {
         pendingSwitch =
           r.status === 'confirm'
