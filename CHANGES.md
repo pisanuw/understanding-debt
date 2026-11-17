@@ -189,3 +189,5 @@
 2026-11-15 [code] netlify.toml: /assets/* (content-hashed scripts and styles) cached a year, immutable, so repeat visits skip revalidation.
 
 2026-11-16 [code] sign-in links wait for a "Finish signing in" click (Plabs, same fix as the HintWise template): mail scanners were spending single-use links on page load
+
+2026-11-17 [code] HintWise first-party analytics on branch analytics (owner: "add analytics to the rest of the apps but do not deploy"): web/public/hw-events.js (pinned copy), a screen event per hash route (name and tab only), a line under What udebt stores; not merged
