@@ -5,6 +5,10 @@
  *
  *   <script defer src="/hw-events.js" data-app="<slug>"></script>
  *
+ * Optional data-mask="/t/ /join/": the path segment right after each listed
+ * prefix is always sent as ":id", for share codes, invites and access keys
+ * too short or too plain for the id rule below to recognise.
+ *
  * Sends, with navigator.sendBeacon to the platform's app-events function:
  *   pageview  on load and on every in-app path change (history API), with the
  *             referring site's host on the first one;
@@ -28,6 +32,9 @@
   var app = script && script.getAttribute('data-app');
   var endpoint = (script && script.getAttribute('data-endpoint')) || 'https://auth.hintwise.org/functions/v1/app-events';
   if (!app || (window.hintwise && window.hintwise.track)) return;
+  var masks = ((script && script.getAttribute('data-mask')) || '').split(/\s+/).filter(function (m) {
+    return /^\/[^\s]*\/$/.test(m);
+  });
 
   var nav = navigator;
   var off = nav.globalPrivacyControl === true || nav.doNotTrack === '1' || window.doNotTrack === '1' || nav.webdriver === true;
@@ -46,7 +53,14 @@
     });
   }
   function here() {
-    return location.pathname
+    var p = location.pathname;
+    for (var i = 0; i < masks.length; i++) {
+      if (p.indexOf(masks[i]) === 0) {
+        p = masks[i] + p.slice(masks[i].length).replace(/^[^/]+/, ':id');
+        break;
+      }
+    }
+    return p
       .split('/')
       .map(function (seg) {
         return seg && idLike(seg) ? ':id' : seg;
