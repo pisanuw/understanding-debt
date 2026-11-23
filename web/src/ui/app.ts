@@ -237,7 +237,6 @@ export class App {
     else if (this.deps.anon) this.who.append(h('a', { href: '#/' }, 'Samples'), h('a', { href: '#/settings' }, 'Settings'), h('a', { href: '#/signin', class: 'signin-link' }, 'Sign in'));
   }
 
-  /** Draws the screen for the current address; a slower earlier draw never replaces a newer one. */
   /** The last screen counted for analytics: its name and tab, never a repository id or unit. */
   private counted = '';
 
@@ -254,6 +253,7 @@ export class App {
     hw?.track?.('screen', route.name === 'repo' ? { name: route.name, tab: route.tab } : { name: route.name });
   }
 
+  /** Draws the screen for the current address; a slower earlier draw never replaces a newer one. */
   async render(): Promise<void> {
     const seq = ++this.renderSeq;
     const mine: (() => void)[] = [];
