@@ -9,6 +9,8 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 1000'%3E%3Crect width='1000' height='1000' rx='250' fill='%23312E81'/%3E%3Cg transform='translate%280 1000%29 scale%281 -1%29'%3E%3Cpath fill='%23FFFFFF' d='M557 253V442Q557 467 541 483Q525 499 501 499Q484 499 471 492Q458 485 450 472Q443 459 443 442L403 461Q403 500 419 529Q435 558 465 574Q494 590 532 590Q571 590 600 574Q629 558 645 530Q661 502 661 465V253ZM339 253V747H443V253Z'/%3E%3Cpath fill='%23FF7A45' d='M750 893 L781 781 L893 750 L781 719 L750 607 L719 719 L607 750 L719 781Z'/%3E%3C/g%3E%3C/svg%3E%0A" />
     <!-- The samples' list, fetched while the script loads (the front page waits for it). -->
     <link rel="preload" href="/samples/index.json" as="fetch" crossorigin="anonymous" />
+    <!-- HintWise first-party analytics: public/hw-events.js is a byte-for-byte copy of claude-built-apps platform/src/analytics/hw-events.js (test/csp.test.ts pins it). -->
+    <script defer src="/hw-events.js" data-app="udebt"></script>
   </head>
   <body>
     <div id="app"></div>

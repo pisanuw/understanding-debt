@@ -30,6 +30,16 @@ describe('the footer, the favicon and the CSP', () => {
     expect(sha256(style)).toBe(FOOTER_STYLE_CSP);
   });
 
+  it("loads HintWise analytics: public/hw-events.js is the platform's script byte for byte", () => {
+    const script = readFileSync(new URL('../public/hw-events.js', import.meta.url));
+    // sha256 of claude-built-apps platform/src/analytics/hw-events.js (ids and quoted text masked, 17 Nov 2026).
+    expect(createHash('sha256').update(script).digest('hex')).toBe('fe0b6e92ddd6093e9ba7fa2b9fff32cd68bb5a42e191e9770fda93e5a1ba6227');
+    expect(html.match(/<script defer src="\/hw-events.js" data-app="udebt"><\/script>/g)).toHaveLength(1);
+    expect(html.indexOf('hw-events.js')).toBeLessThan(html.indexOf('</head>'));
+    const csp = /Content-Security-Policy = "([^"]+)"/.exec(toml)?.[1] ?? '';
+    expect(/connect-src ([^;]+)/.exec(csp)?.[1]).toContain('https://auth.hintwise.org');
+  });
+
   it('uses the HintWise favicon tag', () => {
     expect(html).toMatch(/<link rel="icon" href="data:image\/svg\+xml,%3Csvg[^>]+%23312E81/);
   });

@@ -72,6 +72,30 @@ beforeEach(() => {
 });
 afterEach(() => app?.stop());
 
+describe('analytics', () => {
+  it('counts each change of screen by name and tab, never with a repository id or unit', async () => {
+    const track = vi.fn();
+    (window as Window & { hintwise?: { track: typeof track } }).hintwise = { track };
+    try {
+      await start();
+      await go('#/r/1');
+      await go('#/r/1');
+      await go('#/r/1/quiz');
+      await go('#/settings');
+      const calls = track.mock.calls.map((c) => [c[0], c[1]]);
+      expect(calls).toEqual([
+        ['screen', { name: 'repos' }],
+        ['screen', { name: 'repo', tab: 'specs' }],
+        ['screen', { name: 'repo', tab: 'quiz' }],
+        ['screen', { name: 'settings' }],
+      ]);
+      expect(JSON.stringify(calls)).not.toMatch(/"id"|"unit"/);
+    } finally {
+      delete (window as Window & { hintwise?: unknown }).hintwise;
+    }
+  });
+});
+
 describe('routes', () => {
   it('reads every address the app makes', () => {
     expect(parseRoute('')).toEqual({ name: 'repos' });

@@ -61,6 +61,7 @@ export function settingsScreen(app: App): HTMLElement {
         h('li', null, 'Answers you checked yourself against a reference answer are marked self-checked, and the debt says so.'),
         h('li', null, 'When you sign in, udebt asks once whether to copy these answers into your account, keep them separate, or discard them.'),
         h('li', null, 'The samples’ analyses and questions are files of this site; their code is read from GitHub at the pinned commit through udebt’s functions, which keep nothing.'),
+        h('li', null, 'Visits are counted for HintWise’s own analytics, with no cookie and nothing kept in this browser: the page’s path, how long it was open, and the address of a link you follow out. Never what you type. Nothing is sent when your browser asks not to be tracked (Global Privacy Control).'),
       )
     : h(
         'ul',
@@ -69,6 +70,7 @@ export function settingsScreen(app: App): HTMLElement {
         h('li', null, 'The repositories you added, your quiz sessions (the questions asked) and the analyses you asked for.'),
         h('li', null, 'Analyses of public repositories (units, decisions, file and line references, never code) are shared with every signed-in person, as is the fact that a repository is in udebt.'),
         h('li', null, 'Where: HintWise’s database (Supabase, US East). The HintWise gateway records the cost of each model call. "Delete my account" above removes your records, sessions and repositories in udebt and every other HintWise app.'),
+        h('li', null, 'Visits are counted for HintWise’s own analytics, with no cookie and nothing kept in this browser: the page’s path, how long it was open, and the address of a link you follow out. Never what you type. Nothing is sent when your browser asks not to be tracked (Global Privacy Control).'),
       );
   const local = app.deps.anon;
   const forget = local
