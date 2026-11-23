@@ -9,6 +9,13 @@ import { getByokKey, getMode, setByokKey, setMode, type LlmMode } from '../../mo
 import type { App } from '../app';
 import { button, h, toast } from '../dom';
 
+/**
+ * What HintWise's analytics script (public/hw-events.js) and the app's "screen" event send,
+ * field by field, so the list stays true: keep it in step with the script and app.ts.
+ */
+export const VISITS =
+  'Visits are counted for HintWise’s own analytics, with no cookie and nothing kept in this browser: the page’s path (never what follows the #, so never a repository or a unit), which screen and tab you open, the site you came from (its name only), how long the page was open, the site of a link you follow out, and script errors with any quoted text taken out. Never what you type. HintWise’s server counts a visitor with a code made from the IP address, the browser and a random value replaced every day, so visits on different days cannot be linked and the IP address is not stored. Nothing is sent when your browser asks not to be tracked (Global Privacy Control or Do Not Track).';
+
 export function settingsScreen(app: App): HTMLElement {
   const storage = app.deps.storage;
   // Not chosen yet: the HintWise key when it serves this visitor (signed in, or the shared
@@ -61,6 +68,7 @@ export function settingsScreen(app: App): HTMLElement {
         h('li', null, 'Answers you checked yourself against a reference answer are marked self-checked, and the debt says so.'),
         h('li', null, 'When you sign in, udebt asks once whether to copy these answers into your account, keep them separate, or discard them.'),
         h('li', null, 'The samples’ analyses and questions are files of this site; their code is read from GitHub at the pinned commit through udebt’s functions, which keep nothing.'),
+        h('li', null, VISITS),
       )
     : h(
         'ul',
@@ -69,6 +77,7 @@ export function settingsScreen(app: App): HTMLElement {
         h('li', null, 'The repositories you added, your quiz sessions (the questions asked) and the analyses you asked for.'),
         h('li', null, 'Analyses of public repositories (units, decisions, file and line references, never code) are shared with every signed-in person, as is the fact that a repository is in udebt.'),
         h('li', null, 'Where: HintWise’s database (Supabase, US East). The HintWise gateway records the cost of each model call. "Delete my account" above removes your records, sessions and repositories in udebt and every other HintWise app.'),
+        h('li', null, VISITS),
       );
   const local = app.deps.anon;
   const forget = local

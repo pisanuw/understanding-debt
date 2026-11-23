@@ -237,6 +237,22 @@ export class App {
     else if (this.deps.anon) this.who.append(h('a', { href: '#/' }, 'Samples'), h('a', { href: '#/settings' }, 'Settings'), h('a', { href: '#/signin', class: 'signin-link' }, 'Sign in'));
   }
 
+  /** The last screen counted for analytics: its name and tab, never a repository id or unit. */
+  private counted = '';
+
+  /**
+   * Counts a change of screen for HintWise's first-party analytics (public/hw-events.js, loaded
+   * by index.html). The page's path is always '/', since udebt routes in the hash, which the
+   * script never sends; this sends the screen's name (and a repository's tab) instead.
+   */
+  private countScreen(route: Route): void {
+    const key = route.name === 'repo' ? `repo:${route.tab}` : route.name;
+    if (key === this.counted) return;
+    this.counted = key;
+    const hw = (this.win as Window & { hintwise?: { track?: (name: string, props?: Record<string, string>) => void } }).hintwise;
+    hw?.track?.('screen', route.name === 'repo' ? { name: route.name, tab: route.tab } : { name: route.name });
+  }
+
   /** Draws the screen for the current address; a slower earlier draw never replaces a newer one. */
   async render(): Promise<void> {
     const seq = ++this.renderSeq;
@@ -244,6 +260,7 @@ export class App {
     this.building = mine;
     this.header();
     const route = parseRoute(this.win.location.hash);
+    this.countScreen(route);
     let screen: HTMLElement;
     try {
       if (!this.user && !this.deps.anon) screen = signinScreen(this);

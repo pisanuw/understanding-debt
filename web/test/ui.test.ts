@@ -17,6 +17,7 @@ import { renderMarkdown } from '../src/ui/markdown';
 import { busy, day, extLink, fmt, toast } from '../src/ui/dom';
 import { errorText, evidenceLine } from '../src/ui/screens/quiz';
 import { countBadge, showCount } from '../src/ui/screens/review';
+import { VISITS } from '../src/ui/screens/settings';
 import { CapError, LazyByokClient } from '../src/model/client';
 import { fakeGateway } from '../netlify/functions/lib/fake';
 import { FAKE_TOKEN } from '../netlify/functions/lib/env';
@@ -71,6 +72,34 @@ beforeEach(() => {
   window.location.hash = '';
 });
 afterEach(() => app?.stop());
+
+describe('analytics', () => {
+  it('counts each change of screen by name and tab, never with a repository id or unit', async () => {
+    const track = vi.fn();
+    (window as Window & { hintwise?: { track: typeof track } }).hintwise = { track };
+    try {
+      await start();
+      await go('#/r/1');
+      await go('#/r/1');
+      await go('#/r/1/quiz');
+      await go('#/settings');
+      const calls = track.mock.calls.map((c) => [c[0], c[1]]);
+      expect(calls).toEqual([
+        ['screen', { name: 'repos' }],
+        ['screen', { name: 'repo', tab: 'specs' }],
+        ['screen', { name: 'repo', tab: 'quiz' }],
+        ['screen', { name: 'settings' }],
+      ]);
+      expect(JSON.stringify(calls)).not.toMatch(/"id"|"unit"/);
+      // "What udebt stores" names every field the script and the screen event send.
+      expect(document.body.textContent).toContain(VISITS);
+      for (const field of ['path', 'screen and tab', 'site you came from', 'how long', 'link you follow out', 'script errors', 'IP address', 'Global Privacy Control', 'Do Not Track'])
+        expect(VISITS).toContain(field);
+    } finally {
+      delete (window as Window & { hintwise?: unknown }).hintwise;
+    }
+  });
+});
 
 describe('routes', () => {
   it('reads every address the app makes', () => {
