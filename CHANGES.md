@@ -193,3 +193,7 @@
 2026-11-17 [code] HintWise first-party analytics on branch analytics (owner: "add analytics to the rest of the apps but do not deploy"): web/public/hw-events.js (pinned copy), a screen event per hash route (name and tab only), a line under What udebt stores; not merged
 
 2026-11-23 [decision] Owner, 23 Nov: "Merge all the apps": the analytics branch brought onto main (branch analytics-on-main; deploys the site on merge, origin https://udebt.hintwise.org registered by claude-built-apps shared/0016); What udebt stores now names every field the analytics sends (referring site, screen and tab, script errors, the daily visitor code)
+
+2026-11-26 [code] web: VISITS (What udebt stores) says the server keeps a device class from the user agent and that the daily salt is deleted once the next day's first visit is counted; countScreen swallows any throw from the analytics script (test makes track and window.hintwise throw)
+2026-11-26 [note] Correction to the 2026-11-23 line: the branch merged as PR #1 was analytics-merge (e056268), not analytics-on-main
+2026-11-26 [doc] web: VISITS after review r1: the salt changes each UTC day, serves every HintWise app, goes at a later UTC day's first visit; errors per page viewed; redaction only as far as the script can tell

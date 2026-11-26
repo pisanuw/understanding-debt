@@ -93,8 +93,40 @@ describe('analytics', () => {
       expect(JSON.stringify(calls)).not.toMatch(/"id"|"unit"/);
       // "What udebt stores" names every field the script and the screen event send.
       expect(document.body.textContent).toContain(VISITS);
-      for (const field of ['path', 'screen and tab', 'site you came from', 'how long', 'link you follow out', 'script errors', 'IP address', 'Global Privacy Control', 'Do Not Track'])
+      for (const field of ['path', 'screen and tab', 'site you came from', 'how long', 'link you follow out', 'script error messages', 'IP address', 'Global Privacy Control', 'Do Not Track'])
         expect(VISITS).toContain(field);
+      // The redaction in hw-events.js and events.ts misses some quoting, so the text promises no more.
+      expect(VISITS).toContain('the script removes the quoted text, email addresses and long numbers it can detect, but a message can still contain words a browser quotes from what you typed');
+      // The server's side (claude-built-apps platform/src/analytics): a device class from the user
+      // agent, and one salt per UTC day for every app, deleted at a later day's first event.
+      expect(VISITS).toContain('kind of device (phone, tablet or computer), worked out from the browser’s user agent');
+      expect(VISITS).toContain('The random value changes each UTC day and serves every HintWise app; it is deleted at the first visit any HintWise app counts on a later UTC day, so visits on different UTC days cannot be linked');
+    } finally {
+      delete (window as Window & { hintwise?: unknown }).hintwise;
+    }
+  });
+
+  it('a throw from the analytics script never stops a screen from drawing', async () => {
+    const track = vi.fn(() => {
+      throw new Error('analytics broke');
+    });
+    (window as Window & { hintwise?: { track: typeof track } }).hintwise = { track };
+    try {
+      await start();
+      await go('#/settings');
+      expect(track).toHaveBeenCalledWith('screen', { name: 'settings' });
+      expect(document.body.textContent).toContain(VISITS);
+      expect(document.body.textContent).not.toContain('Something went wrong');
+      // A getter that throws, as a replaced or half-loaded window.hintwise might.
+      Object.defineProperty(window, 'hintwise', {
+        configurable: true,
+        get() {
+          throw new Error('no hintwise');
+        },
+      });
+      await go('#/add');
+      expect(byText('h1', /add/i)).toBeTruthy();
+      expect(document.body.textContent).not.toContain('Something went wrong');
     } finally {
       delete (window as Window & { hintwise?: unknown }).hintwise;
     }
