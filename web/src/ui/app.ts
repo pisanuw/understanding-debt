@@ -243,14 +243,20 @@ export class App {
   /**
    * Counts a change of screen for HintWise's first-party analytics (public/hw-events.js, loaded
    * by index.html). The page's path is always '/', since udebt routes in the hash, which the
-   * script never sends; this sends the screen's name (and a repository's tab) instead.
+   * script never sends; this sends the screen's name (and a repository's tab) instead. It runs
+   * before render()'s try, so anything the script (or a replaced window.hintwise) throws is
+   * swallowed here: analytics never stops a screen from drawing.
    */
   private countScreen(route: Route): void {
     const key = route.name === 'repo' ? `repo:${route.tab}` : route.name;
     if (key === this.counted) return;
     this.counted = key;
-    const hw = (this.win as Window & { hintwise?: { track?: (name: string, props?: Record<string, string>) => void } }).hintwise;
-    hw?.track?.('screen', route.name === 'repo' ? { name: route.name, tab: route.tab } : { name: route.name });
+    try {
+      const hw = (this.win as Window & { hintwise?: { track?: (name: string, props?: Record<string, string>) => void } }).hintwise;
+      hw?.track?.('screen', route.name === 'repo' ? { name: route.name, tab: route.tab } : { name: route.name });
+    } catch {
+      /* analytics is best effort */
+    }
   }
 
   /** Draws the screen for the current address; a slower earlier draw never replaces a newer one. */

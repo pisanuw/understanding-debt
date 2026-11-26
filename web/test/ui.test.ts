@@ -95,6 +95,36 @@ describe('analytics', () => {
       expect(document.body.textContent).toContain(VISITS);
       for (const field of ['path', 'screen and tab', 'site you came from', 'how long', 'link you follow out', 'script errors', 'IP address', 'Global Privacy Control', 'Do Not Track'])
         expect(VISITS).toContain(field);
+      // The server's side (claude-built-apps platform/src/analytics): a device class from the
+      // user agent, and a daily salt deleted when a later day's first event is recorded.
+      expect(VISITS).toContain('kind of device (phone, tablet or computer), worked out from the browser’s user agent');
+      expect(VISITS).toContain('deleted once the next day’s first visit is counted');
+    } finally {
+      delete (window as Window & { hintwise?: unknown }).hintwise;
+    }
+  });
+
+  it('a throw from the analytics script never stops a screen from drawing', async () => {
+    const track = vi.fn(() => {
+      throw new Error('analytics broke');
+    });
+    (window as Window & { hintwise?: { track: typeof track } }).hintwise = { track };
+    try {
+      await start();
+      await go('#/settings');
+      expect(track).toHaveBeenCalledWith('screen', { name: 'settings' });
+      expect(document.body.textContent).toContain(VISITS);
+      expect(document.body.textContent).not.toContain('Something went wrong');
+      // A getter that throws, as a replaced or half-loaded window.hintwise might.
+      Object.defineProperty(window, 'hintwise', {
+        configurable: true,
+        get() {
+          throw new Error('no hintwise');
+        },
+      });
+      await go('#/add');
+      expect(byText('h1', /add/i)).toBeTruthy();
+      expect(document.body.textContent).not.toContain('Something went wrong');
     } finally {
       delete (window as Window & { hintwise?: unknown }).hintwise;
     }
