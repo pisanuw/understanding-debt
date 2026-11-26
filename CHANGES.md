@@ -196,3 +196,4 @@
 
 2026-11-26 [code] web: VISITS (What udebt stores) says the server keeps a device class from the user agent and that the daily salt is deleted once the next day's first visit is counted; countScreen swallows any throw from the analytics script (test makes track and window.hintwise throw)
 2026-11-26 [note] Correction to the 2026-11-23 line: the branch merged as PR #1 was analytics-merge (e056268), not analytics-on-main
+2026-11-26 [doc] web: VISITS after review r1: the salt changes each UTC day, serves every HintWise app, goes at a later UTC day's first visit; errors per page viewed; redaction only as far as the script can tell
