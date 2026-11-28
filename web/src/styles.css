@@ -8,8 +8,11 @@
   --good: #0ca30c; --good-text: #006300; --warning: #c98a00; --critical: #c42b2b;
   --you: #e8f0fb; --code: #f3f2ee; --banner: #fff4d6; --self: #6b4fbb;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+/* The dark set, twice and the same: for the light and dark mode switch's choice (data-theme on <html>, set before the
+   first paint by public/hw-theme-init.js) and, until there is one, for the device's setting. Both are for screens
+   only, so paper gets the light set. */
+@media screen {
+  :root[data-theme="dark"] {
     color-scheme: dark;
     --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #a29f96;
     --grid: #2c2c2a; --axis: #45443f; --ring: rgba(255, 255, 255, 0.1); --wash: rgba(255, 255, 255, 0.05);
@@ -17,12 +20,14 @@
     --you: #18263a; --code: #141413; --banner: #3a2f10; --self: #b9a2f5;
   }
 }
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #a29f96;
-  --grid: #2c2c2a; --axis: #45443f; --ring: rgba(255, 255, 255, 0.1); --wash: rgba(255, 255, 255, 0.05);
-  --accent: #6ea8f5; --accent-ink: #0b0b0b; --good-text: #3fcf3f; --warning: #f0b429; --critical: #ff7b72;
-  --you: #18263a; --code: #141413; --banner: #3a2f10; --self: #b9a2f5;
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #a29f96;
+    --grid: #2c2c2a; --axis: #45443f; --ring: rgba(255, 255, 255, 0.1); --wash: rgba(255, 255, 255, 0.05);
+    --accent: #6ea8f5; --accent-ink: #0b0b0b; --good-text: #3fcf3f; --warning: #f0b429; --critical: #ff7b72;
+    --you: #18263a; --code: #141413; --banner: #3a2f10; --self: #b9a2f5;
+  }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -35,6 +40,9 @@ header.top .wrap { display: flex; flex-wrap: wrap; align-items: baseline; justif
 .brand { color: var(--ink); text-decoration: none; display: inline-flex; gap: 8px; align-items: baseline; }
 .brand strong { font-size: 19px; letter-spacing: -0.01em; }
 .brand span { color: var(--ink-2); font-size: 13px; }
+/* The account links, then the light and dark mode switch, at the end of the header; the switch never wraps alone. */
+.top-end { display: flex; align-items: center; gap: 6px 14px; min-width: 0; margin-left: auto; }
+hw-theme-toggle:not([hidden]) { display: inline-flex; flex: none; width: var(--hw-theme-toggle-size, 44px); height: var(--hw-theme-toggle-size, 44px); }
 nav.who { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; align-items: baseline; min-width: 0; }
 nav.who .email { color: var(--ink-2); overflow-wrap: anywhere; }
 main { padding: 18px 16px 40px; }
@@ -174,4 +182,9 @@ fieldset.kinds:disabled label.mode { cursor: default; opacity: 0.65; }
   table.debt tr.child td:first-child { padding-left: 14px; }
   table.debt .long { display: none; }
   table.debt .short { display: inline; }
+}
+@media print {
+  hw-theme-toggle { display: none !important; }
+  /* Paper drops the fill unless told: the primary button's label takes the ink. */
+  button.primary { color: var(--ink); }
 }

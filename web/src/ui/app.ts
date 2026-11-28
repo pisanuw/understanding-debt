@@ -122,7 +122,9 @@ export class App {
   ) {
     this.trees = deps.tree ? new TreeCache(deps.tree) : null;
     this.who = h('nav', { class: 'who', 'aria-label': 'Account' });
-    const top = h('header', { class: 'top' }, h('div', { class: 'wrap' }, h('a', { class: 'brand', href: '#/' }, h('strong', null, 'udebt'), h('span', null, 'understanding debt')), this.who));
+    // The account links, then the light and dark mode switch, at the end of the header.
+    const end = h('div', { class: 'top-end' }, this.who, h('hw-theme-toggle'));
+    const top = h('header', { class: 'top' }, h('div', { class: 'wrap' }, h('a', { class: 'brand', href: '#/' }, h('strong', null, 'udebt'), h('span', null, 'understanding debt')), end));
     this.main = h('main', { class: 'wrap', id: 'main' });
     clear(root).append(top, this.main);
     if (deps.preview) root.prepend(h('p', { class: 'preview-banner' }, 'Preview: fixture data and fake sign-in, gateway and GitHub; nothing leaves this tab.'));
