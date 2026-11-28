@@ -3,6 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Light and dark mode: public/hw-theme-init.js sets data-theme on <html> before the first paint. A file, not an
+         inline script, so the Content-Security-Policy keeps script-src 'self' (a byte-for-byte copy of claude-built-apps
+         platform/src/theme/theme-init.js; test/theme.test.ts pins it). -->
+    <script src="/hw-theme-init.js"></script>
     <meta name="color-scheme" content="light dark" />
     <meta name="description" content="udebt: read the architecture of a codebase and climb a quiz ladder until you understand it." />
     <title>udebt</title>

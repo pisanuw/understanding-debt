@@ -16,5 +16,6 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true }],
     },
   },
-  { ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'playwright-report/**', 'test-results/**'] },
+  // The light and dark mode files are copies, checked byte for byte (test/theme.test.ts), not this app's code.
+  { ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'playwright-report/**', 'test-results/**', 'src/lib/hw-theme.js', 'public/hw-theme-init.js'] },
 );
